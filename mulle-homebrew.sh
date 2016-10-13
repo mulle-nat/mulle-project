@@ -6,7 +6,7 @@
 generate_brew_formula()
 {
    local project
-   local target
+   local name
    local homepage
    local desc
    local version
@@ -15,7 +15,7 @@ generate_brew_formula()
 
    project="$1"
    shift
-   target="$1"
+   name="$1"
    shift
    homepage="$1"
    shift
@@ -33,7 +33,7 @@ generate_brew_formula()
 
    local tmparchive
 
-   tmparchive="/tmp/${target}-${version}-archive"
+   tmparchive="/tmp/${name}-${version}-archive"
 
    if [ ! -f "${tmparchive}" ]
    then
@@ -93,19 +93,11 @@ IFS="
       system "mulle-test"
    end
 end
-# FORMULA ${TARGET}.rb
+# FORMULA ${name}.rb
 EOF
 }
 
 
-#
-# Boiler plate code from here on. Could put this into a convenient
-# location somewhere (mulle-homebrew ?)
-# From now on need:
-#    TAG
-#    HOMEBREWTAP
-#    RBFILE
-#    ORIGIN
 get_header_version()
 {
    local filename
