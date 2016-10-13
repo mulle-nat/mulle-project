@@ -194,6 +194,8 @@ git_main()
 #
 homebrew_main()
 {
+   [ ! -d "${HOMEBREWTAP}" ] && fail "failed to locate \"${HOMEBREWTAP}\""
+
    ARCHIVEURL="`eval echo "${ARCHIVEURL}"`"
 
    redirect_exekutor "${HOMEBREWTAP}/${RBFILE}" \
@@ -228,8 +230,6 @@ homebrew_initialize()
 
    . "mulle-bootstrap-logging.sh"
    . "mulle-bootstrap-functions.sh"
-
-   [ ! -d "${HOMEBREWTAP}" ] && fail "failed to locate \"${HOMEBREWTAP}\""
 }
 
 homebrew_initialize
