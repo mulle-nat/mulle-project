@@ -98,12 +98,70 @@ EOF
 }
 
 
+#
+# convert VfLBochum -> VfL Bochum
+# HugoFiege -> Hugo Fiege
+#
+split_camelcase_string()
+{
+   sed -e 's/\(.\)\([A-Z]\)\([a-z_0-9]\)/\1 \2\3/g'
+}
+
+# convert all to uppercase, spaces and minus to '_'
+# does not work well for camel case
+make_cpp_string()
+{
+   tr '[a-z]' '[A-Z]' | tr ' ' '_' | tr '-' '_'
+}
+
+
+make_directory_string()
+{
+   tr '[A-Z]' '[a-z]' | tr ' ' '-' | tr '_' '-'
+}
+
+
+make_file_string()
+{
+   tr '[A-Z]' '[a-z]' | tr ' ' '_' | tr '-' '_'
+}
+
+
+get_name_from_project()
+{
+   case "$2" in
+      c|C)
+         echo "$1" | split_camelcase_string | make_directory_string
+      ;;
+
+      *)
+         echo "$1"
+      ;;
+   esac
+}
+
+
+get_header_from_name()
+{
+   echo "src/$1.h" | make_file_string
+}
+
+
+get_versionname_from_project()
+{
+   echo "$1_VERSION" | split_camelcase_string | make_cpp_string
+}
+
+
 get_header_version()
 {
    local filename
+   local versionname
 
    filename="$1"
-   fgrep "${VERSIONNAME}" "${filename}" | \
+   versionname="${2:-${VERSIONNAME}}"  # backwards compatibility
+
+   fgrep "${versionname}" "${filename}" | \
    sed 's|(\([0-9]*\) \<\< [0-9]*)|\1|g' | \
    sed 's|^.*(\(.*\))|\1|' | \
    sed 's/ | /./g'
@@ -322,8 +380,9 @@ homebrew_initialize()
    [ ! -d "${directory}" ] && echo "failed to locate mulle-bootstrap library" >&2 && exit 1
    PATH="${directory}:$PATH"
 
-   . "mulle-bootstrap-logging.sh"
-   . "mulle-bootstrap-functions.sh"
+   [ -z "${MULLE_BOOTSTRAP_LOGGING_SH}" ]   && . mulle-bootstrap-logging.sh
+   [ -z "${MULLE_BOOTSTRAP_FUNCTIONS_SH}" ] && . mulle-bootstrap-functions.sh
+   [ -z "${MULLE_BOOTSTRAP_ARRAY_SH}" ]     && . mulle-bootstrap-array.sh
 }
 
 homebrew_initialize

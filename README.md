@@ -25,7 +25,12 @@ mulle-build
 Create a `release.sh` script in `./bin`  (to be executed from project root)
 
 ```
-NAME="my-project"    # your project name as known by git and homebrew
+PROJECT="MyProject"      # your project name, requires camel-case
+DESC="MyProject does this and that"
+DEPENDENCIES="libz
+cmake"                   # list brew dependencies
+ORIGIN=public            # git repo to push to
+LANGUAGE=c               # c,cpp, objc of the header file
 
 # source mulle-homebrew.sh (clumsily)
 
@@ -48,14 +53,21 @@ do
 done
 
 
+#
+# these can usually be deduced, if you follow the conventions
+#
+NAME="`get_name_from_project "${PROJECT}" "${LANGUAGE}"`"
+HEADER="`get_header_from_name "${NAME}"`"
+VERSIONNAME="`get_versionname_from_project "${PROJECT}"`"
+VERSION="`get_header_version "${HEADER}" "${VERSIONNAME}"`"
+
+
+
 # --- HOMEBREW FORMULA ---
 # Information needed to construct a proper brew formula
 #
 HOMEPAGE="https://www.mulle-kybernetik.com/software/git/${NAME}"
-DESC="My useful project"
-PROJECT="MyProject"  # for ruby, it requires camel-case
 ARCHIVEURL='https://www.mulle-kybernetik.com/software/git/${NAME}/tarball/${VERSION}'  # ARCHIVEURL will be evaled later! keep it in single quotes
-DEPENDENCIES=        # other required brew dependencies separated by linefeed
 
 
 # --- HOMEBREW TAP ---
@@ -65,19 +77,9 @@ RBFILE="${NAME}.rb"                    # ruby file for brew
 HOMEBREWTAP="../homebrew-software"     # your tap repository path
 
 
-# --- GIT AND HOMEBREW VERSIONING ---
-# you have to figure out how to provide the script with a version
-# the easiest way is to use the predefined `get_header_version`.
-# Which is provided by `mulle-homebrew.sh`
-#
-HEADER="src/my_project.h"
-VERSIONNAME="MY_VERSION"
-VERSION="`get_header_version ${HEADER}`"
-
 # --- GIT ---
 # tag to tag your release
 # and the origin where
-ORIGIN=public                        # git repo to push
 TAG="${1:-${TAGPREFIX}${VERSION}}"
 
 
