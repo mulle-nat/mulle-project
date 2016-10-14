@@ -3,7 +3,15 @@
 A convenience script to tag and release something and publish it to
 a homebrew tap.
 
-> In it's current state probably NOT useful for anybody else than the autor!
+> In it's current state probably NOT that useful for most people.
+
+For this example it is assumed, that you keep your version in a header file,
+in this major.minor.patch format:
+
+```
+#define MY_VERSION  ((1 << 20) | (7 << 8) | 10)
+```
+
 
 ## Usage
 
@@ -22,6 +30,23 @@ NAME="my-project"    # your project name as known by git and homebrew
 # source mulle-homebrew.sh (clumsily)
 
 . ./bin/mulle-homebrew/mulle-homebrew.sh
+
+# parse options
+homebrew_parse_options "$@"
+
+# dial past options
+while [ $# -ne 0 ]
+do
+   case "$1" in
+      -*)
+         shift
+      ;;
+      *)
+         break;
+      ;;
+   esac
+done
+
 
 # --- HOMEBREW FORMULA ---
 # Information needed to construct a proper brew formula
@@ -45,8 +70,8 @@ HOMEBREWTAP="../homebrew-software"     # your tap repository path
 # the easiest way is to use the predefined `get_header_version`.
 # Which is provided by `mulle-homebrew.sh`
 #
-HEADER="src/mulle_vararg.h"
-VERSIONNAME="MULLE_VARARG_VERSION"
+HEADER="src/my_project.h"
+VERSIONNAME="MY_VERSION"
 VERSION="`get_header_version ${HEADER}`"
 
 # --- GIT ---
@@ -59,7 +84,7 @@ TAG="${1:-${TAGPREFIX}${VERSION}}"
 main()
 {
    git_main "${ORIGIN}" "${TAG}" || exit 1
-   homebrew_main || exit 1
+   homebrew_main
 }
 
 main "$@"
