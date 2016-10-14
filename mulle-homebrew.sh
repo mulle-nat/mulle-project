@@ -135,7 +135,7 @@ git_must_be_clean()
 # ORIGIN
 # TAG
 #
-git_main()
+_git_main()
 {
    local origin
    local tag
@@ -145,31 +145,52 @@ git_main()
    tag="$1"
    shift
 
-   exekutor git_must_be_clean || exit 1
 
-   local branch
 
-   branch="`exekutor git rev-parse --abbrev-ref HEAD`"
+   exekutor git_must_be_clean || return 1
 
    #
    # make it a release
    #
-   exekutor git checkout -B release  || exit 1
-   exekutor git rebase "${branch}"   || exit 1
+   exekutor git checkout -B release  || return 1
+
+   exekutor git rebase "${branch}"   || return 1
 
    # if rebase fails, we shouldn't be hitting tag now
-   exekutor git tag "${tag}"         || exit 1
-
-   exekutor git push "${origin}" release --tags  || exit 1
+   exekutor git tag "${tag}"         || return 1
+   exekutor git push "${origin}" release --tags  || return 1
 
    executor git ls-remote github 2> /dev/null
    if [ $? -eq 0 ]
    then
-      exekutor git push github release --tags || exit 1
+      log_fluff "Pushing to github"
+      exekutor git push github release --tags || return 1
+   else
+      log_verbose "There is no remote named github"
    fi
 
-   exekutor git checkout "${branch}"          || exit 1
-   exekutor git push "${origin}" "${branch}"  || exit 1
+   exekutor git checkout "${branch}"          || return 1
+   exekutor git push "${origin}" "${branch}"  || return 1
+}
+
+
+git_main()
+{
+   local branch
+
+   branch="`exekutor git rev-parse --abbrev-ref HEAD`"
+   if [ "${branch}" = "release" ]
+   then
+      fail "Don't call it from release branch"
+   fi
+
+   if _git_main "$@" "$branch"
+   then
+      return 0
+   fi
+
+   exekutor git checkout "${branch}"
+   exit 1
 }
 
 
