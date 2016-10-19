@@ -198,7 +198,7 @@ _git_main()
    local origin
    local tag
 
-   origin="$1"
+   origin="${1:-origin}"
    shift
    tag="$1"
    shift
