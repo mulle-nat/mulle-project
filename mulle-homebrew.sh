@@ -169,10 +169,22 @@ get_header_version()
 }
 
 
+git_tag_must_not_exist()
+{
+   local tag
+
+   tag="$1"
+
+   if git rev-parse "${tag}" > /dev/null 2>&1
+   then
+      fail "Tag \"${tag}\" already exists"
+   fi
+}
+
+
 git_must_be_clean()
 {
    local name
-   local clean
 
    name="${1:-${PWD}}"
 
@@ -180,6 +192,8 @@ git_must_be_clean()
    then
       fail "\"${name}\" is not a git repository"
    fi
+
+   local clean
 
    clean=`git status -s --untracked-files=no`
    if [ "${clean}" != "" ]
@@ -204,19 +218,20 @@ _git_main()
    tag="$1"
    shift
 
-   exekutor git_must_be_clean || return 1
-
    case "${tag}" in
       -*|"")
-         fail "invalid tag \"${tag}\""
+         fail "Invalid tag \"${tag}\""
       ;;
    esac
 
    case "${origin}" in
       -*|"")
-         fail "invalid origin \"${tag}\""
+         fail "Invalid origin \"${tag}\""
       ;;
    esac
+
+   exekutor git_must_be_clean               || return 1
+   exekutor git_tag_must_not_exist "${tag}" || return 1
 
    #
    # make it a release
