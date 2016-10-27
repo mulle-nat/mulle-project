@@ -182,6 +182,19 @@ git_tag_must_not_exist()
 }
 
 
+git_tag_must_not_exist()
+{
+   local tag
+
+   tag="$1"
+
+   if git rev-parse "${tag}" > /dev/null 2>&1
+   then
+      fail "Tag \"${tag}\" already exists"
+   fi
+}
+
+
 git_must_be_clean()
 {
    local name
