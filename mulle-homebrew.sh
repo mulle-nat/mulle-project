@@ -161,10 +161,11 @@ get_header_version()
    filename="$1"
    versionname="${2:-${VERSIONNAME}}"  # backwards compatibility
 
-   fgrep "${versionname}" "${filename}" | \
+   fgrep -s -w "${versionname}" "${filename}" | \
    sed 's|(\([0-9]*\) \<\< [0-9]*)|\1|g' | \
    sed 's|^.*(\(.*\))|\1|' | \
-   sed 's/ | /./g'
+   sed 's/ | /./g' | \
+   head -1
 }
 
 
