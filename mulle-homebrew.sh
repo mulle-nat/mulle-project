@@ -42,8 +42,8 @@ generate_brew_formula()
       then
          if [ $? -ne 0 -o ! -f "${tmparchive}"  ]
          then
-               echo "Download failed" >&2
-               exit 1
+            echo "Download failed" >&2
+            exit 1
          fi
       fi
    else
