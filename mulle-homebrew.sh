@@ -83,6 +83,8 @@ IFS="
 "
    for dependency in ${dependencies}
    do
+      dependency="`eval echo "${dependency}"`"
+
       exekutor echo "   depends_on '${dependency}'"
       shift
    done
@@ -432,4 +434,6 @@ homebrew_initialize()
 }
 
 homebrew_initialize
+
+:
 
