@@ -38,10 +38,13 @@ generate_brew_formula()
    if [ ! -f "${tmparchive}" ]
    then
       exekutor curl -L -o "${tmparchive}" "${archiveurl}"
-      if [ $? -ne 0 -o ! -f "${tmparchive}" ]
+      if [ -z "${MULLE_EXECUTOR_DRY_RUN}" ]
       then
-         echo "Download failed" >&2
-         exit 1
+         if [ $? -ne 0 -o ! -f "${tmparchive}"  ]
+         then
+               echo "Download failed" >&2
+               exit 1
+         fi
       fi
    else
       echo "using cached file ${tmparchive} instead of downloading again" >&2
@@ -51,12 +54,15 @@ generate_brew_formula()
    # anything less than 17 KB is wrong
    #
    size="`exekutor du -k "${tmparchive}" | exekutor awk '{ print $ 1}'`"
-   if [ $size -lt 17 ]
+   if [ -z "${MULLE_EXECUTOR_DRY_RUN}" ]
    then
-      echo "Archive truncated or missing" >&2
-      cat "${tmparchive}" >&2
-      rm "${tmparchive}"
-      exit 1
+      if [ "$size" -lt 17 ]
+      then
+         echo "Archive truncated or missing" >&2
+         cat "${tmparchive}" >&2
+         rm "${tmparchive}"
+         exit 1
+      fi
    fi
 
    local hash
@@ -286,14 +292,25 @@ homebrew_main()
    ARCHIVEURL="`eval echo "${ARCHIVEURL}"`"
 
    log_info "Generate brew fomula \"${PROJECT}\""
-   redirect_exekutor "${HOMEBREWTAP}/${RBFILE}" \
-      generate_brew_formula "${PROJECT}" \
-                            "${NAME}" \
-                            "${HOMEPAGE}" \
-                            "${DESC}" \
-                            "${VERSION}" \
-                            "${ARCHIVEURL}" \
-                            "${DEPENDENCIES}" || exit 1
+   if [ -z "${MULLE_EXECUTOR_DRY_RUN}" ]
+   then
+      redirect_exekutor "${HOMEBREWTAP}/${RBFILE}" \
+         generate_brew_formula "${PROJECT}" \
+                               "${NAME}" \
+                               "${HOMEPAGE}" \
+                               "${DESC}" \
+                               "${VERSION}" \
+                               "${ARCHIVEURL}" \
+                               "${DEPENDENCIES}" || exit 1
+      else
+         generate_brew_formula "${PROJECT}" \
+                               "${NAME}" \
+                               "${HOMEPAGE}" \
+                               "${DESC}" \
+                               "${VERSION}" \
+                               "${ARCHIVEURL}" \
+                               "${DEPENDENCIES}" || exit 1
+   fi
 
    log_info "Push brew fomula to tap"
    (
