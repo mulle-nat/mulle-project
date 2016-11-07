@@ -56,7 +56,7 @@ generate_brew_formula()
    size="`exekutor du -k "${tmparchive}" | exekutor awk '{ print $ 1}'`"
    if [ -z "${MULLE_EXECUTOR_DRY_RUN}" ]
    then
-      if [ "$size" -lt 2 ]
+      if [ "$size" -lt ${ARCHIVE_MINSIZE:-2} ]
       then
          echo "Archive truncated or missing" >&2
          cat "${tmparchive}" >&2
