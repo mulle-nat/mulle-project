@@ -114,17 +114,17 @@ main()
 main "$@"
 ```
 
-Then make it executable and test it from your project root:
 
+Then make it executable and test it from your project root:
 
 ```
 chmod 755 ./bin/release.sh
-./bin/release.sh  -v -n # sic!
+./bin/release.sh -v -n # sic!
 ```
 
-If the output looks good run it with:
+If the output looks good, then do the release:
 
 ```
-./bin/release.sh  # sic!
+./bin/release.sh
 ```
 
