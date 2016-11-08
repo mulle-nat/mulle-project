@@ -226,18 +226,24 @@ git_must_be_clean()
 
 # Parameters!
 #
+# BRANCH
 # ORIGIN
 # TAG
 #
 _git_main()
 {
+   local branch
    local origin
    local tag
 
+   branch="${1:-master}"
+   [ $# -ne 0 ] && shift
+
    origin="${1:-origin}"
-   shift
+   [ $# -ne 0 ] && shift
+
    tag="$1"
-   shift
+   [ $# -ne 0 ] && shift
 
    case "${tag}" in
       -*|"")
@@ -287,16 +293,18 @@ _git_main()
 git_main()
 {
    local branch
+   local rval
+
+   log_info "Verify repository"
 
    branch="`exekutor git rev-parse --abbrev-ref HEAD`"
+   branch="${branch:-master}" # for dry run
    if [ "${branch}" = "release" ]
    then
       fail "Don't call it from release branch"
    fi
 
-   local rval
-
-   _git_main "$@" "$branch"
+   _git_main "${branch}" "$@"
    rval=$?
 
    log_info "Checkout \"${branch}\" again"
