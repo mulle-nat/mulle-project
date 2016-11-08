@@ -3,17 +3,26 @@
 A convenience script to tag and release something and publish it to
 a homebrew tap.
 
-> In it's current state probably NOT that useful for most people.
-
-For this example it is assumed, that you keep your version in a header file,
+It is assumed, that you keep your version in a header file,
 in this major.minor.patch format:
 
 ```
 #define MY_VERSION  ((1 << 20) | (7 << 8) | 10)
 ```
 
+In the simple scenario, you are pushing to one host and serving your archive
+for homebrew from there:
 
-## Usage
+
+![with own host](mulle-objc-setup.png)
+
+In the more complex scenarion, you have a remote called **github** and you
+push your release branch their and serve the archive from github:
+
+![with own host](nat-setup.png)
+
+
+## Setting up the simple scenario
 
 Install into local project `./bin` directory
 
