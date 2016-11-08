@@ -74,7 +74,7 @@ generate_brew_formula()
 
    hash="`exekutor shasum -p -a 256 "${tmparchive}" | exekutor awk '{ print $1 }'`"
 
-   exekutor cat <<EOF
+   cat <<EOF
 class ${project} < Formula
    homepage "${homepage}"
    desc "${desc}"
@@ -90,12 +90,12 @@ IFS="
    do
       dependency="`eval echo "${dependency}"`"
 
-      exekutor echo "   depends_on '${dependency}'"
+      echo "   depends_on '${dependency}'"
       shift
    done
    IFS="${DEFAULT_IFS}"
 
-   exekutor cat <<EOF
+   cat <<EOF
    depends_on 'mulle-kybernetik/software/mulle-build' => :build
 
    def install
