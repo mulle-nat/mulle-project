@@ -91,7 +91,7 @@ IFS="
    IFS="${DEFAULT_IFS}"
 
    exekutor cat <<EOF
-   depends_on 'mulle-build' => :build
+   depends_on 'mulle-kybernetik/software/mulle-build' => :build
 
    def install
       system "mulle-install", "-e", "--prefix", "#{prefix}"
