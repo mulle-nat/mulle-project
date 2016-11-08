@@ -15,26 +15,49 @@ in this major.minor.patch format:
 
 ## Usage
 
-Install into local project `./bin` directory
+Install into local project `./bin` directory using [mulle-build](//github.com/mulle-nat/mulle-build):
 
 ```
-echo "https://www.mulle-kybernetik.com/repositories/mulle-homebrew;bin/mulle-homebrew" >> .bootstrap/embedded_repositories
+echo "https://github.com/mulle-objc/mulle-homebrew;bin/mulle-homebrew" >> .bootstrap/embedded_repositories
 mulle-build
 ```
 
-Create a `release.sh` script in `./bin`  (to be executed from project root)
+Copy `bin/mulle-homebrew/repository-info.sh.template` to `bin/repository-info.sh`
+and edit it to fit your repository setup:
+
+```
+#! /bin/sh
+
+ORIGIN=origin
+REMOTEROOTDIR="mulle-objc"
+#
+# keep these settings for github
+#
+REMOTEHOST="https://github.com"
+REMOTEURL="${REMOTEHOST}/${REMOTEROOTDIR}"
+ARCHIVEURL='${REMOTEURL}/${NAME}/archive/${VERSION}.tar.gz'  # ARCHIVEURL will be evaled later! keep it in single quotes
+
+:  # keep! important
+```
+
+Copy `bin/mulle-homebrew/release.sh.template` to `bin/release.sh`. Then edit it
+to fit your project setup:
+
 
 ```
 PROJECT="MyProject"      # your project name, requires camel-case
 DESC="MyProject does this and that"
 DEPENDENCIES="libz
 cmake"                   # list brew dependencies
-ORIGIN=public            # git repo to push to
 LANGUAGE=c               # c,cpp, objc of the header file
 
-# source mulle-homebrew.sh (clumsily)
+#
+# Ideally you don't hafta change anything below this line
+#
+MULLE_BOOTSTRAP_FAIL_PREFIX="release.sh"
 
-. ./bin/mulle-homebrew/mulle-homebrew.sh
+. ./bin/repository-info.sh || exit 1
+. ./bin/mulle-homebrew/mulle-homebrew.sh || exit 1
 
 # parse options
 homebrew_parse_options "$@"
@@ -66,12 +89,11 @@ VERSION="`get_header_version "${HEADER}" "${VERSIONNAME}"`"
 # --- HOMEBREW FORMULA ---
 # Information needed to construct a proper brew formula
 #
-HOMEPAGE="https://www.mulle-kybernetik.com/software/git/${NAME}"
-ARCHIVEURL='https://www.mulle-kybernetik.com/software/git/${NAME}/tarball/${VERSION}'  # ARCHIVEURL will be evaled later! keep it in single quotes
+HOMEPAGE="${REMOTEURL}/${NAME}"
 
 
 # --- HOMEBREW TAP ---
-# Specify to where and under what bame to publish via your brew tap
+# Specify to where and under what name to publish via your brew tap
 #
 RBFILE="${NAME}.rb"                    # ruby file for brew
 HOMEBREWTAP="../homebrew-software"     # your tap repository path
@@ -92,7 +114,7 @@ main()
 main "$@"
 ```
 
-Then make it executable and execute
+Then make it executable and execute it from your project root
 
 
 ```
