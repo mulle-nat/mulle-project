@@ -35,6 +35,11 @@ generate_brew_formula()
 
    tmparchive="/tmp/${name}-${version}-archive"
 
+   if [ -z "${USE_CACHE}" -a -f "${tmparchive}" ]
+   then
+      rm "${tmparchive}" || fail "could not delete old"
+   fi
+
    if [ ! -f "${tmparchive}" ]
    then
       exekutor curl -L -o "${tmparchive}" "${archiveurl}"
@@ -389,6 +394,10 @@ homebrew_parse_options()
             MULLE_EXECUTOR_TRACE="YES"
          ;;
 
+         --cache)
+            USE_CACHE="YES"
+         ;;
+
          -n)
             MULLE_EXECUTOR_DRY_RUN="YES"
          ;;
@@ -415,6 +424,7 @@ homebrew_parse_options()
 
          -*)
             log_error "unknown option \"$1\""
+            exit 1
          ;;
       esac
 
