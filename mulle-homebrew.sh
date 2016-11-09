@@ -356,7 +356,7 @@ homebrew_main()
                                "${DEPENDENCIES}" || exit 1
    fi
 
-   log_info "Push brew fomula to tap"
+   log_info "Push brew fomula \"${RBFILE}\" to tap"
    (
       exekutor cd "${HOMEBREWTAP}" ;
       exekutor git add "${RBFILE}" ;
