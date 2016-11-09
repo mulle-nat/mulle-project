@@ -147,7 +147,7 @@ get_name_from_project()
          echo "$1" | split_camelcase_string | make_directory_string
       ;;
 
-      *)
+      ""|*)
          echo "$1"
       ;;
    esac
