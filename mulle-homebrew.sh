@@ -96,10 +96,13 @@ IFS="
    IFS="${DEFAULT_IFS}"
 
    cat <<EOF
+
    depends_on 'mulle-kybernetik/software/mulle-build' => :build
+   depends_on 'mulle-kybernetik/software/mulle-bootstrap' => :build
+   depends_on 'cmake' => :build
 
    def install
-      system "mulle-install", "-e", "--prefix", "#{prefix}"
+      system "mulle-install", "--prefix", "#{prefix}", "--homebrew"
    end
 
    test do
