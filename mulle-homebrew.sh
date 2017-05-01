@@ -43,7 +43,7 @@ generate_brew_formula()
    if [ ! -f "${tmparchive}" ]
    then
       exekutor curl -L -o "${tmparchive}" "${archiveurl}"
-      if [ -z "${MULLE_EXECUTOR_DRY_RUN}" ]
+      if [ -z "${MULLE_FLAG_EXEKUTOR_DRY_RUN}" ]
       then
          if [ $? -ne 0 -o ! -f "${tmparchive}"  ]
          then
@@ -59,7 +59,7 @@ generate_brew_formula()
    # anything less than 2 KB is wrong
    #
    size="`exekutor du -k "${tmparchive}" | exekutor awk '{ print $ 1}'`"
-   if [ -z "${MULLE_EXECUTOR_DRY_RUN}" ]
+   if [ -z "${MULLE_FLAG_EXEKUTOR_DRY_RUN}" ]
    then
       if [ "$size" -lt ${ARCHIVE_MINSIZE:-2} ]
       then
@@ -95,8 +95,8 @@ IFS="
    done
    IFS="${DEFAULT_IFS}"
 
-   cat <<EOF
-   depends_on 'mulle-kybernetik/software/mulle-build' => :build
+   exekutor cat <<EOF
+   depends_on 'mulle-kybernetik/alpha/mulle-build' => :build
 
    def install
       system "mulle-install", "-e", "--prefix", "#{prefix}"
@@ -336,25 +336,14 @@ homebrew_main()
    ARCHIVEURL="`eval echo "${ARCHIVEURL}"`"
 
    log_info "Generate brew fomula \"${PROJECT}\""
-   if [ -z "${MULLE_EXECUTOR_DRY_RUN}" ]
-   then
-      redirect_exekutor "${HOMEBREWTAP}/${RBFILE}" \
-         generate_brew_formula "${PROJECT}" \
-                               "${NAME}" \
-                               "${HOMEPAGE}" \
-                               "${DESC}" \
-                               "${VERSION}" \
-                               "${ARCHIVEURL}" \
-                               "${DEPENDENCIES}" || exit 1
-      else
-         generate_brew_formula "${PROJECT}" \
-                               "${NAME}" \
-                               "${HOMEPAGE}" \
-                               "${DESC}" \
-                               "${VERSION}" \
-                               "${ARCHIVEURL}" \
-                               "${DEPENDENCIES}" || exit 1
-   fi
+   redirect_exekutor "${HOMEBREWTAP}/${RBFILE}" \
+      generate_brew_formula "${PROJECT}" \
+                            "${NAME}" \
+                            "${HOMEPAGE}" \
+                            "${DESC}" \
+                            "${VERSION}" \
+                            "${ARCHIVEURL}" \
+                            "${DEPENDENCIES}" || exit 1
 
    log_info "Push brew fomula \"${RBFILE}\" to tap"
    (
@@ -376,50 +365,46 @@ homebrew_parse_options()
       case "$1" in
          -v|--verbose)
             GITFLAGS="`concat "${GITFLAGS}" "-v"`"
-            MULLE_BOOTSTRAP_VERBOSE="YES"
+            MULLE_FLAG_LOG_VERBOSE="YES"
          ;;
 
          -vv)
             GITFLAGS="`concat "${GITFLAGS}" "-v"`"
-            MULLE_BOOTSTRAP_FLUFF="YES"
-            MULLE_BOOTSTRAP_VERBOSE="YES"
-            MULLE_EXECUTOR_TRACE="YES"
+            MULLE_FLAG_LOG_FLUFF="YES"
+            MULLE_FLAG_LOG_VERBOSE="YES"
+            MULLE_FLAG_LOG_EXEKUTOR="YES"
          ;;
 
          -vvv)
             GITFLAGS="`concat "${GITFLAGS}" "-v"`"
             MULLE_TEST_TRACE_LOOKUP="YES"
-            MULLE_BOOTSTRAP_FLUFF="YES"
-            MULLE_BOOTSTRAP_VERBOSE="YES"
-            MULLE_EXECUTOR_TRACE="YES"
+            MULLE_FLAG_LOG_FLUFF="YES"
+            MULLE_FLAG_LOG_VERBOSE="YES"
+            MULLE_FLAG_LOG_EXEKUTOR="YES"
          ;;
 
          --cache)
             USE_CACHE="YES"
          ;;
 
-         -n)
-            MULLE_EXECUTOR_DRY_RUN="YES"
-         ;;
-
          -f)
             MULLE_TEST_IGNORE_FAILURE="YES"
          ;;
 
+         -n|--dry-run)
+            MULLE_FLAG_EXEKUTOR_DRY_RUN="YES"
+         ;;
+
          -s|--silent)
-            MULLE_BOOTSTRAP_TERSE="YES"
+            MULLE_FLAG_LOG_TERSE="YES"
          ;;
 
          -t|--trace)
             set -x
          ;;
 
-         -n|--dry-run)
-            MULLE_EXECUTOR_DRY_RUN="YES"
-         ;;
-
          -te|--trace-execution)
-            MULLE_EXECUTOR_TRACE="YES"
+            MULLE_FLAG_LOG_EXEKUTOR="YES"
          ;;
 
          -*)
@@ -436,6 +421,8 @@ homebrew_parse_options()
 homebrew_initialize()
 {
    local directory
+
+   MULLE_EXECUTABLE_PID=$$
 
    if [ -z "${DEFAULT_IFS}" ]
    then
