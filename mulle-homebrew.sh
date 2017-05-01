@@ -95,7 +95,7 @@ IFS="
    IFS="${DEFAULT_IFS}"
 
    cat <<EOF
-   depends_on 'mulle-kybernetik/${BOOTSTRAP_TAP}/mulle-build' => :build
+   depends_on '${BOOTSTRAP_TAP}mulle-build' => :build
 
    def install
       system "mulle-install", "--prefix", "#{prefix}", "--homebrew"
