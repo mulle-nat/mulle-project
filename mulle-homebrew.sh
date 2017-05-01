@@ -406,6 +406,42 @@ homebrew_parse_options()
             MULLE_FLAG_LOG_EXEKUTOR="YES"
          ;;
 
+         --bootstrap-tap)
+            [ $# -eq 1 ] && fail "missing parameter"
+            shift
+            BOOTSTRAP_TAP="$1"
+         ;;
+
+         --branch)
+            [ $# -eq 1 ] && fail "missing parameter"
+            shift
+            BRANCH="$1"
+         ;;
+
+         --dependency-tap)
+            [ $# -eq 1 ] && fail "missing parameter"
+            shift
+            DEPENDENCY_TAP="$1"
+         ;;
+
+         --publisher)
+            [ $# -eq 1 ] && fail "missing parameter"
+            shift
+            PUBLISHER="$1"
+         ;;
+
+         --publisher-tap)
+            [ $# -eq 1 ] && fail "missing parameter"
+            shift
+            PUBLISHER_TAP="$1"
+         ;;
+
+         --tag)
+            [ $# -eq 1 ] && fail "missing parameter"
+            shift
+            TAG="$1"
+         ;;
+
          -*)
             log_error "unknown option \"$1\""
             exit 1
