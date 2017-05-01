@@ -28,8 +28,8 @@ generate_brew_formula()
    dependencies="$1"
    shift
 
-   [ -z "${version}" ] && exit 1
-   [ -z "${archiveurl}" ] && exit 1
+   [ -z "${version}" ]    && internal_fail "empty version"
+   [ -z "${archiveurl}" ] && internal_fail "empty archiveurl"
 
    local tmparchive
 
@@ -37,7 +37,7 @@ generate_brew_formula()
 
    if [ -z "${USE_CACHE}" -a -f "${tmparchive}" ]
    then
-      rm "${tmparchive}" || fail "could not delete old"
+      rm "${tmparchive}" || fail "could not delete old \"${tmparchive}\""
    fi
 
    if [ ! -f "${tmparchive}" ]
@@ -47,12 +47,11 @@ generate_brew_formula()
       then
          if [ $? -ne 0 -o ! -f "${tmparchive}"  ]
          then
-            echo "Download failed" >&2
-            exit 1
+            fail "Download failed"
          fi
       fi
    else
-      echo "using cached file ${tmparchive} instead of downloading again" >&2
+      echo "Using cached file \"${tmparchive}\" instead of downloading again" >&2
    fi
 
    #
@@ -95,8 +94,8 @@ IFS="
    done
    IFS="${DEFAULT_IFS}"
 
-   exekutor cat <<EOF
-   depends_on 'mulle-kybernetik/alpha/mulle-build' => :build
+   cat <<EOF
+   depends_on 'mulle-kybernetik/${BOOTSTRAP_TAP}/mulle-build' => :build
 
    def install
       system "mulle-install", "--prefix", "#{prefix}", "--homebrew"
