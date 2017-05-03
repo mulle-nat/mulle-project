@@ -186,6 +186,7 @@ HOMEBREW_PARENT_PATH=".."
 
 HOMEBREW_TAP="${HOMEBREW_PARENT_PATH}/homebrew-`basename -- ${PUBLISHER_TAP}`"
 
+RBFILE="${RBFILE:-${NAME}.rb}"
 
 # --- GIT ---
 
@@ -224,7 +225,8 @@ main()
                  "${HOMEPAGE_URL}" \
                  "${DESC}" \
                  "${ARCHIVE_URL}" \
-                 "${HOMEBREW_TAP}"
+                 "${HOMEBREW_TAP}" \
+                 "${RBFILE}"
 }
 
 main "$@"

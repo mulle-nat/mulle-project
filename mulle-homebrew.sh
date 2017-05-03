@@ -203,6 +203,23 @@ _generate_brew_formula()
 }
 
 
+get_name_from_project()
+{
+   local name="$1"
+   local language="$2"
+
+   case "${language}" in
+      c|C|sh|bash)
+         echo "${name}" | split_camelcase_string | make_directory_string
+      ;;
+
+      ""|*)
+         echo "${name}"
+      ;;
+   esac
+}
+
+
 formula_push()
 {
    local rbfile="$1" ; shift
@@ -372,20 +389,26 @@ homebrew_parse_options()
 
 homebrew_main()
 {
-   local project="$1"
-   local name="$2"
-   local version="$3"
-   local dependencies="$4"
-   local builddependencies="$5"
-   local homepage="$6"
-   local desc="$7"
-   local archiveurl="$8"
-   local homebrewtap="$9"
+   local project="$1" ; shift
+   local name="$1"; shift
+   local version="$1"; shift
+   local dependencies="$1"; shift
+   local builddependencies="$1"; shift
+   local homepage="$1"; shift
+   local desc="$1"; shift
+   local archiveurl="$1"; shift
+   local homebrewtap="$1"; shift
+   local rbfile="$1"; shift
 
    local formula
-   local rbfile
 
-   rbfile="${name}.rb"                    # ruby file for brew
+   [ -z "${project}" ]     && internal_fail "missing project"
+   [ -z "${name}" ]        && internal_fail "missing name"
+   [ -z "${version}" ]     && internal_fail "missing version"
+   [ -z "${homepage}" ]    && internal_fail "missing homepage"
+   [ -z "${archiveurl}" ]  && internal_fail "missing archiveurl"
+   [ -z "${homebrewtap}" ] && internal_fail "missing homebrewtap"
+   [ -z "${rbfile}" ]      && internal_fail "missing rbfile"
 
    [ ! -d "${homebrewtap}" ] && fail "failed to locate \"${homebrewtap}\" from \"$PWD\""
 

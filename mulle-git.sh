@@ -60,19 +60,6 @@ make_file_string()
 }
 
 
-get_name_from_project()
-{
-   case "$2" in
-      c|C)
-         echo "$1" | split_camelcase_string | make_directory_string
-      ;;
-
-      ""|*)
-         echo "$1"
-      ;;
-   esac
-}
-
 
 get_header_from_name()
 {
