@@ -37,9 +37,10 @@
 #   ./bin/release.sh --publisher mulle-nat --publisher-tap mulle-kybernetik/alpha/
 #
 
-PROJECT="MyProject"      # your project name, requires camel-case
-DESC="MyProject does this and that"
-LANGUAGE=c               # c,cpp, objc
+PROJECT="MulleHomebrew"      # your project name, requires camel-case
+DESC="Release and publish a project to a homebrew tap"
+LANGUAGE=bash             # c,cpp, objc
+
 #
 # Keep these commented out, if the automatic detection works well
 # enough for you
@@ -102,7 +103,7 @@ generate_brew_formula()
 
 MULLE_BOOTSTRAP_FAIL_PREFIX="`basename -- $0`"
 
-LIBEXEC_DIR="`mulle-homebrew-path --libexec-path`" || exit 1
+LIBEXEC_DIR="."
 
 . "${LIBEXEC_DIR}/mulle-homebrew.sh" || exit 1
 . "${LIBEXEC_DIR}/mulle-git.sh"      || exit 1

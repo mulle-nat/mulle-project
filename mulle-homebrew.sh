@@ -1,32 +1,43 @@
-#! /bin/sh
+#! /usr/bin/env bash
 #
+#   Copyright (c) 2017 Nat! - Mulle kybernetiK
+#   All rights reserved.
 #
+#   Redistribution and use in source and binary forms, with or without
+#   modification, are permitted provided that the following conditions are met:
+#
+#   Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+#   Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+#   Neither the name of Mulle kybernetiK nor the names of its contributors
+#   may be used to endorse or promote products derived from this software
+#   without specific prior written permission.
+#
+#   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+#   AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+#   IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+#   ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+#   LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+#   CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+#   SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+#   INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+#   CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+#   ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+#   POSSIBILITY OF SUCH DAMAGE.
 #
 
-generate_brew_formula()
+generate_brew_formula_header()
 {
-   local project
-   local name
-   local homepage
-   local desc
-   local version
-   local archiveurl
-   local dependencies
-
-   project="$1"
-   shift
-   name="$1"
-   shift
-   homepage="$1"
-   shift
-   desc="$1"
-   shift
-   version="$1"
-   shift
-   archiveurl="$1"
-   shift
-   dependencies="$1"
-   shift
+   local project="$1"
+   local name="$2"
+   local version="$3"
+   local homepage="$4"
+   local desc="$5"
+   local archiveurl="$6"
 
    [ -z "${version}" ]    && internal_fail "empty version"
    [ -z "${archiveurl}" ] && internal_fail "empty archiveurl"
@@ -37,7 +48,7 @@ generate_brew_formula()
 
    if [ -z "${USE_CACHE}" -a -f "${tmparchive}" ]
    then
-      rm "${tmparchive}" || fail "could not delete old \"${tmparchive}\""
+      exekutor rm "${tmparchive}" || fail "could not delete old \"${tmparchive}\""
    fi
 
    if [ ! -f "${tmparchive}" ]
@@ -73,7 +84,12 @@ generate_brew_formula()
 
    hash="`exekutor shasum -p -a 256 "${tmparchive}" | exekutor awk '{ print $1 }'`"
 
-   cat <<EOF
+   local lines
+
+   ##
+   ##
+
+   lines="`cat <<EOF
 class ${project} < Formula
    homepage "${homepage}"
    desc "${desc}"
@@ -82,20 +98,63 @@ class ${project} < Formula
    sha256 "${hash}"
 
 EOF
+`"
+   exekutor echo "${lines}"
+}
 
-IFS="
+
+_print_dependencies()
+{
+   local dependencies="$1"
+   local epilog="$2"
+
+   local lines
+   local line
+
+   IFS="
 "
    for dependency in ${dependencies}
    do
+      IFS="${DEFAULT_IFS}"
       dependency="`eval echo "${dependency}"`"
 
-      echo "   depends_on '${dependency}'"
-      shift
+      line="   depends_on '${dependency}'${epilog}"
+
+      # initial LF is liked
+      lines="${lines}
+${line}"
    done
    IFS="${DEFAULT_IFS}"
 
-   cat <<EOF
-   depends_on '${BOOTSTRAP_TAP}mulle-build' => :build
+   if [ ! -z "${lines}" ]
+   then
+      exekutor echo "${lines}"
+   fi
+}
+
+
+generate_brew_formula_dependencies()
+{
+   local dependencies="$1"
+   local builddependencies="$2"
+
+   if [ ! -z "${dependencies}" ]
+   then
+      _print_dependencies "${dependencies}"
+   fi
+
+   if [ ! -z "${builddependencies}" ]
+   then
+      _print_dependencies "${builddependencies}" " => :build"
+   fi
+}
+
+
+generate_brew_formula_mulle_build()
+{
+   local lines
+
+   lines="`cat <<EOF
 
    def install
       system "mulle-install", "--prefix", "#{prefix}", "--homebrew"
@@ -104,252 +163,62 @@ IFS="
    test do
       system "mulle-test"
    end
+EOF
+`"
+   exekutor echo "${lines}"
+}
+
+
+generate_brew_formula_footer()
+{
+   local name="$1"
+
+   local lines
+
+   lines="`cat <<EOF
 end
 # FORMULA ${name}.rb
 EOF
+`"
+   exekutor echo "${lines}"
 }
 
 
-#
-# convert VfLBochum -> VfL Bochum
-# HugoFiege -> Hugo Fiege
-#
-split_camelcase_string()
+_generate_brew_formula()
 {
-   sed -e 's/\(.\)\([A-Z]\)\([a-z_0-9]\)/\1 \2\3/g'
-}
+   local project="$1"
+   local name="$2"
+   local version="$3"
+   local dependencies="$4"
+   local builddependencies="$5"
+   local homepage="$6"
+   local desc="$7"
+   local archiveurl="$8"
 
-# convert all to uppercase, spaces and minus to '_'
-# does not work well for camel case
-make_cpp_string()
-{
-   tr '[a-z]' '[A-Z]' | tr ' ' '_' | tr '-' '_'
-}
-
-
-make_directory_string()
-{
-   tr '[A-Z]' '[a-z]' | tr ' ' '-' | tr '_' '-'
+   generate_brew_formula_header "${project}" "${name}" "${version}" \
+                                "${homepage}" "${desc}" "${archiveurl}"
+   generate_brew_formula_dependencies "${dependencies}" "${builddependencies}"
+   generate_brew_formula_build "${project}" "${name}" "${version}" "${dependencies}"
+   generate_brew_formula_footer "${name}"
 }
 
 
-make_file_string()
+formula_push()
 {
-   tr '[A-Z]' '[a-z]' | tr ' ' '_' | tr '-' '_'
-}
+   local rbfile="$1" ; shift
+   local version="$1" ; shift
+   local name="$1" ; shift
+   local homebrewtap="$1" ; shift
 
+   HOMEBREW_TAP_BRANCH="${HOMEBREW_TAP_BRANCH:-master}"
+   HOMEBREW_TAP_REMOTE="${HOMEBREW_TAP_REMOTE:-origin}"
 
-get_name_from_project()
-{
-   case "$2" in
-      c|C)
-         echo "$1" | split_camelcase_string | make_directory_string
-      ;;
-
-      ""|*)
-         echo "$1"
-      ;;
-   esac
-}
-
-
-get_header_from_name()
-{
-   echo "src/$1.h" | make_file_string
-}
-
-
-get_versionname_from_project()
-{
-   echo "$1_VERSION" | split_camelcase_string | make_cpp_string
-}
-
-
-get_header_version()
-{
-   local filename
-   local versionname
-
-   filename="$1"
-   versionname="${2:-${VERSIONNAME}}"  # backwards compatibility
-
-   fgrep -s -w "${versionname}" "${filename}" | \
-   sed 's|(\([0-9]*\) \<\< [0-9]*)|\1|g' | \
-   sed 's|^.*(\(.*\))|\1|' | \
-   sed 's/ | /./g' | \
-   head -1
-}
-
-
-git_tag_must_not_exist()
-{
-   local tag
-
-   tag="$1"
-
-   if git rev-parse "${tag}" > /dev/null 2>&1
-   then
-      fail "Tag \"${tag}\" already exists"
-   fi
-}
-
-
-git_tag_must_not_exist()
-{
-   local tag
-
-   tag="$1"
-
-   if git rev-parse "${tag}" > /dev/null 2>&1
-   then
-      fail "Tag \"${tag}\" already exists"
-   fi
-}
-
-
-git_must_be_clean()
-{
-   local name
-
-   name="${1:-${PWD}}"
-
-   if [ ! -d .git ]
-   then
-      fail "\"${name}\" is not a git repository"
-   fi
-
-   local clean
-
-   clean=`git status -s --untracked-files=no`
-   if [ "${clean}" != "" ]
-   then
-      fail "repository \"${name}\" is tainted"
-   fi
-}
-
-
-# Parameters!
-#
-# BRANCH
-# ORIGIN
-# TAG
-#
-_git_main()
-{
-   local branch
-   local origin
-   local tag
-
-   branch="${1:-master}"
-   [ $# -ne 0 ] && shift
-
-   origin="${1:-origin}"
-   [ $# -ne 0 ] && shift
-
-   tag="$1"
-   [ $# -ne 0 ] && shift
-
-   case "${tag}" in
-      -*|"")
-         fail "Invalid tag \"${tag}\""
-      ;;
-   esac
-
-   case "${origin}" in
-      -*|"")
-         fail "Invalid origin \"${tag}\""
-      ;;
-   esac
-
-   exekutor git_must_be_clean               || return 1
-   exekutor git_tag_must_not_exist "${tag}" || return 1
-
-   #
-   # make it a release
-   #
-   log_info "Push clean state of \"${branch}\" to \"${origin}\""
-   exekutor git push "${origin}" "${branch}"  || return 1
-
-   log_info "Make it a release, by rebasing"
-   exekutor git checkout -B release           || return 1
-   exekutor git rebase "${branch}"            || return 1
-
-   # if rebase fails, we shouldn't be hitting tag now
-
-   log_info "Tag the release with \"${tag}\""
-   exekutor git tag "${tag}"                    || return 1
-
-   log_info "Push release with tags to \"${origin}\""
-   exekutor git push "${origin}" release --tags || return 1
-
-   log_info "Check if remote github is present"
-   exekutor git ls-remote  -q --exit-code github release > /dev/null 2>&1
-   if [ $? -eq 0 ]
-   then
-      log_info "Pushing release with tags to github"
-      exekutor git push github release --tags || return 1
-   else
-      log_info "There is no remote named github"
-   fi
-}
-
-
-git_main()
-{
-   local branch
-   local rval
-
-   log_info "Verify repository"
-
-   branch="`exekutor git rev-parse --abbrev-ref HEAD`"
-   branch="${branch:-master}" # for dry run
-   if [ "${branch}" = "release" ]
-   then
-      fail "Don't call it from release branch"
-   fi
-
-   _git_main "${branch}" "$@"
-   rval=$?
-
-   log_info "Checkout \"${branch}\" again"
-   exekutor git checkout "${branch}" || return 1
-   return $rval
-}
-
-
-#
-# Expected environment!
-# PROJECT
-# NAME
-# VERSION
-# HOMEPAGE
-# DESC
-# DEPENDENCIES
-# HOMEBREWTAP
-# RBFILE
-#
-homebrew_main()
-{
-   [ ! -d "${HOMEBREWTAP}" ] && fail "failed to locate \"${HOMEBREWTAP}\""
-
-   ARCHIVEURL="`eval echo "${ARCHIVEURL}"`"
-
-   log_info "Generate brew fomula \"${PROJECT}\""
-   redirect_exekutor "${HOMEBREWTAP}/${RBFILE}" \
-      generate_brew_formula "${PROJECT}" \
-                            "${NAME}" \
-                            "${HOMEPAGE}" \
-                            "${DESC}" \
-                            "${VERSION}" \
-                            "${ARCHIVEURL}" \
-                            "${DEPENDENCIES}" || exit 1
-
-   log_info "Push brew fomula \"${RBFILE}\" to tap"
+   log_info "Push brew fomula \"${rbfile}\" to \"${HOMEBREW_TAP_REMOTE}\""
    (
-      exekutor cd "${HOMEBREWTAP}" ;
-      exekutor git add "${RBFILE}" ;
-      exekutor git commit -m "${VERSION} release of ${NAME}" "${RBFILE}" ;
-      exekutor git push origin master
+      exekutor cd "${homebrewtap}" &&
+      exekutor git add "${rbfile}" &&
+      exekutor git commit -m "${version} release of ${name}" "${rbfile}" &&
+      exekutor git push "${HOMEBREW_TAP_REMOTE}" "${HOMEBREW_TAP_BRANCH}"
    )  || exit 1
 }
 
@@ -407,39 +276,87 @@ homebrew_parse_options()
          ;;
 
          --bootstrap-tap)
-            [ $# -eq 1 ] && fail "missing parameter"
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
             shift
             BOOTSTRAP_TAP="$1"
          ;;
 
          --branch)
-            [ $# -eq 1 ] && fail "missing parameter"
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
             shift
             BRANCH="$1"
          ;;
 
          --dependency-tap)
-            [ $# -eq 1 ] && fail "missing parameter"
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
             shift
             DEPENDENCY_TAP="$1"
          ;;
 
+         --github)
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
+            shift
+            GITHUB="$1"
+         ;;
+
+         --homebrew-path)
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
+            shift
+            HOMEBREW_PATH="$1"
+         ;;
+
+         --homepage-url)
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
+            shift
+            HOMEPAGE_URL="$1"
+         ;;
+
+         --origin)
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
+            shift
+            ORIGIN="$1"
+         ;;
+
          --publisher)
-            [ $# -eq 1 ] && fail "missing parameter"
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
             shift
             PUBLISHER="$1"
          ;;
 
          --publisher-tap)
-            [ $# -eq 1 ] && fail "missing parameter"
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
             shift
             PUBLISHER_TAP="$1"
          ;;
 
          --tag)
-            [ $# -eq 1 ] && fail "missing parameter"
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
             shift
             TAG="$1"
+         ;;
+
+         --tag-prefix)
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
+            shift
+            TAG_PREFIX="$1"
+         ;;
+
+            # allow user to specify own parameters for his
+            # generate_formula scripts w/o having to modify this file
+         --*)
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
+
+            varname="`sed 's/^..//' <<< "$1"`"
+            varname="`tr '-' '_' <<< "${varname}"`"
+            varname="`tr '[a-z]' '[A-Z]' <<< "${varname}"`"
+            if ! egrep -q -s '^[A-Z_][A-Z0-9_]*$' <<< "${varname}" > /dev/null
+            then
+               fail "invalid variable specification \"${varname}\", created by \"$1\""
+            fi
+
+            shift
+            eval "${varname}='$1'"
+            log_info "User variable ${varname} set to \"$1\""
          ;;
 
          -*)
@@ -450,6 +367,41 @@ homebrew_parse_options()
 
       shift
    done
+}
+
+
+homebrew_main()
+{
+   local project="$1"
+   local name="$2"
+   local version="$3"
+   local dependencies="$4"
+   local builddependencies="$5"
+   local homepage="$6"
+   local desc="$7"
+   local archiveurl="$8"
+   local homebrewtap="$9"
+
+   local formula
+   local rbfile
+
+   rbfile="${name}.rb"                    # ruby file for brew
+
+   [ ! -d "${homebrewtap}" ] && fail "failed to locate \"${homebrewtap}\" from \"$PWD\""
+
+   log_info "Generate brew fomula \"${rbfile}\""
+   formula="`generate_brew_formula "${project}" \
+                                   "${name}" \
+                                   "${version}" \
+                                   "${dependencies}" \
+                                   "${builddependencies}" \
+                                   "${homepage}" \
+                                   "${desc}" \
+                                   "${archiveurl}"`" || exit 1
+
+   redirect_exekutor "${homebrewtap}/${rbfile}" echo "${formula}"
+
+   formula_push "${rbfile}" "${version}" "${name}" "${homebrewtap}"
 }
 
 
@@ -476,4 +428,3 @@ homebrew_initialize()
 homebrew_initialize
 
 :
-
