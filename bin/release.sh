@@ -58,7 +58,8 @@ LANGUAGE=bash             # c,cpp, objc
 # libpng
 # '
 BUILD_DEPENDENCIES='${BOOTSTRAP_TAP}mulle-bootstrap
-${BOOTSTRAP_TAP}mulle-build'
+${BOOTSTRAP_TAP}mulle-build
+cmake'
 
 
 #######

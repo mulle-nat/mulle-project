@@ -157,7 +157,7 @@ generate_brew_formula_mulle_build()
    lines="`cat <<EOF
 
    def install
-      system "mulle-install", "--prefix", "#{prefix}", "--homebrew"
+      system "mulle-install", "-vvv", "--prefix", "#{prefix}", "--homebrew"
    end
 
    test do
