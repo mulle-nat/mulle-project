@@ -196,9 +196,9 @@ _generate_brew_formula()
    local archiveurl="$8"
 
    generate_brew_formula_header "${project}" "${name}" "${version}" \
-                                "${homepage}" "${desc}" "${archiveurl}"
-   generate_brew_formula_dependencies "${dependencies}" "${builddependencies}"
-   generate_brew_formula_build "${project}" "${name}" "${version}" "${dependencies}"
+                                "${homepage}" "${desc}" "${archiveurl}" &&
+   generate_brew_formula_dependencies "${dependencies}" "${builddependencies}" &&
+   generate_brew_formula_build "${project}" "${name}" "${version}" "${dependencies}" &&
    generate_brew_formula_footer "${name}"
 }
 
@@ -389,7 +389,7 @@ homebrew_main()
 
    [ ! -d "${homebrewtap}" ] && fail "failed to locate \"${homebrewtap}\" from \"$PWD\""
 
-   log_info "Generate brew fomula \"${rbfile}\""
+   log_info "Generate brew fomula \"${homebrewtap}/${rbfile}\""
    formula="`generate_brew_formula "${project}" \
                                    "${name}" \
                                    "${version}" \
