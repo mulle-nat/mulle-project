@@ -6,13 +6,13 @@ A convenience script to tag and release your project and publish it on
 a [homebrew](//brew.sh) tap. It has been designed, so that it can be used with multiple forks.
 
 1. Checks that the repository state is clean, no modified files exist
-2. Checks that a tag with the version does not exist
-3. Pushes the current development state (usually **master**) to its **origin** (can be configured)
+2. Checks that a tag with the current version does not exist
+3. Pushes the current development branch (usually **master**) to its **origin** (can be configured)
 4. Rebases your **release** (can be configured) branch on your current development branch
 5. Tags your repository with the current version
 6. Pushes the tagged **release** to **origin**
 7. Optionally pushes the tagged **release** to **github**
-8. Resets the current branch back to its development state (see 3.)
+8. Checks out the the current development branch (usually **master**) again (see 3.)
 9. Downloads the source archive for the created tag
 10. Calculates the sha256 for the archive
 11. Creates the homebrew formula for your project and places it into your tap
@@ -220,7 +220,9 @@ If the output looks good, then do the release:
 ```
 
 
-## Options
+## Variables
+
+Most variable can be set via a commandline option. The value for the variable the argument following the option. E.g. `--publisher nat` is treated as `PUBLISHER='nat'`.
 
 ## Required Variables
 

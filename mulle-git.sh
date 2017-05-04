@@ -81,11 +81,20 @@ get_project_version()
    filename="$1"
    versionname="$2"
 
-   fgrep -s -w "${versionname}" "${filename}" | \
-   sed 's|(\([0-9]*\) \<\< [0-9]*)|\1|g' | \
-   sed 's|^.*(\(.*\))|\1|' | \
-   sed 's/ | /./g' | \
-   head -1
+   match="`fgrep -s -w "${versionname}" "${filename}" | head -1`"
+   case "${match}" in
+      *"<<"*)
+         echo "${match}" | \
+         sed 's|(\([0-9]*\) \<\< [0-9]*)|\1|g' | \
+         sed 's|^.*(\(.*\))|\1|' | \
+         sed 's/ | /./g'
+      ;;
+
+      *)
+         # may stumble if there is any other number than version in the line
+         sed -n 's/^[^0-9]*\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*$/\1/p' <<< "${match}"
+      ;;
+   esac
 }
 
 

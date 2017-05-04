@@ -45,7 +45,7 @@ LANGUAGE=bash             # c,cpp, objc
 # Keep these commented out, if the automatic detection works well
 # enough for you
 #
-# VERSIONFILE=
+VERSIONFILE=release.sh.template
 # VERSIONNAME=
 
 #
@@ -59,7 +59,7 @@ LANGUAGE=bash             # c,cpp, objc
 # '
 BUILD_DEPENDENCIES='${BOOTSTRAP_TAP}mulle-bootstrap
 ${BOOTSTRAP_TAP}mulle-build
-cmake'
+cmake'  # cmake would be useful to, if you are cmake based!
 
 
 #######
@@ -76,6 +76,43 @@ generate_brew_formula_build()
    local version="$3"
 
    generate_brew_formula_mulle_build "${project}" "${name}" "${version}"
+   generate_brew_formula_mulle_test  "${project}" "${name}" "${version}"
+}
+
+
+#
+# If you are unhappy with the formula in general, then change
+# this function. Print your formula to stdout.
+#
+generate_brew_formula()
+{
+#   local project="$1"
+#   local name="$2"
+#   local version="$3"
+#   local dependencies="$4"
+#   local builddependencies="$5"
+#   local homepage="$6"
+#   local desc="$7"
+#   local archiveurl="$8"
+
+   _generate_brew_formula "$@"
+}
+
+#######
+# If you are using mulle-build, you don't hafta change anything after this
+#######
+
+#
+# Generate your `def install` `test do` lines here to stdout.
+#
+generate_brew_formula_build()
+{
+   local project="$1"
+   local name="$2"
+   local version="$3"
+
+   generate_brew_formula_mulle_build "${project}" "${name}" "${version}"
+   generate_brew_formula_mulle_test  "${project}" "${name}" "${version}"
 }
 
 
@@ -103,11 +140,19 @@ generate_brew_formula()
 #######
 
 MULLE_BOOTSTRAP_FAIL_PREFIX="`basename -- $0`"
+MULLE_HOMEBREW_VERSION=2.0.0
 
+INSTALLED_MULLE_HOMEBREW_VERSION="${MULLE_HOMEBREW_VERSION}"
 LIBEXEC_DIR="."
 
 . "${LIBEXEC_DIR}/mulle-homebrew.sh" || exit 1
 . "${LIBEXEC_DIR}/mulle-git.sh"      || exit 1
+
+if ! homebrew_is_compatible_version "${INSTALLED_MULLE_HOMEBREW_VERSION}" "${MULLE_HOMEBREW_VERSION}"
+then
+   fail "Installed mulle-homebrew version ${INSTALLED_MULLE_HOMEBREW_VERSION} is \
+not compatible with this script from version ${MULLE_HOMEBREW_VERSION}"
+fi
 
 # parse options
 homebrew_parse_options "$@"
@@ -214,10 +259,12 @@ GITHUB="${GITHUB:-github}"
 BRANCH="${BRANCH:-release}"
 
 
-
 main()
 {
+   # do the release
    git_main "${BRANCH}" "${ORIGIN}" "${TAG}" "${GITHUB}" || exit 1
+
+   # generate the formula and push it
    homebrew_main "${PROJECT}" \
                  "${NAME}" \
                  "${VERSION}" \

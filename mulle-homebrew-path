@@ -42,6 +42,7 @@ Usage: mulle-homebrew-path [option]
 Options:
    --libexec-path : print path to support scripts
    --templatepath : print path to release.sh template
+   --version      : print version of installed scripts
 
 EOF
    exit 1
@@ -55,6 +56,53 @@ fail()
 }
 
 
+libexec_path()
+{
+   if [ ! -f mulle-homebrew.sh ]
+   then
+      [ ! -d "../libexec" ] && fail "libexec not found"
+      [ ! -d "../libexec/mulle-homebrew" ] && fail "libexec/mulle-homebrew is missing"
+
+      cd ../libexec/mulle-homebrew || exit 1
+   fi
+
+   pwd -P
+}
+
+
+share_path()
+{
+   if [ ! -f release.sh.template ]
+   then
+      [ ! -d "../share" ] && fail "share not found"
+      [ ! -d "../share/mulle-homebrew" ] && fail "share/mulle-homebrew is missing"
+
+      cd ../share/mulle-homebrew || exit 1
+   fi
+
+   pwd -P
+}
+
+
+template_path()
+{
+   share_path > /dev/null || exit 1
+
+   [ ! -f "release.sh.template" ] && fail "release.sh.template is missing"
+
+   echo "`pwd -P`/release.sh.template"
+}
+
+
+version()
+{
+   local filename
+
+   filename="`template_path`"
+   egrep -s "^MULLE_HOMEBREW_VERSION=" "${filename}" | cut -d= -f2
+}
+
+
 path="`dirname -- "$0"`"
 cd "${path}" || exit 1
 
@@ -65,37 +113,19 @@ case "$1" in
    ;;
 
    "--libexec-path")
-      if [ ! -f mulle-homebrew.sh ]
-      then
-         [ ! -d "../libexec" ] && fail "libexec not found"
-         [ ! -d "../libexec/mulle-homebrew" ] && fail "libexec/mulle-homebrew is missing"
-
-         cd ../libexec/mulle-homebrew || exit 1
-      fi
-      pwd -P
+      libexec_path
    ;;
 
    "--share-path")
-      if [ ! -f release.sh.template ]
-      then
-         [ ! -d "../share" ] && fail "share not found"
-         [ ! -d "../share/mulle-homebrew" ] && fail "share/mulle-homebrew is missing"
-
-         cd ../share/mulle-homebrew || exit 1
-      fi
-      pwd -P
+      share_path
    ;;
 
    "--template-path")
-      if [ ! -f release.sh.template ]
-      then
-         [ ! -d "../share" ]                && fail "share not found"
-         [ ! -d "../share/mulle-homebrew" ] && fail "share/mulle-homebrew is missing"
-         [ ! -f "../share/mulle-homebrew/release.sh.template" ] && fail "release.sh.template is missing"
+      template_path
+   ;;
 
-         cd ../share/mulle-homebrew || fail "share not found"
-      fi
-      echo "`pwd -P`/release.sh.template"
+   --version)
+      version
    ;;
 
    -*)

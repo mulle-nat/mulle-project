@@ -152,21 +152,57 @@ generate_brew_formula_dependencies()
 
 generate_brew_formula_mulle_build()
 {
+   local project="$1"; shift
+   local name="$1" ; shift
+   local version="$1" ; shift
+
+   local aux_args
+   local option
+
+   for option in "$@"
+   do
+      aux_args=",${aux_args}\"${option}\" "
+   done
+
    local lines
 
    lines="`cat <<EOF
 
    def install
-      system "mulle-install", "-vvv", "--prefix", "#{prefix}", "--homebrew"
-   end
-
-   test do
-      system "mulle-test"
+      system "mulle-install", "-vvv", "--prefix", "#{prefix}", "--homebrew" ${aux_args}
    end
 EOF
 `"
    exekutor echo "${lines}"
 }
+
+
+generate_brew_formula_mulle_test()
+{
+   local project="$1"; shift
+   local name="$1" ; shift
+   local version="$1" ; shift
+
+   local aux_args
+   local option
+
+   for option in "$@"
+   do
+      aux_args=",${aux_args}\"${option}\" "
+   done
+
+   local lines
+
+   lines="`cat <<EOF
+
+   test do
+      system "mulle-test" ${aux_args}
+   end
+EOF
+`"
+   exekutor echo "${lines}"
+}
+
 
 
 generate_brew_formula_footer()
@@ -208,12 +244,13 @@ get_name_from_project()
    local name="$1"
    local language="$2"
 
+   language="`tr '[A-Z]' '[a-z]' <<< "${language}"`"
    case "${language}" in
-      c|C|sh|bash)
+      c|sh|bash)
          echo "${name}" | split_camelcase_string | make_directory_string
       ;;
 
-      ""|*)
+      *|"")
          echo "${name}"
       ;;
    esac
@@ -385,6 +422,56 @@ homebrew_parse_options()
       shift
    done
 }
+
+
+check_version()
+{
+   local version="$1"
+
+
+   if [ "${major}" -lt "${CMAKE_VERSION_MAJOR}" ] || [ "${major}" -eq "${CMAKE_VERSION_MAJOR}" -a "${minor}" -lt "${CMAKE_VERSION_MINOR}" ]
+   then
+      return 1
+   fi
+
+   return 0
+}
+
+
+homebrew_is_compatible_version()
+{
+   local installed="$1"
+   local script="$2"
+
+   local s_major
+   local s_minor
+   local i_major
+   local i_minor
+
+   s_major="`echo "${script}"    | head -1 | cut -d. -f1`"
+   s_minor="`echo "${script}"    | head -1 | cut -d. -f2`"
+   i_major="`echo "${installed}" | head -1 | cut -d. -f1`"
+   i_minor="`echo "${installed}" | head -1 | cut -d. -f2`"
+
+   if [ "${i_major}" = "" -o "${i_minor}" = "" -o \
+        "${s_major}" = "" -o "${s_minor}" = "" ]
+   then
+      return 2
+   fi
+
+   if [ "${i_major}" != "${s_major}" ]
+   then
+      return 1
+   fi
+
+   if [ "${i_minor}" -lt "${s_minor}" ]
+   then
+      return 1
+   fi
+
+   return 0
+}
+
 
 
 homebrew_main()
