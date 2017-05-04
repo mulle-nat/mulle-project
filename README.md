@@ -1,5 +1,7 @@
 # mulle-homebrew
 
+![mulle-homebrew.iconset/icon_128x128-png](mulle-homebrew.iconset/icon_128x128.png)
+
 A convenience script to tag and release your project and publish it on
 a [homebrew](//brew.sh) tap. It has been designed, so that it can be used with multiple forks.
 
@@ -40,7 +42,7 @@ brew install mulle-kybernetik/software/mulle-homebrew
 
 ## Prepare your project for mulle-homebrew
 
-### Create a customized release.sh script
+### 1. Create a customized release.sh script
 
 #### Required: Set project specific variables
 
@@ -77,12 +79,14 @@ LANGUAGE=c               # c,cpp, objc
 ...
 ```
 
+Edit `PROJECT` and `DESC` and `LANGUAGE` to match your project.  The language setting is important for the automatic version detection, it can be any string but if your project is written in **C** use `c` and not `C-language` ...  
+
+
 **mulle-homebrew** has an automatic version detection mechanism (see below).
 You can tweak it by changing `VERSIONNAME` to the string to search for and
-`VERSIONFILE` for the file to search in.
+`VERSIONFILE` for the file to search in, but leave it commented out for now.
 
-Change all these settings to fit your project.The language setting is important
-for the automatic version detection.  In the best case that's all you need to
+Change all these settings to fit your project. In the best case that's all you need to
 change.  But best cases are rare occurrences.
 
 
@@ -92,11 +96,13 @@ If you have dependencies on other homebrew formula at run-time, list them in
 `DEPENDENCIES`. List them in `BUILD_DEPENDENCIES` if you only
 need them at build-time.
 
-> If you rely on a non-official tap, it might be useful to use the
-> `${DEPENDENCY_TAP}` prefix, to make the script more flexible.
+> If your project relies on a related project that is served by a non-official tap, 
+> it might be useful to use a variable prefix like `${DEPENDENCY_TAP}`, to make 
+> the script more reusable.
 
 
 ```
+...
 #
 # Specify needed homebrew packages by name as you would when saying
 # `brew install`.
@@ -124,12 +130,14 @@ are all done.
 #### Optional: Emit lines for building your project without mulle-build
 
 You will have to change `generate_brew_formula_build` so
-that a proper [formula](https://github.com/Homebrew/brew/blob/master/docs/Formula-Cookbook.md) to build your project can me emitted.
+that proper build stages of [formula](https://github.com/Homebrew/brew/blob/master/docs/Formula-Cookbook.md) are emitted.
 
-Using the code from the cookbook, this how you would modify
-`generate_brew_formula_build`:
+Using the code from the cookbook, this is how you would modify
+`generate_brew_formula_build` (you usually leave `generate_brew_formula` as is):
 
 ```
+...
+
 #
 # Generate your `def install` `test do` lines here
 # if you are not using mulle-build
@@ -158,34 +166,10 @@ generate_brew_formula_build()
 EOF
 }
 
-
-#
-# If you are unhappy with the formula in general change
-# this function. Print your formula to stdout.
-#
-generate_brew_formula()
-{
-#   local project="$1"
-#   local name="$2"
-#   local version="$3"
-#   local dependencies="$4"
-#   local builddependencies="$5"
-#   local homepage="$6"
-#   local desc="$7"
-#   local archiveurl="$8"
-
-   _generate_brew_formula "$@"
-}
-
-#######
-# Ideally changes to the following values are done with the command line
-# which makes it easier for forks.
-#######
-
 ...
 ```
 
-### Required: Configure versioning
+### 2. Configure versioning
 
 If you keep your version in a header file, it is assumed to be in a
 **major.minor.patch** format. The header file's name by default is
@@ -211,7 +195,7 @@ in your project root.
 The version is under your control, **mulle-homebrew** will never change it.
 
 
-### Test your release.sh script
+### 3. Test your release.sh script
 
 Test the script from your project root. You need to give it the publisher,
 which is your user name and the homebrew tap to publish the release to
@@ -243,10 +227,10 @@ If the output looks good, then do the release:
 Variable        | Option            | Description
 ----------------|-------------------|------------------------------------------
 `DESC`          |     none          | Description of your project, used in formula
-`LANGUAGE`      |     none          | main language of your project: `c`,`cpp`, `objc`
+`LANGUAGE`      |     none          | Main language of your project: `c`,`cpp`, `objc` or anything else
 `PROJECT`       |     none          | Name of your project in [Camel case](https://en.wikipedia.org/wiki/Camel_case). Used to derive formula name amongst other things.
 `PUBLISHER_TAP` | `--publisher-tap` | tap to use for publishing the formula. Needs trailing slash
-`PUBLISHER`     | `--publisher`     | your github user name
+`PUBLISHER`     | `--publisher`     | Your github user name
 
 
 ## Optional Variables
@@ -254,16 +238,16 @@ Variable        | Option            | Description
 Variable         | Option             | Description
 -----------------|--------------------|------------------------------------------
 `ARCHIVE_URL`    | `--archive-url`    | URL of the source archive.
-`BOOTSTRAP_TAP`  | `--bootstrap-tap`  | tap to use for depends_on => build in formulas
-`BRANCH`         | `--branch`         | branch to use as release branch
-`DEPENDENCY_TAP` | `--dependency-tap` | tap to use for depends_on in formulas
-`GITHUB`         | `--github`         | git remote github
+`BOOTSTRAP_TAP`  | `--bootstrap-tap`  | Tap to use for depends_on => build in formulas
+`BRANCH`         | `--branch`         | Branch to use as release branch
+`DEPENDENCY_TAP` | `--dependency-tap` | Tap to use for depends_on in formulas
+`GITHUB`         | `--github`         | Git remote github
 `HOMEPAGE_URL`   | `--homepage-url`   | URL of the homepage to use for the formula.
-`ORIGIN`         | `--origin`         | git remote origin
-`TAG_PREFIX`     | `--tag-prefix`     | prefix to use with version to create the tag
-`TAG`            | `--tag`            | tag to use, instead of version
-`VERSIONFILE`    |    none            | location of the version file
-`VERSIONNAME`    |    none            | name of the #define to search for
+`ORIGIN`         | `--origin`         | Git remote origin
+`TAG_PREFIX`     | `--tag-prefix`     | Prefix to use with version to create the tag
+`TAG`            | `--tag`            | Tag to use, instead of version
+`VERSIONFILE`    |    none            | Location of the version file
+`VERSIONNAME`    |    none            | Name of the #define to search for
 
 
 > #### Hint

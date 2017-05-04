@@ -1,2 +1,5 @@
 build/
 *.old
+ 
+# keep it local
+alpha-release.sh
