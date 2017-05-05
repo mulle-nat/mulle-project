@@ -39,13 +39,13 @@
 
 PROJECT="MulleHomebrew"      # your project name, requires camel-case
 DESC="Release and publish a project to a homebrew tap"
-LANGUAGE=bash             # c,cpp, objc
+LANGUAGE="bash"              # c,cpp, objc
 
 #
 # Keep these commented out, if the automatic detection works well
 # enough for you
 #
-VERSIONFILE=release.sh.template
+VERSIONFILE="release.sh.template"
 # VERSIONNAME=
 
 #
@@ -140,7 +140,7 @@ generate_brew_formula()
 #######
 
 MULLE_BOOTSTRAP_FAIL_PREFIX="`basename -- $0`"
-MULLE_HOMEBREW_VERSION=2.0.0
+MULLE_HOMEBREW_VERSION="3.0.0"
 
 INSTALLED_MULLE_HOMEBREW_VERSION="${MULLE_HOMEBREW_VERSION}"
 LIBEXEC_DIR="."
@@ -228,16 +228,16 @@ then
    fail "you need to specify a publisher tap with --publisher-tap (hint: <mulle-kybernetik/software/>)"
 fi
 
-HOMEBREW_PARENT_PATH=".."
+TAPS_LOCATION="${TAPS_LOCATION:-..}"
 
-HOMEBREW_TAP="${HOMEBREW_PARENT_PATH}/homebrew-`basename -- ${PUBLISHER_TAP}`"
+HOMEBREW_TAP="${HOMEBREW_TAP:-${TAPS_LOCATION}/homebrew-`basename -- ${PUBLISHER_TAP}`}"
 
 RBFILE="${RBFILE:-${NAME}.rb}"
 
 # --- GIT ---
 
 #
-# require PUBLISHER and PUBLISHER_TAP as command line parameters, so
+# require PUBLISHER (and PUBLISHER_TAP) as command line parameter, so
 # that forks don't have to edit this constantly
 #
 if [ -z "${PUBLISHER}" ]

@@ -2,8 +2,10 @@
 
 ![mulle-homebrew.iconset/icon_128x128-png](mulle-homebrew.iconset/icon_128x128.png)
 
-A convenience script to tag and release your project and publish it on
-a [homebrew](//brew.sh) tap. It has been designed, so that it can be used with multiple forks.
+**mulle-homebrew** provides a convenience script to tag and release your project 
+and publish it on a [homebrew](//brew.sh) tap. It has been designed, so that it can be used with multiple forks.
+
+#### What the script does
 
 1. Checks that the repository state is clean, no modified files exist
 2. Checks that a tag with the current version does not exist
@@ -37,7 +39,7 @@ updating your homebrew formula, reduces to a one-liner like:
 Install it via [homebrew](//brew.sh).
 
 ```
-brew install mulle-kybernetik/software/mulle-homebrew
+brew install mulle-kybernetik/alpha/mulle-homebrew
 ```
 
 ## Prepare your project for mulle-homebrew
@@ -52,8 +54,7 @@ project.
 
 
 ```
-mkdir bin
-install -m 0755 "`mulle-homebrew-path --template-path`" bin/release.sh
+`mulle-homebrew-env --install ./bin`"
 ```
 
 Then edit it to fit your project setup. This is what you will see:
@@ -68,7 +69,8 @@ Then edit it to fit your project setup. This is what you will see:
 
 PROJECT="MyProject"      # your project name, requires camel-case
 DESC="MyProject does this and that"
-LANGUAGE=c               # c,cpp, objc
+LANGUAGE="c"             # c,cpp, objc, bash ...
+
 #
 # Keep these commented out, if the automatic detection works well
 # enough for you
@@ -79,15 +81,17 @@ LANGUAGE=c               # c,cpp, objc
 ...
 ```
 
-Edit `PROJECT` and `DESC` and `LANGUAGE` to match your project.  The language setting is important for the automatic version detection, it can be any string but if your project is written in **C** use `c` and not `C-language` ...  
+Edit `PROJECT` and `DESC` and `LANGUAGE` to match your project.  The language
+setting is important for the automatic version detection. It can be any string,
+but if your project is written in **C** use `c` and not `C-language` ...
 
 
 **mulle-homebrew** has an automatic version detection mechanism (see below).
 You can tweak it by changing `VERSIONNAME` to the string to search for and
-`VERSIONFILE` for the file to search in, but leave it commented out for now.
+`VERSIONFILE` for the file to search in. Often you don't need to do that though.
 
-Change all these settings to fit your project. In the best case that's all you need to
-change.  But best cases are rare occurrences.
+Change all these settings to fit your project. In the best case that's all you
+need to do.  But best cases are rare occurrences.
 
 
 #### Optional: Set dependency related variables
@@ -96,9 +100,9 @@ If you have dependencies on other homebrew formula at run-time, list them in
 `DEPENDENCIES`. List them in `BUILD_DEPENDENCIES` if you only
 need them at build-time.
 
-> If your project relies on a related project that is served by a non-official tap, 
-> it might be useful to use a variable prefix like `${DEPENDENCY_TAP}`, to make 
-> the script more reusable.
+> If your project relies on a related project that is served by a non-official
+> tap, it might be useful to use variable prefixes like `${DEPENDENCY_TAP}`.
+> That makes the script more reusable, for someone that forks your project.
 
 
 ```
@@ -124,13 +128,16 @@ ${BOOTSTRAP_TAP}mulle-build'
 If you can use **mulle-brew** to build an install your project, then you
 are all done.
 
-> **mulle-brew** can build Xcode, cmake and autconf projects
+> **mulle-brew** can build Xcode, cmake and autoconf projects. If you use **cmake** 
+> don't forget to specify it as a dependency.
 
 
 #### Optional: Emit lines for building your project without mulle-build
 
 You will have to change `generate_brew_formula_build` so
-that proper build stages of [formula](https://github.com/Homebrew/brew/blob/master/docs/Formula-Cookbook.md) are emitted.
+that proper build stages of
+[formula](https://github.com/Homebrew/brew/blob/master/docs/Formula-Cookbook.md)
+are emitted.
 
 Using the code from the cookbook, this is how you would modify
 `generate_brew_formula_build` (you usually leave `generate_brew_formula` as is):
@@ -177,17 +184,23 @@ If you keep your version in a header file, it is assumed to be in a
 of the version identifier can be changed with `VERSIONNAME`, if
 **mulle-homebrew** can not deduce it from the `PROJECT_NAME` setting.
 
+There are various variations possible, you can use the shifted form and
+various unshifted forms:
 
-`src/version.h`:
+`version.h`:
 
 ```
 #define MY_VERSION  ((1 << 20) | (7 << 8) | 10)
+#define MY_VERSION  1.7.10
+MY_VERSION="1.7.10"
+set MY_VERSION '1.7.10'
 ```
 
 As an alternative you can maintain the version in a file called `VERSION`
 in your project root.
 
 `VERSION`:
+
 ```
 1.7.10
 ```
@@ -198,31 +211,38 @@ The version is under your control, **mulle-homebrew** will never change it.
 ### 3. Test your release.sh script
 
 Test the script from your project root. You need to give it the publisher,
-which is your user name and the homebrew tap to publish the release to
+which is your user name, and the homebrew tap to publish the release to
 (note the trailing slash character `/`). The `release.sh` can be started with
 `-n`, which performs a dry run without doing anything to your project or
-repository.
+repository. Also you need to specify where the generate formula should be put. That is done somewhat indirectly with `--taps-location` and `--publisher-tap`.
 
 ```
-./bin/release.sh -v -n --publisher mulle-nat --publisher-tap 'mulle-kybernetik/software/'
+./bin/release.sh -v -n --taps-location ~/taps --publisher mulle-nat --publisher-tap 'mulle-kybernetik/software/'
 ```
 
-> #### Caveat
+> #### Tip
 >
-> If your homebrew tap is not in the parent directory of your project, specify
-> it with `--homebrew-path /path/to/tap/..`. Notice the '..'!
+> If your homebrew tap is in the parent directory of your project, you can omit
+> the `--taps-location` option.
+> 
+> Here is an example if the taps are located elsewhere. If your taps path is
+> `/home/nat/mulle-kybernetik/taps/homebrew-software`
+> the `--taps-location` is the parent directory `/home/nat/mulle-kybernetik/taps`.
+> and `--publisher-tap` is `mulle-kybernetik/software/`
 
 
 If the output looks good, then do the release:
 
 ```
-./bin/release.sh --publisher mulle-nat --publisher-tap 'mulle-kybernetik/software/'
+./bin/release.sh --taps-location ~/taps --publisher mulle-nat --publisher-tap 'mulle-kybernetik/software/'
 ```
 
 
-## Variables
+## Script Variables
 
-Most variable can be set via a commandline option. The value for the variable the argument following the option. E.g. `--publisher nat` is treated as `PUBLISHER='nat'`.
+Variables can be set via a commandline option. The value for the variable
+is the argument following the option. So for example `--publisher nat` is
+treated as `PUBLISHER='nat'`.
 
 ## Required Variables
 
@@ -248,15 +268,21 @@ Variable         | Option             | Description
 `ORIGIN`         | `--origin`         | Git remote origin
 `TAG_PREFIX`     | `--tag-prefix`     | Prefix to use with version to create the tag
 `TAG`            | `--tag`            | Tag to use, instead of version
+`TAPS_LOCATION`  | `--taps-location`  | Where your taps are stored on your filesystem.
 `VERSIONFILE`    |    none            | Location of the version file
 `VERSIONNAME`    |    none            | Name of the #define to search for
 
 
-> #### Hint
->
-> You can specify your own variables in the same manner, with any `--` option.
-> An option `--foo 'VfL Bochum 1848'` will create a global variable called
-> `FOO` set to the string "VfL Bochum 1848".
+## User Variables
+
+You can specify your own variables in the same manner, with any `--` option.
+An option `--foo 'VfL Bochum 1848'` will create a global variable called
+`FOO` set to the string "VfL Bochum 1848".
+
+> In that way you could also specify `DESC` or `PROJECT`. But it is generally
+> not recommended.
+
+
 
 ## Miscellaneous
 

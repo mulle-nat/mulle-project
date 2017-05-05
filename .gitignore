@@ -3,3 +3,4 @@ build/
  
 # keep it local
 alpha-release.sh
+.DS_Store

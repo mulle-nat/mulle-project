@@ -118,19 +118,6 @@ git_tag_must_not_exist()
 }
 
 
-git_tag_must_not_exist()
-{
-   local tag
-
-   tag="$1"
-
-   if git rev-parse "${tag}" > /dev/null 2>&1
-   then
-      fail "Tag \"${tag}\" already exists"
-   fi
-}
-
-
 git_must_be_clean()
 {
    local name
@@ -208,7 +195,10 @@ _git_main()
       ;;
    esac
 
+   log_verbose "Check clean state of project"
    exekutor git_must_be_clean               || return 1
+
+   log_verbose "Check that the tag \"${tag}\" does not exist yet"
    exekutor git_tag_must_not_exist "${tag}" || return 1
 
    if ! _git_check_remote "${origin}"
@@ -250,7 +240,7 @@ git_main()
    local branch
    local rval
 
-   log_info "Verify repository \"`pwd -P`\""
+   log_verbose "Verify repository \"`pwd -P`\""
 
    branch="`exekutor git rev-parse --abbrev-ref HEAD`"
    branch="${branch:-master}" # for dry run
@@ -262,7 +252,7 @@ git_main()
    _git_main "${branch}" "$@"
    rval=$?
 
-   log_info "Checkout \"${branch}\" again"
+   log_verbose "Checkout \"${branch}\" again"
    exekutor git checkout "${branch}" || return 1
    return $rval
 }

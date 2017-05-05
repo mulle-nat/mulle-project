@@ -34,15 +34,19 @@
 usage()
 {
    cat <<EOF >&2
-Usage: mulle-homebrew-path [option]
+Usage: mulle-homebrew-env [command]
 
-   Prints the absolute path to mulle-homebrew-path. More useful
-   putput can be had by specifying an option:
+   Prints the configuration of various mulle-homebrew related values.
+   You can also use it to install a template of release.sh in your bin
+   directory.
 
-Options:
-   --libexec-path : print path to support scripts
-   --templatepath : print path to release.sh template
-   --version      : print version of installed scripts
+Commands:
+   install [dir]    : install a release.sh template, usually in your ./bin
+   libexec-path     : print path to support scripts (default)
+   share-path       : print path to resources
+   template-path    : print path to release.sh template
+   version          : print version of installed scripts
+   path             : path of the executable
 
 EOF
    exit 1
@@ -103,36 +107,61 @@ version()
 }
 
 
+projectdir="`pwd -P`"
+
 path="`dirname -- "$0"`"
 cd "${path}" || exit 1
 
 
+# the option prefix is kinda historic now
+
 case "$1" in
-   "--help"|"-h")
+   "--help"|"-h"|"help")
       usage
    ;;
 
-   "--libexec-path")
+   "libexec-path"|"")
       libexec_path
    ;;
 
-   "--share-path")
+   "share-path")
       share_path
    ;;
 
-   "--template-path")
+   "template-path")
       template_path
    ;;
 
-   --version)
+   "--version"|"version")
       version
+   ;;
+
+   "install-template"|"install")
+      shift
+      directory="${1:-bin}"
+      case "${directory}" in
+         /*)
+            # absolute ? keep as is
+         ;;
+
+         *)
+            directory="${projectdir}/${directory}"
+         ;;
+      esac
+
+      if [ ! -d "${directory}" ]
+      then
+         mkdir "${directory}" || exit 1
+      fi
+
+      install -m 0755 "`template_path`" "${directory}/release.sh"
    ;;
 
    -*)
       fail "unknown option \"$1\""
    ;;
 
-   "")
+   path)
       echo "`pwd -P`/`basename -- "$0"`"
    ;;
 

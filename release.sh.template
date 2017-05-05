@@ -39,7 +39,7 @@
 
 PROJECT="MyProject"      # your project name, requires camel-case
 DESC="MyProject does this and that"
-LANGUAGE=c               # c,cpp, objc
+LANGUAGE="c"             # c,cpp, objc, bash ...
 
 
 #
@@ -106,10 +106,10 @@ generate_brew_formula()
 #######
 
 MULLE_BOOTSTRAP_FAIL_PREFIX="`basename -- $0`"
-MULLE_HOMEBREW_VERSION=2.0.0
+MULLE_HOMEBREW_VERSION="3.0.0"
 
-INSTALLED_MULLE_HOMEBREW_VERSION="`mulle-homebrew-path --version`" || exit 1
-LIBEXEC_DIR="`mulle-homebrew-path --libexec-path`" || exit 1
+INSTALLED_MULLE_HOMEBREW_VERSION="`mulle-homebrew-env version`" || exit 1
+LIBEXEC_DIR="`mulle-homebrew-env libexec-path`" || exit 1
 
 . "${LIBEXEC_DIR}/mulle-homebrew.sh" || exit 1
 . "${LIBEXEC_DIR}/mulle-git.sh"      || exit 1
@@ -194,16 +194,16 @@ then
    fail "you need to specify a publisher tap with --publisher-tap (hint: <mulle-kybernetik/software/>)"
 fi
 
-HOMEBREW_PARENT_PATH=".."
+TAPS_LOCATION="${TAPS_LOCATION:-..}"
 
-HOMEBREW_TAP="${HOMEBREW_PARENT_PATH}/homebrew-`basename -- ${PUBLISHER_TAP}`"
+HOMEBREW_TAP="${HOMEBREW_TAP:-${TAPS_LOCATION}/homebrew-`basename -- ${PUBLISHER_TAP}`}"
 
 RBFILE="${RBFILE:-${NAME}.rb}"
 
 # --- GIT ---
 
 #
-# require PUBLISHER and PUBLISHER_TAP as command line parameters, so
+# require PUBLISHER (and PUBLISHER_TAP) as command line parameter, so
 # that forks don't have to edit this constantly
 #
 if [ -z "${PUBLISHER}" ]

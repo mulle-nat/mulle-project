@@ -353,12 +353,6 @@ homebrew_parse_options()
             GITHUB="$1"
          ;;
 
-         --homebrew-path)
-            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
-            shift
-            HOMEBREW_PATH="$1"
-         ;;
-
          --homepage-url)
             [ $# -eq 1 ] && fail "missing parameter for \"$1\""
             shift
@@ -393,6 +387,12 @@ homebrew_parse_options()
             [ $# -eq 1 ] && fail "missing parameter for \"$1\""
             shift
             TAG_PREFIX="$1"
+         ;;
+
+         --taps-location)
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
+            shift
+            TAPS_LOCATION="$1"
          ;;
 
             # allow user to specify own parameters for his
