@@ -196,6 +196,11 @@ case "$1" in
       result="`sed "s/^PROJECT=\\\"MyProject\\\"/PROJECT=\\\"${name}\\\"/" "${template}"`" || exit 1
       [ -z "${result}" ] && fail "release.sh generation failed"
 
+      if [ -f "${projectdir}/CMakeLists.txt" ]
+      then
+         result="`sed "s/^' *# cmake would be useful.*$/cmake'/" <<< "${result}"`" || exit 1
+      fi
+
       echo "${result}" > "${directory}/release.sh"
       chmod 755 "${directory}/release.sh"
    ;;

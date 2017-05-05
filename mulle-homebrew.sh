@@ -196,7 +196,7 @@ generate_brew_formula_mulle_test()
    lines="`cat <<EOF
 
    test do
-      system "mulle-test" ${aux_args}
+      system "mulle-test", "-vvv", "--fast-test" ${aux_args}
    end
 EOF
 `"
