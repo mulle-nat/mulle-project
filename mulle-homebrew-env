@@ -60,6 +60,40 @@ fail()
 }
 
 
+camelcase()
+{
+   local string="$1"
+
+   # convert crap into _
+   string="$(tr -C '[:alnum:]' '_' <<< "${string}")"
+
+   # remove duplicate __
+   string="$(sed 's/__/_/g' <<< "${string}")"
+
+   # remove leading and trailing _
+   string="$(sed 's/^_//g' <<< "${string}")"
+   string="$(sed 's/_$//g' <<< "${string}")"
+
+   # turn _[a-z] into uppercase
+   local  component
+   local  remainder
+
+   remainder="${string}"
+   while [ ! -z "${remainder}" ]
+   do
+      component="$(cut -d_ -f1 <<< "${remainder}")"
+      remainder="$(cut -s -d_ -f2- <<< "${remainder}")"
+
+      # uppercase
+      component="$(tr '[:lower:]' '[:upper:]' <<< "${component:0:1}")${component:1}"
+
+      printf "%s" "${component}"
+   done
+
+   printf "\n"
+}
+
+
 libexec_path()
 {
    if [ ! -f mulle-homebrew.sh ]
@@ -103,7 +137,7 @@ version()
    local filename
 
    filename="`template_path`"
-   egrep -s "^MULLE_HOMEBREW_VERSION=" "${filename}" | cut -d= -f2
+   egrep -s "^MULLE_HOMEBREW_VERSION=" "${filename}" | cut -d= -f2 | tr -d '"'
 }
 
 
@@ -154,7 +188,16 @@ case "$1" in
          mkdir "${directory}" || exit 1
       fi
 
-      install -m 0755 "`template_path`" "${directory}/release.sh"
+      name="`basename -- "${projectdir}"`"
+      name="`camelcase "${name}"`"
+
+      # try to avoid creating empty release.sh if things go awry
+      template="`template_path`"
+      result="`sed "s/^PROJECT=\\\"MyProject\\\"/PROJECT=\\\"${name}\\\"/" "${template}"`" || exit 1
+      [ -z "${result}" ] && fail "release.sh generation failed"
+
+      echo "${result}" > "${directory}/release.sh"
+      chmod 755 "${directory}/release.sh"
    ;;
 
    -*)

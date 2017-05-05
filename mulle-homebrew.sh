@@ -424,20 +424,6 @@ homebrew_parse_options()
 }
 
 
-check_version()
-{
-   local version="$1"
-
-
-   if [ "${major}" -lt "${CMAKE_VERSION_MAJOR}" ] || [ "${major}" -eq "${CMAKE_VERSION_MAJOR}" -a "${minor}" -lt "${CMAKE_VERSION_MINOR}" ]
-   then
-      return 1
-   fi
-
-   return 0
-}
-
-
 homebrew_is_compatible_version()
 {
    local installed="$1"
