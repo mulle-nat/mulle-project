@@ -13,7 +13,7 @@ mulle-git.sh
 )
 
 set( SCRIPTS
-mulle-homebrew-path
+mulle-homebrew-env
 )
 
 
