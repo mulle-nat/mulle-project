@@ -1,6 +1,7 @@
 build/
 *.old
- 
+
 # keep it local
 alpha-release.sh
+camelcase.sh
 .DS_Store

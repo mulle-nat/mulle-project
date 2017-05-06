@@ -91,14 +91,21 @@ generate_brew_formula_header()
 
    lines="`cat <<EOF
 class ${project} < Formula
-   homepage "${homepage}"
-   desc "${desc}"
-   url "${archiveurl}"
-   version "${version}"
-   sha256 "${hash}"
-
+${INDENTATION}desc "${desc}"
+${INDENTATION}homepage "${homepage}"
+${INDENTATION}url "${archiveurl}"
+${INDENTATION}sha256 "${hash}"
 EOF
 `"
+
+   line="version \"${version}\""
+   if fgrep -s "${version}" <<< "${archiveurl}" > /dev/null
+   then
+      line="# ${line}"
+   fi
+
+   lines="${lines}
+${INDENTATION}${line}"
    exekutor echo "${lines}"
 }
 
@@ -118,7 +125,7 @@ _print_dependencies()
       IFS="${DEFAULT_IFS}"
       dependency="`eval echo "${dependency}"`"
 
-      line="   depends_on '${dependency}'${epilog}"
+      line="${INDENTATION}depends_on \"${dependency}\"${epilog}"
 
       # initial LF is liked
       lines="${lines}
@@ -161,16 +168,16 @@ generate_brew_formula_mulle_build()
 
    for option in "$@"
    do
-      aux_args=",${aux_args}\"${option}\" "
+      aux_args=" ,${aux_args}\"${option}\""
    done
 
    local lines
 
    lines="`cat <<EOF
 
-   def install
-      system "mulle-install", "-vvv", "--prefix", "#{prefix}", "--homebrew" ${aux_args}
-   end
+${INDENTATION}def install
+${INDENTATION}${INDENTATION}system "mulle-install", "-vvv", "--prefix", prefix, "--homebrew"${aux_args}
+${INDENTATION}end
 EOF
 `"
    exekutor echo "${lines}"
@@ -188,16 +195,18 @@ generate_brew_formula_mulle_test()
 
    for option in "$@"
    do
-      aux_args=",${aux_args}\"${option}\" "
+      aux_args=" ,${aux_args}\"${option}\""
    done
 
    local lines
 
    lines="`cat <<EOF
 
-   test do
-      system "mulle-test", "-vvv", "--fast-test" ${aux_args}
-   end
+${INDENTATION}test do
+${INDENTATION}${INDENTATION}if File.directory? 'tests'
+${INDENTATION}${INDENTATION}${INDENTATION}system "mulle-test", "-vvv", "--fast-test"
+${INDENTATION}${INDENTATION}end
+${INDENTATION}end
 EOF
 `"
    exekutor echo "${lines}"
@@ -307,6 +316,10 @@ homebrew_parse_options()
 
          --cache)
             USE_CACHE="YES"
+         ;;
+
+         --no-tap-push)
+            OPTION_NO_TAP_PUSH="YES"
          ;;
 
          -f)
@@ -459,7 +472,6 @@ homebrew_is_compatible_version()
 }
 
 
-
 homebrew_main()
 {
    local project="$1" ; shift
@@ -497,7 +509,10 @@ homebrew_main()
 
    redirect_exekutor "${homebrewtap}/${rbfile}" echo "${formula}"
 
-   formula_push "${rbfile}" "${version}" "${name}" "${homebrewtap}"
+   if [ "${OPTION_NO_TAP_PUSH}" != "YES" ]
+   then
+      formula_push "${rbfile}" "${version}" "${name}" "${homebrewtap}"
+   fi
 }
 
 
@@ -511,6 +526,8 @@ homebrew_initialize()
    then
       DEFAULT_IFS="${IFS}"
    fi
+
+   INDENTATION="  "  # ruby fascism
 
    directory="`mulle-bootstrap library-path 2> /dev/null`"
    [ ! -d "${directory}" ] && echo "failed to locate mulle-bootstrap library" >&2 && exit 1
