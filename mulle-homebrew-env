@@ -96,38 +96,28 @@ camelcase()
 
 libexec_path()
 {
-   if [ ! -f mulle-homebrew.sh ]
-   then
-      [ ! -d "../libexec" ] && fail "libexec not found"
-      [ ! -d "../libexec/mulle-homebrew" ] && fail "libexec/mulle-homebrew is missing"
+   [ ! -d "${libexecpath}" ] && fail "libexec folder \"${libexecpath}\" missing"
 
-      cd ../libexec/mulle-homebrew || exit 1
-   fi
-
+   cd "${libexecpath}" || exit 1
    pwd -P
 }
 
 
 share_path()
 {
-   if [ ! -f release.sh.template ]
-   then
-      [ ! -d "../share" ] && fail "share not found"
-      [ ! -d "../share/mulle-homebrew" ] && fail "share/mulle-homebrew is missing"
+   [ ! -d "${sharepath}" ] && fail "share folder \"${sharepath}\" missing"
 
-      cd ../share/mulle-homebrew || exit 1
-   fi
-
+   cd "${sharepath}" || exit 1
    pwd -P
 }
 
 
+
 template_path()
 {
-   share_path > /dev/null || exit 1
+   [ ! -f "${sharepath}/release.sh.template" ] && fail "template \""${sharepath}/release.sh.template"\" missing"
 
-   [ ! -f "release.sh.template" ] && fail "release.sh.template is missing"
-
+   cd "${sharepath}" || exit 1
    echo "`pwd -P`/release.sh.template"
 }
 
@@ -141,14 +131,47 @@ version()
 }
 
 
+#
+# stolen from:
+# http://stackoverflow.com/questions/1055671/how-can-i-get-the-behavior-of-gnus-readlink-f-on-a-mac
+# ----
+#
+_prepend_path_if_relative()
+{
+   case "$2" in
+      /*)
+         echo "$2"
+         ;;
+      *)
+         echo "$1/$2"
+         ;;
+   esac
+}
+
+
+resolve_symlinks()
+{
+   local dir_context
+   local linkpath
+
+   if linkpath="`readlink "$1"`"
+   then
+      dir_context=`dirname -- "$1"`
+      resolve_symlinks "`_prepend_path_if_relative "${dir_context}" "${linkpath}"`"
+   else
+      echo "$1"
+   fi
+}
+
+
 projectdir="`pwd -P`"
 
 # resolve symlinks if there
-executable="`readlink "$0"`"
-executable="${executable:-$0}"
-
-path="`dirname -- "${executable}"`"
-cd "${path}" || exit 1
+executable="`resolve_symlinks "$0"`"
+exedirpath="`dirname "${executable}"`"
+prefix="`dirname "${exedirpath}"`"
+libexecpath="${prefix}/libexec/mulle-homebrew"
+sharepath="${prefix}/share/mulle-homebrew"
 
 
 # the option prefix is kinda historic now
