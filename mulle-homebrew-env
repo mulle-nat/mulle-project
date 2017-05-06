@@ -143,7 +143,11 @@ version()
 
 projectdir="`pwd -P`"
 
-path="`dirname -- "$0"`"
+# resolve symlinks if there
+executable="`readlink "$0"`"
+executable="${executable:-$0}"
+
+path="`dirname -- "${executable}"`"
 cd "${path}" || exit 1
 
 
@@ -210,7 +214,7 @@ case "$1" in
    ;;
 
    path)
-      echo "`pwd -P`/`basename -- "$0"`"
+      echo "${executable}"
    ;;
 
    *)
