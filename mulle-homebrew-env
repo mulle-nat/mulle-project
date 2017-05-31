@@ -170,8 +170,17 @@ projectdir="`pwd -P`"
 executable="`resolve_symlinks "$0"`"
 exedirpath="`dirname "${executable}"`"
 prefix="`dirname "${exedirpath}"`"
-libexecpath="${prefix}/libexec/mulle-homebrew"
-sharepath="${prefix}/share/mulle-homebrew"
+
+# allow local execution from project
+if [ -e "${prefix}/mulle-homebrew.sh" -a -e "${prefix}/release.sh.template" ]
+then
+   libexecpath="${prefix}"
+   sharepath="${prefix}"
+else
+   libexecpath="${prefix}/libexec/mulle-homebrew"
+   sharepath="${prefix}/share/mulle-homebrew"
+fi
+
 
 
 # the option prefix is kinda historic now

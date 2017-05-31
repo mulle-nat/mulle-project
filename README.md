@@ -2,8 +2,10 @@
 
 ![mulle-homebrew.iconset/icon_128x128-png](mulle-homebrew.iconset/icon_128x128.png)
 
-**mulle-homebrew** provides a convenience script to tag and release your project 
-and publish it on a [homebrew](//brew.sh) tap. It has been designed, so that it can be used with multiple forks.
+**mulle-homebrew** provides a convenience script to tag and release your
+[cmake](//cmake.org) based project and publish it on a [homebrew](//brew.sh)
+tap. It has been designed, so that it can be used with multiple forks.
+
 
 #### What the script does
 
@@ -54,7 +56,7 @@ project.
 
 
 ```
-`mulle-homebrew-env --install ./bin`"
+mulle-homebrew-env install ./bin
 ```
 
 Then edit it to fit your project setup. This is what you will see:
@@ -128,7 +130,7 @@ ${BOOTSTRAP_TAP}mulle-build'
 If you can use **mulle-brew** to build an install your project, then you
 are all done.
 
-> **mulle-brew** can build Xcode, cmake and autoconf projects. If you use **cmake** 
+> **mulle-brew** can build Xcode, cmake and autoconf projects. If you use **cmake**
 > don't forget to specify it as a dependency.
 
 
@@ -224,7 +226,7 @@ repository. Also you need to specify where the generate formula should be put. T
 >
 > If your homebrew tap is in the parent directory of your project, you can omit
 > the `--taps-location` option.
-> 
+>
 > Here is an example if the taps are located elsewhere. If your taps path is
 > `/home/nat/mulle-kybernetik/taps/homebrew-software`
 > the `--taps-location` is the parent directory `/home/nat/mulle-kybernetik/taps`.
@@ -289,8 +291,8 @@ An option `--foo 'VfL Bochum 1848'` will create a global variable called
 ### How to setup a homebrew tap on github.com
 
 
-On [github.com](https://github.com) create a repository with a "homebrew-" prefixed name.
-If your tap is supposed to be accessed as "software" call it "homebrew-software".
-If your github user name is `mulle-nat`, you could then access this tap with
-`brew tap mulle-nat/software`.
+On [github.com](https://github.com) create a repository with a "homebrew-"
+prefixed name. If your tap is supposed to be accessed as "software" call it
+"homebrew-software". If your github user name is `mulle-nat`, you could then
+access this tap with `brew tap mulle-nat/software`.
 
