@@ -172,10 +172,10 @@ exedirpath="`dirname "${executable}"`"
 prefix="`dirname "${exedirpath}"`"
 
 # allow local execution from project
-if [ -e "${prefix}/mulle-homebrew.sh" -a -e "${prefix}/release.sh.template" ]
+if [ -e "${exedirpath}/mulle-homebrew.sh" -a -e "${exedirpath}/release.sh.template" ]
 then
-   libexecpath="${prefix}"
-   sharepath="${prefix}"
+   libexecpath="${exedirpath}"
+   sharepath="${exedirpath}"
 else
    libexecpath="${prefix}/libexec/mulle-homebrew"
    sharepath="${prefix}/share/mulle-homebrew"
