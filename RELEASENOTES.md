@@ -1,3 +1,25 @@
+### 4.0.0
+
+mulle-hombrew used to be used as an embedded project. This is no more.
+You can install it via `brew` for example or put it into your regular
+dependencies (`.bootstrap/repositories` instead of
+`.bootstrap/embedded_repositories`)
+
+
+#### The meaning of PROJECT and NAME has changed
+
+* PROJECT is now simply the (GitHub) repository name
+* NAME is the brew formula filename without .rb extension
+
+#### Other changes
+
+* simplified release.sh
+* use two (three) .sh files release-info.sh and formula-info.sh for customization. This allows (in many cases) to upgrade the release script with mulle-homebrew-env install w/o having to re-edit the release.sh file
+* new exposed version functionality via mulle-homebrew-get-version
+* you can choose to not generate a formula if so desired, simply remove formula-info.sh
+* now checks if remotes require merging before tagging
+* add mulle-homebrew-untag because I notoriusly forget to update the dox
+
 ### 3.4.4
 
 * improve error messages for common problems

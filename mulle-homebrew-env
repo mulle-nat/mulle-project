@@ -30,21 +30,19 @@
 #   POSSIBILITY OF SUCH DAMAGE.
 #
 
-
 usage()
 {
    cat <<EOF >&2
 Usage: mulle-homebrew-env [command]
 
    Prints the configuration of various mulle-homebrew related values.
-   You can also use it to install a template of release.sh in your bin
-   directory.
+   You can also use it to install a release.sh in your bin
+   directory and release-info.sh and formula-info.sh in your project directory.
 
 Commands:
    install [dir]    : install a release.sh template, usually in your ./bin
    libexec-path     : print path to support scripts (default)
    share-path       : print path to resources
-   template-path    : print path to release.sh template
    version          : print version of installed scripts
    path             : path of the executable
 
@@ -112,13 +110,32 @@ share_path()
 }
 
 
-
-template_path()
+_template_path()
 {
-   [ ! -f "${sharepath}/release.sh.template" ] && fail "template \""${sharepath}/release.sh.template"\" missing"
+   local name="$1"
+
+   [ ! -f "${sharepath}/${name}" ] && fail "template \""${sharepath}/${name}"\" missing"
 
    cd "${sharepath}" || exit 1
-   echo "`pwd -P`/release.sh.template"
+   echo "`pwd -P`/${name}"
+}
+
+
+release_template_path()
+{
+   _template_path "release.sh.template"
+}
+
+
+release_info_template_path()
+{
+   _template_path "release-info.sh.template"
+}
+
+
+formula_info_template_path()
+{
+   _template_path "formula-info.sh.template"
 }
 
 
@@ -126,7 +143,7 @@ version()
 {
    local filename
 
-   filename="`template_path`"
+   filename="`release_template_path`"
    egrep -s "^MULLE_HOMEBREW_VERSION=" "${filename}" | cut -d= -f2 | tr -d '"'
 }
 
@@ -164,93 +181,269 @@ resolve_symlinks()
 }
 
 
-projectdir="`pwd -P`"
+write_release_template()
+{
+   local directory="$1"
 
-# resolve symlinks if there
-executable="`resolve_symlinks "$0"`"
-exedirpath="`dirname "${executable}"`"
-prefix="`dirname "${exedirpath}"`"
+   local template
 
-# allow local execution from project
-if [ -e "${exedirpath}/mulle-homebrew.sh" -a -e "${exedirpath}/release.sh.template" ]
-then
-   libexecpath="${exedirpath}"
-   sharepath="${exedirpath}"
-else
-   libexecpath="${prefix}/libexec/mulle-homebrew"
-   sharepath="${prefix}/share/mulle-homebrew"
-fi
+   # try to avoid creating empty release.sh if things go awry
+   template="`release_template_path`"
+
+   if [ ! -d "${directory}" ]
+   then
+      mkdir -p "${directory}" || exit 1
+   fi
+
+   if [ -z "${AUTHOR}" ]
+   then
+      AUTHOR="${USER:-${LOGNAME}}"
+
+      if [ "${LOGNAME}" = "nat" -a "`id -u`" = "955" ]
+      then
+         case `hostname` in
+            kempe*)
+               AUTHOR='Nat! - Mulle kybernetiK'
+            ;;
+
+            *)
+               AUTHOR='Nat! - Codeon GmbH'
+            ;;
+         esac
+      fi
+   fi
+
+   cat << EOF > "${directory}/release.sh"
+#! /usr/bin/env bash
+#
+#   Copyright (c) `date '+%Y'` ${AUTHOR}
+#   All rights reserved.
+#
+EOF
+
+   if [ -z "${NO_BSD3}" ]
+   then
+      cat << EOF >> "${directory}/release.sh"
+#   Redistribution and use in source and binary forms, with or without
+#   modification, are permitted provided that the following conditions are met:
+#
+#   Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+#   Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+#   Neither the name of Mulle kybernetiK nor the names of its contributors
+#   may be used to endorse or promote products derived from this software
+#   without specific prior written permission.
+#
+#   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+#   AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+#   IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+#   ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+#   LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+#   CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+#   SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+#   INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+#   CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+#   ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+#   POSSIBILITY OF SUCH DAMAGE.
+#
+EOF
+   fi
+
+   cat "${template}" >> "${directory}/release.sh"
+   chmod 755 "${directory}/release.sh"
+}
 
 
+write_release_info_template()
+{
+   local directory="$1"
 
-# the option prefix is kinda historic now
+   local template
 
-case "$1" in
-   "--help"|"-h"|"help")
-      usage
-   ;;
+   # try to avoid creating empty release.sh if things go awry
+   template="`release_info_template_path`"
 
-   "libexec-path"|"")
-      libexec_path
-   ;;
+   if [ ! -d "${directory}" ]
+   then
+      mkdir -p "${directory}" || exit 1
+   fi
 
-   "share-path")
-      share_path
-   ;;
+   local filename
 
-   "template-path")
-      template_path
-   ;;
+   filename="${directory}/release-info.sh"
+   if [ ! -e "${filename}" -o "${OPTION_FORCE}" = "YES" ]
+   then
+      (
+         cat "${template}" > "${filename}" &&
+         chmod 755 "${filename}"
+      ) || exit 1
+   fi
+}
 
-   "--version"|"version")
-      version
-   ;;
 
-   "install-template"|"install")
-      shift
-      directory="${1:-bin}"
-      case "${directory}" in
-         /*)
-            # absolute ? keep as is
+write_formula_info_template()
+{
+   local directory="$1"
+   local projectdir="$2"
+
+   local template
+   local name
+
+   # try to avoid creating empty release.sh if things go awry
+   template="`formula_info_template_path`"
+
+   name="`basename -- "${projectdir}"`"
+   name="`camelcase "${name}"`"
+
+   result="`sed "s/^# PROJECT=\\\"MyProject\\\"/PROJECT=\\\"${name}\\\"/" "${template}"`" || exit 1
+   [ -z "${result}" ] && fail "release.sh generation failed"
+   result="`echo "${result}" | sed "s/^# DESC=\\\".*\\\"/DESC=\\\"${name} is ...\\\"/"`" || exit 1
+
+   if [ -f "${projectdir}/CMakeLists.txt" ]
+   then
+      result="`echo "${result}" |  sed "s/^' *# cmake may be useful to add *$/cmake'/"`" || exit 1
+   fi
+
+   if [ ! -d "${directory}" ]
+   then
+      mkdir -p "${directory}" || exit 1
+   fi
+
+   local filename
+
+   #
+   # sic! check for release-info.sh
+   # because a deleted formula-info.sh has meaning
+   #
+   filename="${directory}/formula-info.sh"
+   if [ ! -e "${directory}/release-info.sh" -o "${OPTION_FORCE}" = "YES" ]
+   then
+      (
+         echo "${result}" > "${filename}" &&
+         chmod 755 "${filename}"
+      ) || exit 1
+   fi
+}
+
+
+main()
+{
+   local projectdir
+   local executable
+   local exedirpath
+   local prefix
+
+   projectdir="`pwd -P`"
+
+   # resolve symlinks if there
+   executable="`resolve_symlinks "$0"`"
+   exedirpath="`dirname "${executable}"`"
+   prefix="`dirname "${exedirpath}"`"
+
+
+   local libexecpath
+   local sharepath
+   local directory
+
+   # allow local execution from project
+   if [ -e "${exedirpath}/mulle-homebrew.sh" -a -e "${exedirpath}/release.sh.template" ]
+   then
+      libexecpath="${exedirpath}"
+      sharepath="${exedirpath}"
+   else
+      libexecpath="${prefix}/libexec/mulle-homebrew"
+      sharepath="${prefix}/share/mulle-homebrew"
+   fi
+
+   local OPTION_FORCE
+
+   # the option prefix is kinda historic now
+   while [ $# -ne 0 ]
+   do
+      case "$1" in
+         "--help"|"-h"|"help")
+            usage
+         ;;
+
+         "-d"|"--directory")
+            [ $# -eq 1 ] && fail "missing argument for $1"
+            shift
+            projectdir="$1"
+         ;;
+
+         "--version")
+            version
+            exit 0
+         ;;
+
+         -f)
+            OPTION_FORCE="YES"
+         ;;
+
+         -t)
+            set -x
+         ;;
+
+         -*)
+            fail "unknown option \"$1\""
          ;;
 
          *)
-            directory="${projectdir}/${directory}"
+            break
          ;;
       esac
+      shift
+   done
 
-      if [ ! -d "${directory}" ]
-      then
-         mkdir "${directory}" || exit 1
-      fi
 
-      name="`basename -- "${projectdir}"`"
-      name="`camelcase "${name}"`"
+   case "$1" in
 
-      # try to avoid creating empty release.sh if things go awry
-      template="`template_path`"
-      result="`sed "s/^PROJECT=\\\"MyProject\\\"/PROJECT=\\\"${name}\\\"/" "${template}"`" || exit 1
-      [ -z "${result}" ] && fail "release.sh generation failed"
+      "libexec-path"|"")
+         libexec_path
+      ;;
 
-      if [ -f "${projectdir}/CMakeLists.txt" ]
-      then
-         result="`sed "s/^' *# cmake would be useful.*$/cmake'/" <<< "${result}"`" || exit 1
-      fi
+      "share-path")
+         share_path
+      ;;
 
-      echo "${result}" > "${directory}/release.sh"
-      chmod 755 "${directory}/release.sh"
-   ;;
+      "version")
+         version
+      ;;
 
-   -*)
-      fail "unknown option \"$1\""
-   ;;
+      "install-template"|"install")
+         shift
+         directory="${1:-bin}"
 
-   path)
-      echo "${executable}"
-   ;;
+         case "${directory}" in
+            /*)
+               # absolute ? keep as is
+            ;;
 
-   *)
-      usage
-   ;;
-esac
+            *)
+               directory="${projectdir}/${directory}"
+            ;;
+         esac
+
+         write_release_template "${directory}"
+         write_formula_info_template "${directory}" "${projectdir}" # write first
+         write_release_info_template "${directory}"
+      ;;
+
+      path)
+         echo "${executable}"
+      ;;
+
+      *)
+         usage
+      ;;
+   esac
+}
+
+
+MULLE_EXECUTABLE_FAIL_PREFIX="`basename -- "$0"`"
+main "$@"
 

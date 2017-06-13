@@ -1,0 +1,162 @@
+#! /usr/bin/env bash
+#
+#   Copyright (c) 2017 Nat! - Mulle kybernetiK
+#   All rights reserved.
+#
+#   Redistribution and use in source and binary forms, with or without
+#   modification, are permitted provided that the following conditions are met:
+#
+#   Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+#   Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+#   Neither the name of Mulle kybernetiK nor the names of its contributors
+#   may be used to endorse or promote products derived from this software
+#   without specific prior written permission.
+#
+#   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+#   AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+#   IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+#   ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+#   LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+#   CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+#   SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+#   INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+#   CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+#   ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+#   POSSIBILITY OF SUCH DAMAGE.
+#
+
+usage()
+{
+   cat <<EOF >&2
+Usage: mulle-homebrew-get-version [options] [projectname]
+
+   Determine the project version.
+
+Options:
+   --language <name>     : project language, (c, obj, cpp, bash etc)
+   --versionname <name>  : version variable name
+   --versionfile <file>  : file containing version
+EOF
+   exit 1
+}
+
+
+fail()
+{
+   echo "Error:" "$*" >&2
+   exit 1
+}
+
+
+main()
+{
+   local directory
+
+   while [ $# -ne 0 ]
+   do
+      case "$1" in
+         --language)
+            [ $# -eq 1 ] && fail "missing argument to $1"
+            shift
+            LANGUAGE="$1"
+         ;;
+
+         --versionname)
+            [ $# -eq 1 ] && fail "missing argument to $1"
+            shift
+            VERSIONNAME="$1"
+         ;;
+
+         --versionfile)
+            [ $# -eq 1 ] && fail "missing argument to $1"
+            shift
+            VERSIONFILE="$1"
+         ;;
+
+         -h|--help)
+            usage
+         ;;
+
+         -*)
+            fail "unknown option $1"
+         ;;
+
+         *)
+            break
+         ;;
+      esac
+
+      shift
+   done
+
+   DIRECTORY_NAME="`basename -- "$PWD"`"
+
+   PROJECT="${1:-${DIRECTORY_NAME}}"
+   [ $# -ne 0 ] && shift
+
+   #
+   # prefer local mulle-homebrew if available
+   # Do not embed it anymore!
+   #
+   if [ -z "`command -v mulle-homebrew-env`" ]
+   then
+      cat <<EOF >&2
+mulle-homebrew-env not found in PATH.
+Visit the homepage for installation instructions:
+   https://github.com/mulle-nat/mulle-homebrew
+EOF
+      exit 1
+   fi
+
+   INSTALLED_MULLE_HOMEBREW_VERSION="`mulle-homebrew-env version`" || exit 1
+   LIBEXEC_DIR="`mulle-homebrew-env libexec-path`" || exit 1
+
+   . "${LIBEXEC_DIR}/mulle-version.sh" || exit 1
+
+   #
+   # these can usually be deduced, if you follow the conventions
+   #
+   if [ -z "${LANGUAGE}" ]
+   then
+      LANGUAGE="`get_language_from_directoryname "${DIRECTORY_NAME}"`" || exit 1
+   fi
+
+   if [ -z "${VERSIONFILE}" ]
+   then
+      VERSIONFILE="`get_header_from_project "${PROJECT}" "${LANGUAGE}"`" || exit 1
+   fi
+
+   if [ -z "${VERSIONNAME}" ]
+   then
+      VERSIONNAME="`get_versionname_from_project "${PROJECT}"`" || exit 1
+   fi
+
+   if [ -f VERSION ]
+   then
+      VERSION="`head -1 VERSION`"
+   else
+      VERSION="`get_project_version "${VERSIONFILE}" "${VERSIONNAME}"`" || exit 1
+      if [ -z "${VERSION}" ]
+      then
+         VERSION="`get_project_version "src/version.h" "${VERSIONNAME}"`" || exit 1
+      fi
+   fi
+
+   if [ -z "${VERSION}" ]
+   then
+      fail "Could not figure out the version for PROJECT=\"${PROJECT}\", LANGUAGE=\"${LANGUAGE}\", VERSIONNAME=\"${VERSIONNAME}\", VERSIONFILE=\"${VERSIONFILE}\". (hint: specify VERSIONNAME, VERSIONFILE)"
+   fi
+
+   echo "${VERSION}"
+}
+
+
+MULLE_EXECUTABLE="`basename -- $0`"
+MULLE_BOOTSTRAP_FAIL_PREFIX="${MULLE_EXECUTABLE}"
+
+main "$@"

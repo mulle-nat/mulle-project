@@ -30,81 +30,6 @@
 #   POSSIBILITY OF SUCH DAMAGE.
 #
 
-#
-# convert VfLBochum -> VfL Bochum
-# HugoFiege -> Hugo Fiege
-#
-split_camelcase_string()
-{
-   sed -e 's/\(.\)\([A-Z]\)\([a-z_0-9]\)/\1 \2\3/g'
-}
-
-
-# convert all to uppercase, spaces and minus to '_'
-# does not work well for camel case
-make_cpp_string()
-{
-   tr '[a-z]' '[A-Z]' | tr ' ' '_' | tr '-' '_'
-}
-
-
-make_directory_string()
-{
-   tr '[A-Z]' '[a-z]' | tr ' ' '-' | tr '_' '-'
-}
-
-
-make_file_string()
-{
-   tr '[A-Z]' '[a-z]' | tr ' ' '_' | tr '-' '_'
-}
-
-
-
-get_header_from_name()
-{
-   echo "src/$1.h" | make_file_string
-}
-
-
-get_versionname_from_project()
-{
-   echo "$1_VERSION" | split_camelcase_string | make_cpp_string
-}
-
-
-get_project_version()
-{
-   local filename
-   local versionname
-
-   filename="$1"
-   versionname="$2"
-
-   match="`fgrep -s -w "${versionname}" "${filename}" | head -1`"
-   case "${match}" in
-      *"<<"*)
-         echo "${match}" | \
-         sed 's|(\([0-9]*\) \<\< [0-9]*)|\1|g' | \
-         sed 's|^.*(\(.*\))|\1|' | \
-         sed 's/ | /./g'
-      ;;
-
-      *)
-         # may stumble if there is any other number than version in the line
-         sed -n 's/^[^0-9]*\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*$/\1/p' <<< "${match}"
-      ;;
-   esac
-}
-
-
-# legacy name
-get_header_version()
-{
-   get_project_version "$@"
-}
-
-
 git_tag_must_not_exist()
 {
    local tag
@@ -139,12 +64,26 @@ git_must_be_clean()
 }
 
 
+# more convenient if not exekutored!
+git_repo_can_push()
+{
+   local remote="${1:-origin}"
+   local branch="${2:-release}"
+
+   local result
+
+   exekutor git fetch -q "${remote}" "${branch}"
+   result="`exekutor git rev-list --left-right "HEAD...${remote}/${branch}" --ignore-submodules --count | awk '{ print $2 }'`"
+   [ -z "${result}" ] || [ "${result}" -eq 0 ]  # -z test for exekutor
+}
+
+
 _git_check_remote()
 {
    local name="$1"
 
    log_info "Check if remote \"${name}\" is present"
-   exekutor git ls-remote -q --exit-code "${name}" > /dev/null
+   exekutor git ls-remote -q --exit-code "${name}" > /dev/null 2> /dev/null
 }
 
 
@@ -203,8 +142,38 @@ _git_main()
 
    if ! _git_check_remote "${origin}"
    then
-      log_error "\"${origin}\" not accessible"
-      return 1
+      fail "\"${origin}\" not accessible"
+   fi
+
+   local have_github
+
+   if _git_check_remote "${github}"
+   then
+      have_github="YES"
+   else
+      log_info "There is no remote named \"${github}\""
+   fi
+
+   #
+   # check that we can push
+   #
+   log_verbose "Check if remotes need merge"
+   if ! git_repo_can_push "${origin}" "${branch}"
+   then
+      fail "You need to merge \"${origin}/${branch}\" first"
+   fi
+
+   if ! git_repo_can_push "${origin}" "${dstbranch}"
+   then
+      fail "You need to merge \"${origin}/${dstbranch}\" first"
+   fi
+
+   if [ "${have_github}" = "YES" ]
+   then
+      if ! git_repo_can_push "${github}" "${dstbranch}"
+      then
+         fail "You need to merge \"${github}/${dstbranch}\" first"
+      fi
    fi
 
    #
@@ -220,17 +189,15 @@ _git_main()
    # if rebase fails, we shouldn't be hitting tag now
 
    log_info "Tag \"${dstbranch}\" with \"${tag}\""
-   exekutor git tag "${tag}"                    || return 1
+   exekutor git tag "${tag}"                  || return 1
 
    log_info "Push \"${dstbranch}\" with tags to \"${origin}\""
    exekutor git push "${origin}" "${dstbranch}" --tags || return 1
 
-   if _git_check_remote "${github}"
+   if [ "${have_github}" = "YES" ]
    then
       log_info "Push \"${dstbranch}\" with tags to \"${github}\""
       exekutor git push "${github}" "${dstbranch}" --tags || return 1
-   else
-      log_info "There is no remote named \"${github}\""
    fi
 }
 

@@ -30,6 +30,38 @@
 #   POSSIBILITY OF SUCH DAMAGE.
 #
 
+
+get_class_from_name()
+{
+   local name="$1"
+
+   local formula
+
+   ## formula is dervied from name, which is rbfile w/o extension
+
+   formula="$(tr '-' ' ' <<< "${name}")"
+
+   (
+
+      local i
+      local tmp
+      local result
+
+      IFS=" "
+      for i in $formula
+      do
+         if [ ! -z "$i" ]
+         then
+            tmp="$(tr '[A-Z]' '[a-z]' <<< "${i}")"
+            tmp="$(tr '[a-z]' '[A-Z]' <<< "${tmp:0:1}")${tmp:1}"
+            result="${result}${tmp}"
+         fi
+      done
+      echo "${result}"
+   )
+}
+
+
 generate_brew_formula_header()
 {
    local project="$1"
@@ -44,7 +76,7 @@ generate_brew_formula_header()
 
    local tmparchive
 
-   tmparchive="/tmp/${name}-${version}-archive"
+   tmparchive="/tmp/${project}-${version}-archive"
 
    if [ -z "${USE_CACHE}" -a -f "${tmparchive}" ]
    then
@@ -71,7 +103,7 @@ generate_brew_formula_header()
    size="`exekutor du -k "${tmparchive}" | exekutor awk '{ print $ 1}'`"
    if [ -z "${MULLE_FLAG_EXEKUTOR_DRY_RUN}" ]
    then
-      if [ "$size" -lt ${ARCHIVE_MINSIZE:-2} ]
+      if [ "$size" -lt "${ARCHIVE_MINSIZE:-2}" ]
       then
          echo "Archive truncated or missing" >&2
          cat "${tmparchive}" >&2
@@ -84,13 +116,17 @@ generate_brew_formula_header()
 
    hash="`exekutor shasum -p -a 256 "${tmparchive}" | exekutor awk '{ print $1 }'`"
 
+   local formula
+
+   formula="`get_class_from_name "${name}"`"
+
+   ##
+   ##
+
    local lines
 
-   ##
-   ##
-
    lines="`cat <<EOF
-class ${project} < Formula
+class ${formula} < Formula
 ${INDENTATION}desc "${desc}"
 ${INDENTATION}homepage "${homepage}"
 ${INDENTATION}url "${archiveurl}"
@@ -213,7 +249,6 @@ EOF
 }
 
 
-
 generate_brew_formula_footer()
 {
    local name="$1"
@@ -241,28 +276,10 @@ _generate_brew_formula()
    local archiveurl="$8"
 
    generate_brew_formula_header "${project}" "${name}" "${version}" \
-                                "${homepage}" "${desc}" "${archiveurl}" &&
+                                "${homepage}" "${desc}" "${archiveurl}"  &&
    generate_brew_formula_dependencies "${dependencies}" "${builddependencies}" &&
    generate_brew_formula_build "${project}" "${name}" "${version}" "${dependencies}" &&
    generate_brew_formula_footer "${name}"
-}
-
-
-get_name_from_project()
-{
-   local name="$1"
-   local language="$2"
-
-   language="`tr '[A-Z]' '[a-z]' <<< "${language}"`"
-   case "${language}" in
-      c|sh|bash)
-         echo "${name}" | split_camelcase_string | make_directory_string
-      ;;
-
-      *|"")
-         echo "${name}"
-      ;;
-   esac
 }
 
 
@@ -291,6 +308,8 @@ formula_push()
 #
 homebrew_parse_options()
 {
+   OPTION_NO_FORMULA="NO"
+
    while [ $# -ne 0 ]
    do
       case "$1" in
@@ -314,14 +333,6 @@ homebrew_parse_options()
             MULLE_FLAG_LOG_EXEKUTOR="YES"
          ;;
 
-         --cache)
-            USE_CACHE="YES"
-         ;;
-
-         --no-tap-push)
-            OPTION_NO_TAP_PUSH="YES"
-         ;;
-
          -f)
             MULLE_TEST_IGNORE_FAILURE="YES"
          ;;
@@ -341,6 +352,25 @@ homebrew_parse_options()
          -te|--trace-execution)
             MULLE_FLAG_LOG_EXEKUTOR="YES"
          ;;
+
+         # single arg long (kinda lame)
+         -cache)
+            USE_CACHE="YES"
+         ;;
+
+         -echo)
+            OPTION_ECHO="YES"
+         ;;
+
+         -no-formula)
+            OPTION_NO_FORMULA="YES"
+         ;;
+
+         -no-push|-no-tap-push)
+            OPTION_NO_TAP_PUSH="YES"
+         ;;
+
+         # arg long
 
          --bootstrap-tap)
             [ $# -eq 1 ] && fail "missing parameter for \"$1\""
@@ -487,6 +517,8 @@ homebrew_main()
 
    local formula
 
+   [ "${OPTION_NO_FORMULA}" = "YES" ] && return
+
    [ -z "${project}" ]     && internal_fail "missing project"
    [ -z "${name}" ]        && internal_fail "missing name"
    [ -z "${version}" ]     && internal_fail "missing version"
@@ -495,9 +527,20 @@ homebrew_main()
    [ -z "${homebrewtap}" ] && internal_fail "missing homebrewtap"
    [ -z "${rbfile}" ]      && internal_fail "missing rbfile"
 
-   [ ! -d "${homebrewtap}" ] && fail "failed to locate \"${homebrewtap}\" from \"$PWD\""
+
+   [ ! -d "${homebrewtap}" ] && fail "Failed to locate tap directory \"${homebrewtap}\" from \"$PWD\""
 
    log_info "Generate brew fomula \"${homebrewtap}/${rbfile}\""
+
+   log_fluff "project           = ${C_RESET}${project}"
+   log_fluff "name              = ${C_RESET}${name}"
+   log_fluff "version           = ${C_RESET}${version}"
+   log_fluff "homepage          = ${C_RESET}${homepage}"
+   log_fluff "desc              = ${C_RESET}${desc}"
+   log_fluff "archiveurl        = ${C_RESET}${archiveurl}"
+   log_fluff "dependencies      = ${C_RESET}${dependencies}"
+   log_fluff "builddependencies = ${C_RESET}${builddependencies}"
+
    formula="`generate_brew_formula "${project}" \
                                    "${name}" \
                                    "${version}" \
@@ -506,6 +549,12 @@ homebrew_main()
                                    "${homepage}" \
                                    "${desc}" \
                                    "${archiveurl}"`" || exit 1
+
+   if [ "${OPTION_ECHO}" ]
+   then
+      echo "${formula}"
+      return
+   fi
 
    redirect_exekutor "${homebrewtap}/${rbfile}" echo "${formula}"
 
@@ -520,22 +569,25 @@ homebrew_initialize()
 {
    local directory
 
-   MULLE_EXECUTABLE_PID=$$
-
-   if [ -z "${DEFAULT_IFS}" ]
+   if [ -z "${MULLE_EXECUTABLE_PID}" ]
    then
-      DEFAULT_IFS="${IFS}"
-   fi
+      MULLE_EXECUTABLE_PID=$$
 
-   INDENTATION="  "  # ruby fascism
+      if [ -z "${DEFAULT_IFS}" ]
+      then
+         DEFAULT_IFS="${IFS}"
+      fi
 
-   directory="`mulle-bootstrap library-path 2> /dev/null`"
-   [ ! -d "${directory}" ] && echo "failed to locate mulle-bootstrap library" >&2 && exit 1
-   PATH="${directory}:$PATH"
+      INDENTATION="  "  # ruby fascism
 
-   [ -z "${MULLE_BOOTSTRAP_LOGGING_SH}" ]   && . mulle-bootstrap-logging.sh
-   [ -z "${MULLE_BOOTSTRAP_FUNCTIONS_SH}" ] && . mulle-bootstrap-functions.sh
-   [ -z "${MULLE_BOOTSTRAP_ARRAY_SH}" ]     && . mulle-bootstrap-array.sh
+      directory="`mulle-bootstrap library-path 2> /dev/null`"
+      [ ! -d "${directory}" ] && echo "Failed to locate mulle-bootstrap library. https://github.com/mulle-nat/mulle-bootstrap" >&2 && exit 1
+      PATH="${directory}:$PATH"
+
+      [ -z "${MULLE_BOOTSTRAP_LOGGING_SH}" ]   && . mulle-bootstrap-logging.sh
+      [ -z "${MULLE_BOOTSTRAP_FUNCTIONS_SH}" ] && . mulle-bootstrap-functions.sh
+      [ -z "${MULLE_BOOTSTRAP_ARRAY_SH}" ]     && . mulle-bootstrap-array.sh
+  fi
 }
 
 homebrew_initialize

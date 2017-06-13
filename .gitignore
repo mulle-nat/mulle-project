@@ -4,4 +4,6 @@ build/
 # keep it local
 alpha-release.sh
 camelcase.sh
+dox/
 .DS_Store
+bin/tap-info.sh
