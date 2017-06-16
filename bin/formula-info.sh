@@ -23,6 +23,7 @@ LANGUAGE="bash"        # c,cpp, objc, bash ...
 # edit bin/release.sh
 #
 BUILD_DEPENDENCIES='${BOOTSTRAP_TAP}mulle-build
+${BOOTSTRAP_TAP}mulle-boostrap
 cmake'
 
 
