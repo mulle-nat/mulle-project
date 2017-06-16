@@ -1,9 +1,16 @@
-### 4.0.0
+## 4.1.0
+
+* do missing publisher check in the template, this allows the absence of
+`formula-info.sh`.
+* improve **mulle-homebrew-get-version** to work with existing -info.sh files
+
+
+# 4.0.0
 
 mulle-hombrew used to be used as an embedded project. This is no more.
 You can install it via `brew` for example or put it into your regular
 dependencies (`.bootstrap/repositories` instead of
-`.bootstrap/embedded_repositories`)
+`.bootstrap/embedded_repositories)
 
 
 #### The meaning of PROJECT and NAME has changed

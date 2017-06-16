@@ -57,9 +57,17 @@ main()
 {
    local directory
 
+   local OPTION_READ_INFO="YES"
+
+   local OPTION_VERSIONNAME
+   local OPTION_VERSIONFILE
+
    while [ $# -ne 0 ]
    do
       case "$1" in
+         --no-info)
+            OPTION_READ_INFO="NO"
+         ;;
          --language)
             [ $# -eq 1 ] && fail "missing argument to $1"
             shift
@@ -69,21 +77,25 @@ main()
          --versionname)
             [ $# -eq 1 ] && fail "missing argument to $1"
             shift
-            VERSIONNAME="$1"
+            OPTION_VERSIONNAME="$1"
          ;;
 
          --versionfile)
             [ $# -eq 1 ] && fail "missing argument to $1"
             shift
-            VERSIONFILE="$1"
+            OPTION_VERSIONFILE="$1"
          ;;
 
          -h|--help)
             usage
          ;;
 
+         -t)
+            set -x
+         ;;
+
          -*)
-            fail "unknown option $1"
+            usage
          ;;
 
          *)
@@ -94,10 +106,28 @@ main()
       shift
    done
 
+   if [ "${OPTION_READ_INFO}" = "YES" ]
+   then
+      if [ -f "./bin/release-info.sh" ]
+      then
+         . ./bin/release-info.sh
+      fi
+      if [ -f "./bin/formula-info.sh" ]
+      then
+         . ./bin/formula-info.sh
+      fi
+   fi
+
    DIRECTORY_NAME="`basename -- "$PWD"`"
 
-   PROJECT="${1:-${DIRECTORY_NAME}}"
-   [ $# -ne 0 ] && shift
+   if [ -z "${PROJECT}" ]
+   then
+      PROJECT="${1:-${DIRECTORY_NAME}}"
+      [ $# -ne 0 ] && shift
+   fi
+
+   VERSIONNAME="${OPTION_VERSIONNAME:-${VERSIONNAME}}"
+   VERSIONFILE="${OPTION_VERSIONFILE:-${VERSIONFILE}}"
 
    #
    # prefer local mulle-homebrew if available

@@ -47,7 +47,7 @@ fi
 #
 # Use mulle-homebrew-get-version to determine version
 #
-options=""
+options="--no-info"
 [ ! -z "${LANGUAGE}" ]    && options="${options} --language \"${LANGUAGE}\""
 [ ! -z "${VERSIONNAME}" ] && options="${options} --versionname \"${VERSIONNAME}\""
 [ ! -z "${VERSIONFILE}" ] && options="${options} --versionfile \"${VERSIONFILE}\""
@@ -57,13 +57,6 @@ VERSION="`eval mulle-homebrew-get-version ${options} "${PROJECT}"`" || exit 1
 
 # --- FORMULA  ---
 
-# DESC must not be empty
-if [ -z "${DESC}" ]
-then
-   log_verbose "Read DESC from \".DESC\""
-   DESC="`egrep -v '^#' .DESC | head -1`"
-fi
-[ -z "${DESC}" ] && fail "DESC is empty"
 
 # dependencies can be empty
 if [ -z "${DEPENDENCIES}" -a -f  .DEPENDENCIES ]
@@ -109,16 +102,6 @@ HOMEPAGE_URL="${HOMEPAGE_URL:-https://github.com/${PUBLISHER}/${PROJECT}}"
 # that forks don't have to edit this constantly
 #
 #
-if [ -z "${PUBLISHER}" ]
-then
-   fail "You need to specify a publisher with --publisher (hint: https://github.com/<publisher>)"
-fi
-
-if [ -z "${PUBLISHER_TAP}" ]
-then
-   fail "you need to specify a publisher tap with --publisher-tap (hint: <mulle-kybernetik/software/>)"
-fi
-
 TAPS_LOCATION="${TAPS_LOCATION:-..}"
 
 HOMEBREW_TAP="${HOMEBREW_TAP:-${TAPS_LOCATION}/homebrew-`basename -- ${PUBLISHER_TAP}`}"

@@ -516,6 +516,8 @@ homebrew_main()
    local rbfile="$1"; shift
 
    local formula
+# DESC must not be empty
+   [ -z "${desc}" ]  && fail "DESC is empty"
 
    [ "${OPTION_NO_FORMULA}" = "YES" ] && return
 

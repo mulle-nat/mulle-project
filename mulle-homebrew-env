@@ -291,17 +291,16 @@ write_formula_info_template()
    local projectdir="$2"
 
    local template
-   local name
+   local project
 
    # try to avoid creating empty release.sh if things go awry
    template="`formula_info_template_path`"
 
-   name="`basename -- "${projectdir}"`"
-   name="`camelcase "${name}"`"
+   project="`basename -- "${projectdir}"`"
 
-   result="`sed "s/^# PROJECT=\\\"MyProject\\\"/PROJECT=\\\"${name}\\\"/" "${template}"`" || exit 1
+   result="`sed "s/^# PROJECT=\\\"MyProject\\\"/PROJECT=\\\"${project}\\\"/" "${template}"`" || exit 1
    [ -z "${result}" ] && fail "release.sh generation failed"
-   result="`echo "${result}" | sed "s/^# DESC=\\\".*\\\"/DESC=\\\"${name} is ...\\\"/"`" || exit 1
+   result="`echo "${result}" | sed "s/^# DESC=\\\".*\\\"/DESC=\\\"${project} is ...\\\"/"`" || exit 1
 
    if [ -f "${projectdir}/CMakeLists.txt" ]
    then
