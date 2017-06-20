@@ -5,18 +5,20 @@ project( mulle-homebrew)
 set( TEMPLATES
 README.md
 release.sh.template
-release-info.sh.template
+version-info.sh.template
 formula-info.sh.template
 )
 
 set( LIBRARY_SCRIPTS
 mulle-homebrew.sh
+mulle-files.sh
 mulle-git.sh
 mulle-version.sh
 mulle-environment.sh
 )
 
 set( SCRIPTS
+mulle-homebrew-init
 mulle-homebrew-env
 mulle-homebrew-get-version
 mulle-homebrew-untag

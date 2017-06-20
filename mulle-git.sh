@@ -73,7 +73,13 @@ git_repo_can_push()
    local result
 
    exekutor git fetch -q "${remote}" "${branch}"
-   result="`exekutor git rev-list --left-right "HEAD...${remote}/${branch}" --ignore-submodules --count | awk '{ print $2 }'`"
+   result="`exekutor git rev-list --left-right "HEAD...${remote}/${branch}" --ignore-submodules --count 2> /dev/null`"
+   if [ $? -ne 0 ]
+   then
+      log_verbose "Remote \"${remote}\" does not have branch \"${branch}\" yet"
+      return 0
+   fi
+   result="`echo "${result}" | awk '{ print $2 }'`"
    [ -z "${result}" ] || [ "${result}" -eq 0 ]  # -z test for exekutor
 }
 

@@ -55,7 +55,7 @@ brew install mulle-kybernetik/software/mulle-homebrew
 Create the default configuration using:
 
 ```
-mulle-homebrew-env install
+mulle-homebrew-init
 ```
 
 This will create the following files
@@ -63,7 +63,7 @@ This will create the following files
 File                  | Mode      | Description
 ----------------------|-----------|------------------
 `bin/release.sh`      | Overwrite | The release script
-`bin/release-info.sh` | Preserve  | Configuration options for git as a shell script
+`bin/version-info.sh` | Preserve  | Contains variable definitions for versioning
 `bin/formula-info.sh` | Preserve  | Configuration options for homebrew as a shell script
 
 The `...-info.sh` files are just shell scripts that are included by
@@ -102,21 +102,22 @@ in your project root.
 The version is under your control, **mulle-homebrew** will never change it.
 
 
-### 3. Edit release-info.sh
+### 3. Edit version-info.sh
 
 > Check if your version is picked up with `mulle-homebrew-get-version`.
-> If it is, you can skip this step.
->
+> If it is, you can skip this step. But you need a version-info.h file
+> to enable release handling with git.
+
 
 Variable               | Description
 -----------------------|------------------------------
 `VERSIONFILE`          | The filename containing the version variable
 `VERSIONNAME`          | The name of the version variable
 
-If you can use **mulle-brew** to build an install your project,
+If you can use **mulle-build** to build an install your project,
 then you are all done.
 
-> **mulle-brew** can build Xcode, cmake and autoconf projects. If you use **cmake**
+> **mulle-build** can build Xcode, cmake and autoconf projects. If you use **cmake**
 > don't forget to specify it as a dependency.
 
 

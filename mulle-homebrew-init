@@ -1,0 +1,379 @@
+#! /usr/bin/env bash
+#
+#   Copyright (c) 2017 Nat! - Mulle kybernetiK
+#   All rights reserved.
+#
+#   Redistribution and use in source and binary forms, with or without
+#   modification, are permitted provided that the following conditions are met:
+#
+#   Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+#   Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+#   Neither the name of Mulle kybernetiK nor the names of its contributors
+#   may be used to endorse or promote products derived from this software
+#   without specific prior written permission.
+#
+#   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+#   AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+#   IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+#   ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+#   LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+#   CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+#   SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+#   INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+#   CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+#   ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+#   POSSIBILITY OF SUCH DAMAGE.
+#
+
+usage()
+{
+   cat <<EOF >&2
+Usage: mulle-homebrew-install [directory]
+
+   Use it to install a release.sh in your bin
+   directory and version-info.sh and formula-info.sh in your project directory.
+
+EOF
+   exit 1
+}
+
+
+fail()
+{
+   echo "Error:" "$*" >&2
+   exit 1
+}
+
+
+libexec_path()
+{
+   [ ! -d "${libexecpath}" ] && fail "libexec folder \"${libexecpath}\" missing"
+
+   cd "${libexecpath}" || exit 1
+   pwd -P
+}
+
+
+share_path()
+{
+   [ ! -d "${sharepath}" ] && fail "share folder \"${sharepath}\" missing"
+
+   cd "${sharepath}" || exit 1
+   pwd -P
+}
+
+
+_template_path()
+{
+   local name="$1"
+
+   [ ! -f "${sharepath}/${name}" ] && fail "template \"${sharepath}/${name}\" missing"
+
+   cd "${sharepath}" || exit 1
+   echo "`pwd -P`/${name}"
+}
+
+
+release_template_path()
+{
+   _template_path "release.sh.template"
+}
+
+
+version_info_template_path()
+{
+   _template_path "version-info.sh.template"
+}
+
+
+formula_info_template_path()
+{
+   _template_path "formula-info.sh.template"
+}
+
+
+version()
+{
+   local filename
+
+   filename="`release_template_path`"
+   egrep -s "^MULLE_HOMEBREW_VERSION=" "${filename}" | cut -d= -f2 | tr -d '"'
+}
+
+
+#
+# stolen from:
+# http://stackoverflow.com/questions/1055671/how-can-i-get-the-behavior-of-gnus-readlink-f-on-a-mac
+# ----
+#
+_prepend_path_if_relative()
+{
+   case "$2" in
+      /*)
+         echo "$2"
+         ;;
+      *)
+         echo "$1/$2"
+         ;;
+   esac
+}
+
+
+resolve_symlinks()
+{
+   local dir_context
+   local linkpath
+
+   if linkpath="`readlink "$1"`"
+   then
+      dir_context=`dirname -- "$1"`
+      resolve_symlinks "`_prepend_path_if_relative "${dir_context}" "${linkpath}"`"
+   else
+      echo "$1"
+   fi
+}
+
+
+write_release_template()
+{
+   local directory="$1"
+
+   local template
+
+   # try to avoid creating empty release.sh if things go awry
+   template="`release_template_path`"
+
+   if [ ! -d "${directory}" ]
+   then
+      mkdir -p "${directory}" || exit 1
+   fi
+
+   if [ -z "${AUTHOR}" ]
+   then
+      AUTHOR="${USER:-${LOGNAME}}"
+
+      if [ "${LOGNAME}" = "nat" -a "`id -u`" = "955" ]
+      then
+         case `hostname` in
+            kempe*)
+               AUTHOR='Nat! - Mulle kybernetiK'
+            ;;
+
+            *)
+               AUTHOR='Nat! - Codeon GmbH'
+            ;;
+         esac
+      fi
+   fi
+
+   cat << EOF > "${directory}/release.sh"
+#! /usr/bin/env bash
+#
+#   Copyright (c) `date '+%Y'` ${AUTHOR}
+#   All rights reserved.
+#
+EOF
+
+   if [ -z "${NO_BSD3}" ]
+   then
+      cat << EOF >> "${directory}/release.sh"
+#   Redistribution and use in source and binary forms, with or without
+#   modification, are permitted provided that the following conditions are met:
+#
+#   Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+#   Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+#   Neither the name of Mulle kybernetiK nor the names of its contributors
+#   may be used to endorse or promote products derived from this software
+#   without specific prior written permission.
+#
+#   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+#   AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+#   IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+#   ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+#   LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+#   CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+#   SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+#   INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+#   CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+#   ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+#   POSSIBILITY OF SUCH DAMAGE.
+#
+EOF
+   fi
+
+   cat "${template}" >> "${directory}/release.sh"
+   chmod 755 "${directory}/release.sh"
+}
+
+
+write_version_info_template()
+{
+   local directory="$1"
+
+   local template
+
+   # try to avoid creating empty release.sh if things go awry
+   template="`version_info_template_path`"
+
+   if [ ! -d "${directory}" ]
+   then
+      mkdir -p "${directory}" || exit 1
+   fi
+
+   local filename
+
+   filename="${directory}/version-info.sh"
+   if [ ! -e "${filename}" -o "${OPTION_FORCE}" = "YES" ]
+   then
+      (
+         cat "${template}" > "${filename}" &&
+         chmod 755 "${filename}"
+      ) || exit 1
+   fi
+}
+
+
+write_formula_info_template()
+{
+   local directory="$1"
+   local projectdir="$2"
+
+   local template
+   local project
+
+   # try to avoid creating empty release.sh if things go awry
+   template="`formula_info_template_path`"
+
+   project="`basename -- "${projectdir}"`"
+
+   result="`sed "s/^# PROJECT=\\\"MyProject\\\"/PROJECT=\\\"${project}\\\"/" "${template}"`" || exit 1
+   [ -z "${result}" ] && fail "release.sh generation failed"
+   result="`echo "${result}" | sed "s/^# DESC=\\\".*\\\"/DESC=\\\"${project} is ...\\\"/"`" || exit 1
+
+   if [ -f "${projectdir}/CMakeLists.txt" ]
+   then
+      result="`echo "${result}" |  sed "s/^' *# cmake may be useful to add *$/cmake'/"`" || exit 1
+   fi
+
+   if [ ! -d "${directory}" ]
+   then
+      mkdir -p "${directory}" || exit 1
+   fi
+
+   local filename
+
+   #
+   # sic! check for version-info.sh
+   # because a deleted formula-info.sh has meaning
+   #
+   filename="${directory}/formula-info.sh"
+   if [ ! -e "${directory}/version-info.sh" -o "${OPTION_FORCE}" = "YES" ]
+   then
+      (
+         echo "${result}" > "${filename}" &&
+         chmod 755 "${filename}"
+      ) || exit 1
+   fi
+}
+
+
+main()
+{
+   local projectdir
+   local executable
+   local exedirpath
+   local prefix
+
+   projectdir="`pwd -P`"
+
+   # resolve symlinks if there
+   executable="`resolve_symlinks "$0"`"
+   exedirpath="`dirname "${executable}"`"
+   prefix="`dirname "${exedirpath}"`"
+
+   local libexecpath
+   local sharepath
+   local directory
+
+   # allow local execution from project
+   if [ -e "${exedirpath}/mulle-homebrew.sh" -a -e "${exedirpath}/release.sh.template" ]
+   then
+      libexecpath="${exedirpath}"
+      sharepath="${exedirpath}"
+   else
+      libexecpath="${prefix}/libexec/mulle-homebrew"
+      sharepath="${prefix}/share/mulle-homebrew"
+   fi
+
+   local OPTION_FORCE
+
+   # the option prefix is kinda historic now
+   while [ $# -ne 0 ]
+   do
+      case "$1" in
+         "--help"|"-h"|"help")
+            usage
+         ;;
+
+         "-d"|"--directory")
+            [ $# -eq 1 ] && fail "missing argument for $1"
+            shift
+            projectdir="$1"
+         ;;
+
+         "--version")
+            version
+            exit 0
+         ;;
+
+         -f)
+            OPTION_FORCE="YES"
+         ;;
+
+         -t)
+            set -x
+         ;;
+
+         -*)
+            fail "unknown option \"$1\""
+         ;;
+
+         *)
+            break
+         ;;
+      esac
+      shift
+   done
+
+
+   directory="${1:-bin}"
+
+   case "${directory}" in
+      /*)
+         # absolute ? keep as is
+      ;;
+
+      *)
+         directory="${projectdir}/${directory}"
+      ;;
+   esac
+
+   write_release_template "${directory}"
+   write_formula_info_template "${directory}" "${projectdir}" # write first
+   write_version_info_template "${directory}"
+}
+
+
+MULLE_EXECUTABLE_FAIL_PREFIX="`basename -- "$0"`"
+main "$@"
+

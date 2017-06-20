@@ -1,3 +1,14 @@
+# 5.0.0
+
+* move the install part of mulle-homebrew-env into mulle-homebrew-init
+* improved VERSION checking for mulle-homebrew
+* release-info.sh is now called version-info.sh
+
+
+## 4.2.0
+
+* simplify release.sh.template even more by putting common stuff into mulle-files.sh
+
 ## 4.1.0
 
 * do missing publisher check in the template, this allows the absence of

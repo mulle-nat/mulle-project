@@ -47,12 +47,15 @@ fi
 #
 # Use mulle-homebrew-get-version to determine version
 #
-options="--no-info"
-[ ! -z "${LANGUAGE}" ]    && options="${options} --language \"${LANGUAGE}\""
-[ ! -z "${VERSIONNAME}" ] && options="${options} --versionname \"${VERSIONNAME}\""
-[ ! -z "${VERSIONFILE}" ] && options="${options} --versionfile \"${VERSIONFILE}\""
+if [ -z "${VERSION}" ]
+then
+   options="--no-info"
+   [ ! -z "${LANGUAGE}" ]    && options="${options} --language \"${LANGUAGE}\""
+   [ ! -z "${VERSIONNAME}" ] && options="${options} --versionname \"${VERSIONNAME}\""
+   [ ! -z "${VERSIONFILE}" ] && options="${options} --versionfile \"${VERSIONFILE}\""
 
-VERSION="`eval mulle-homebrew-get-version ${options} "${PROJECT}"`" || exit 1
+   VERSION="`eval mulle-homebrew-get-version ${options} "${PROJECT}"`" || exit 1
+fi
 
 
 # --- FORMULA  ---

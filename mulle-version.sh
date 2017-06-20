@@ -37,8 +37,9 @@
 split_camelcase_string()
 {
    # unsightly hacks to a couple of hard to split cases
-   sed -e 's/ObjC/Objc/'      | \
-   sed -e 's/ObjcOS/ObjcOs /' | \
+   sed -e 's/ObjC/Objc/'        | \
+   sed -e 's/ObjcOS/ObjcOs /'   | \
+   sed -e 's/ObjcKVC/ObjcKvc /' | \
       sed -e 's/\(.\)\([A-Z]\)\([a-z_0-9]\)/\1 \2\3/g' | \
    sed 's/  / /g'
 }

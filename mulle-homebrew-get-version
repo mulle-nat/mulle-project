@@ -38,6 +38,7 @@ Usage: mulle-homebrew-get-version [options] [projectname]
    Determine the project version.
 
 Options:
+   --no-info             : do not read -info.sh files
    --language <name>     : project language, (c, obj, cpp, bash etc)
    --versionname <name>  : version variable name
    --versionfile <file>  : file containing version
@@ -68,6 +69,7 @@ main()
          --no-info)
             OPTION_READ_INFO="NO"
          ;;
+
          --language)
             [ $# -eq 1 ] && fail "missing argument to $1"
             shift
@@ -108,6 +110,10 @@ main()
 
    if [ "${OPTION_READ_INFO}" = "YES" ]
    then
+      if [ -f "./bin/version-info.sh" ]
+      then
+         . ./bin/version-info.sh
+      fi
       if [ -f "./bin/release-info.sh" ]
       then
          . ./bin/release-info.sh
@@ -156,24 +162,27 @@ EOF
       LANGUAGE="`get_language_from_directoryname "${DIRECTORY_NAME}"`" || exit 1
    fi
 
-   if [ -z "${VERSIONFILE}" ]
+   if [ -z "${VERSION}" ]
    then
-      VERSIONFILE="`get_header_from_project "${PROJECT}" "${LANGUAGE}"`" || exit 1
-   fi
-
-   if [ -z "${VERSIONNAME}" ]
-   then
-      VERSIONNAME="`get_versionname_from_project "${PROJECT}"`" || exit 1
-   fi
-
-   if [ -f VERSION ]
-   then
-      VERSION="`head -1 VERSION`"
-   else
-      VERSION="`get_project_version "${VERSIONFILE}" "${VERSIONNAME}"`" || exit 1
-      if [ -z "${VERSION}" ]
+      if [ -z "${VERSIONFILE}" ]
       then
-         VERSION="`get_project_version "src/version.h" "${VERSIONNAME}"`" || exit 1
+         VERSIONFILE="`get_header_from_project "${PROJECT}" "${LANGUAGE}"`" || exit 1
+      fi
+
+      if [ -z "${VERSIONNAME}" ]
+      then
+         VERSIONNAME="`get_versionname_from_project "${PROJECT}"`" || exit 1
+      fi
+
+      if [ -f VERSION ]
+      then
+         VERSION="`head -1 VERSION`"
+      else
+         VERSION="`get_project_version "${VERSIONFILE}" "${VERSIONNAME}"`" || exit 1
+         if [ -z "${VERSION}" ]
+         then
+            VERSION="`get_project_version "src/version.h" "${VERSIONNAME}"`" || exit 1
+         fi
       fi
    fi
 
