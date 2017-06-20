@@ -1,3 +1,7 @@
+### 5.0.1
+
+* fix unsightly error, if publisher-tap is empty
+
 # 5.0.0
 
 * move the install part of mulle-homebrew-env into mulle-homebrew-init

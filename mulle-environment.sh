@@ -107,7 +107,12 @@ HOMEPAGE_URL="${HOMEPAGE_URL:-https://github.com/${PUBLISHER}/${PROJECT}}"
 #
 TAPS_LOCATION="${TAPS_LOCATION:-..}"
 
-HOMEBREW_TAP="${HOMEBREW_TAP:-${TAPS_LOCATION}/homebrew-`basename -- ${PUBLISHER_TAP}`}"
+if [ ! -z "${PUBLISHER_TAP}" ]
+then
+   tmp="`basename -- ${PUBLISHER_TAP}`"
+fi
+
+HOMEBREW_TAP="${HOMEBREW_TAP:-${TAPS_LOCATION}/homebrew-${tmp}}"
 
 RBFILE="${RBFILE:-${NAME}.rb}"
 
