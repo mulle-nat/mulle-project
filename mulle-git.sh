@@ -43,6 +43,24 @@ git_tag_must_not_exist()
 }
 
 
+git_any_first_commit()
+{
+   git rev-list HEAD | tail -n 1
+}
+
+
+git_last_tag()
+{
+   git describe --tags --abbrev=0
+}
+
+
+git_commits_from_ref()
+{
+   git log --format=%B -n 1 "${1}..HEAD"
+}
+
+
 git_must_be_clean()
 {
    local name
@@ -148,7 +166,7 @@ _git_main()
 
    if ! _git_check_remote "${origin}"
    then
-      fail "\"${origin}\" not accessible"
+      fail "\"${origin}\" not accessible (If present, maybe needs an initial push ?)"
    fi
 
    local have_github

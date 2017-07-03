@@ -69,16 +69,23 @@ get_project_version()
 {
    local filename="$1"
    local versionname="$2"
+   local printtype="${3:-NO}"
 
    local version
 
    match="`fgrep -s -w "${versionname}" "${filename}" | head -1`"
    case "${match}" in
       *"<<"*)
+         if [ "${printtype}" = "YES" ]
+         then
+            echo "<<"
+            return 0
+         fi
+
          echo "${match}" | \
-         sed 's|(\([0-9]*\) \<\< [0-9]*)|\1|g' | \
+         sed 's|( *\([0-9]* *\) *\<\< *[0-9]* *)|\1|g' | \
          sed 's|^.*(\(.*\))|\1|' | \
-         sed 's/ | /./g'
+         sed 's/ *| */./g'
       ;;
 
       *)
@@ -86,12 +93,24 @@ get_project_version()
          version="`sed -n 's/^[^0-9]*\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*$/\1/p' <<< "${match}"`"
          if [ -z "${version}" ]
          then
+            if [ "${printtype}" = "YES" ]
+            then
+               return 1
+            fi
+
             version="`sed -n 's/^[^0-9]*\([0-9][0-9]*\.[0-9][0-9]*\).*$/\1/p' <<< "${match}"`"
             if [ -z "${version}" ]
             then
                version="`sed -n 's/^[^0-9]*\([0-9][0-9]*\).*$/\1/p' <<< "${match}"`"
             fi
          fi
+
+         if [ "${printtype}" = "YES" ]
+         then
+            echo "1.2.3"
+            return 0
+         fi
+
          echo "$version"
       ;;
    esac
@@ -163,6 +182,96 @@ get_formula_name_from_project()
 }
 
 
+project_version_add()
+{
+   local version="$1"
+   local add="$2"
+
+   local major
+   local minor
+   local patch
+
+   [ -z "${add}" -o "${add}" = "NO" ] && internal_fail "wrong add \"${add}\""
+
+   major="`cut -d'.' -f 1 <<< "${version}"`"
+   major="${major:-0}"
+   minor="`cut -d'.' -f 2 <<< "${version}"`"
+   minor="${minor:-0}"
+   patch="`cut -d'.' -f 3 <<< "${version}"`"
+   patch="${patch:-0}"
+
+   patch="$(expr $patch + $add)" || fail "wrong increment parameter \"${add}\""
+   if [ "${patch}" -ge 256 ]
+   then
+      fail "patch field is exhausted. Update the minor"
+   fi
+
+   echo "${major}.${minor}.${patch}"
+}
+
+
+#   local major
+#   local minor
+#   local patch
+#
+#   get_major_minor_patch "${version}"
+#
+get_major_minor_patch()
+{
+   local version="$1"
+
+   major="`cut -d'.' -f 1 <<< "${version}"`"
+   minor="`cut -d'.' -f 2 <<< "${version}"`"
+   patch="`cut -d'.' -f 3 <<< "${version}"`"
+
+   [ -z "${major}" -o -z "${minor}" -o -z "${patch}" ] &&
+      fail "version is like \"${version}\", but must be like 1.5.0 (major.minor.patch)"
+}
+
+
+set_project_version()
+{
+   local version="$1"
+   local versionfile="$2"
+   local versionname="$3"
+
+   if [ -z "${versionname}" ]
+   then
+      echo "$version" > "${versionfile}"
+      return
+   fi
+
+   local major
+   local minor
+   local patch
+
+   get_major_minor_patch "${version}"
+
+   # not lenient for setting at all!
+   # // ((0 << 20) | (4 << 8) | 9)
+   # // or 0.4.9
+
+   local value
+
+   case `get_project_version "${versionfile}" "${versionname}" "YES"` in
+      "<<")
+         value="(($major << 20) \| ($minor << 8) \| $patch)"
+
+         sed -i bak 's|^\(.*\)'"${versionname}"'\([^0-9()]*\)( *( *[0-9][0-9]* *\<\< *20 *) *\| *( *[0-9][0-9]* *\<\< *8 *) *\| *[0-9][0-9]* *)\(.*\)$|\1'"${versionname}"'\2'"${value}"'\3|' "${versionfile}" || fail "could not set version number"
+      ;;
+
+      "1.2.3")
+         value="$major.$minor.$patch)"
+         sed -i bak 's|^\(.*\)'"${versionname}"'\([^0-9]*\)[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\(.*\)$|\1'"${versionname}"'\2'"${value}"'\3|' "${versionfile}" || fail "could not set version number"
+      ;;
+
+      *)
+         fail "Incompatble versions scheme for set. Use either 1.2.3 or ((1 << 20) | (2 << 8) | 3)"
+      ;;
+   esac
+}
+
+
 version_initialize()
 {
    local directory
@@ -187,3 +296,4 @@ version_initialize()
 version_initialize
 
 :
+

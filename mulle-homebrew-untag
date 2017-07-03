@@ -61,11 +61,15 @@ log_info()
    fi
 }
 
+log_fail()
+{
+   log_printf "${C_FAIL}Fatal Error: %b${C_RESET}\n" "$*"
+}
+
 
 _bail()
 {
-   kill 0
-   exit 1        # paranoia
+   exit 1
 }
 
 

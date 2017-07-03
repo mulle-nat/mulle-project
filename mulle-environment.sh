@@ -45,7 +45,7 @@ then
 fi
 
 #
-# Use mulle-homebrew-get-version to determine version
+# Use mulle-homebrew-version to determine version
 #
 if [ -z "${VERSION}" ]
 then
@@ -54,7 +54,7 @@ then
    [ ! -z "${VERSIONNAME}" ] && options="${options} --versionname \"${VERSIONNAME}\""
    [ ! -z "${VERSIONFILE}" ] && options="${options} --versionfile \"${VERSIONFILE}\""
 
-   VERSION="`eval mulle-homebrew-get-version ${options} "${PROJECT}"`" || exit 1
+   VERSION="`eval mulle-homebrew-version ${options} "${PROJECT}"`" || exit 1
 fi
 
 

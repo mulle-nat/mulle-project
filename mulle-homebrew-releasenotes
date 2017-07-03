@@ -1,0 +1,330 @@
+#! /usr/bin/env bash
+#
+#   Copyright (c) 2017 Nat! - Mulle kybernetiK
+#   All rights reserved.
+#
+#   Redistribution and use in source and binary forms, with or without
+#   modification, are permitted provided that the following conditions are met:
+#
+#   Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+#   Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+#   Neither the name of Mulle kybernetiK nor the names of its contributors
+#   may be used to endorse or promote products derived from this software
+#   without specific prior written permission.
+#
+#   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+#   AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+#   IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+#   ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+#   LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+#   CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+#   SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+#   INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+#   CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+#   ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+#   POSSIBILITY OF SUCH DAMAGE.
+#
+
+usage()
+{
+   cat <<EOF >&2
+Usage: mulle-homebrew-releasenotes [options] <version>
+
+   Emit Releasenotes for the next given version.
+   All comments from the last tag till HEAD will be collected.
+   All comment lines starting with a '*' are included in the release notes.
+
+Options:
+   --output <file>          : file where to prepend the releasenotes
+   --message <text>         : message to use instead of git comments
+   --default-message <text> : text to use,if there are no suitable git comments
+   --first-patch-zero       : consider patch 0 to be the first minor commit
+EOF
+   exit 1
+}
+
+
+fail()
+{
+   echo "Error:" "$*" >&2
+   exit 1
+}
+
+
+compute_markers()
+{
+   local version="$1"
+
+   local major
+   local minor
+   local patch
+
+   get_major_minor_patch "${version}"
+
+   if [ "${patch}" -eq "${OPTION_FIRST_PATCH}" ]
+   then
+      if [ "${minor}" -eq 0 ]
+      then
+         echo "#"
+      else
+         echo "##"
+      fi
+   else
+      echo "###"
+   fi
+}
+
+
+emit_releasenotes()
+{
+   local version="$1"
+   local markers="$2"
+
+   if [ -z "${OPTION_MESSAGE}" ]
+   then
+      local start
+
+      start="`git_last_tag`" 2> /dev/null
+      if [ -z "${last_tag}" ]
+      then
+         start="`git_any_first_commit`"
+      fi
+
+      OPTION_MESSAGE="`git_commits_from_ref "${start}" | egrep '^ *\* '`"
+      if [ -z "${OPTION_MESSAGE}" ]
+      then
+          OPTION_MESSAGE="${OPTION_DEFAULT_MESSAGE}"
+      fi
+   fi
+
+   cat <<EOF
+${markers} ${version}
+
+${OPTION_MESSAGE}
+EOF
+}
+
+
+copy_without_first_entry()
+{
+   local header="$1"
+
+   # remove old comments for same version
+   local markers
+   local state
+   local line
+
+   markers="`sed 's/^\(#+\).*/\1' <<< "${header}"`"
+
+   state="start"
+   while read line
+   do
+      case "${state}" in
+         start)
+            state="search"
+         ;;
+
+         search)
+            if egrep -s "^${markers} *" <<< "${line}"
+            then
+               state="copy"
+               echo "${line}"
+            fi
+         ;;
+
+         copy)
+            echo "${line}"
+         ;;
+      esac
+   done < "${OPTION_OUTPUT}"
+}
+
+
+mulle_homebrew_releasenotes_init()
+{
+   if [ -z "`command -v mulle-homebrew-env`" ]
+   then
+      cat <<EOF >&2
+   mulle-homebrew-env not found in PATH.
+   Visit the homepage for installation instructions:
+      https://github.com/mulle-nat/mulle-homebrew
+EOF
+      exit 1
+   fi
+
+   INSTALLED_MULLE_HOMEBREW_VERSION="`mulle-homebrew-env version`" || exit 1
+   LIBEXEC_DIR="`mulle-homebrew-env libexec-path`" || exit 1
+
+   . "${LIBEXEC_DIR}/mulle-git.sh" || exit 1
+   . "${LIBEXEC_DIR}/mulle-version.sh" || exit 1
+}
+
+
+emit_prepended_notes_to_file()
+{
+   local markers="$1"
+   local notes="$2"
+   local tmpfile="$3"
+
+   cat <<EOF
+${notes}
+EOF
+
+   echo
+
+   case "${markers}" in
+      "###"*)
+      ;;
+
+      *)
+         echo
+      ;;
+   esac
+
+   cat "${tmpfile}"
+}
+
+
+main()
+{
+   local start
+
+   local directory
+
+   local OPTION_DEFAULT_MESSAGE="* Various small improvements"
+   local OPTION_MESSAGE=""
+   local OPTION_OUTPUT="-"
+   local OPTION_FIRST_PATCH="1"
+
+   while [ $# -ne 0 ]
+   do
+      case "$1" in
+         -m|--message)
+            [ $# -eq 1 ] && fail "missing argument to $1"
+            shift
+
+            OPTION_MESSAGE="$1"
+         ;;
+
+         -dm|--default_message)
+            [ $# -eq 1 ] && fail "missing argument to $1"
+            shift
+
+            OPTION_DEFAULT_MESSAGE="$1"
+         ;;
+
+         -i|--input)
+            [ $# -eq 1 ] && fail "missing argument to $1"
+            shift
+
+            OPTION_INPUT="$1"
+         ;;
+
+
+         -o|--output)
+            [ $# -eq 1 ] && fail "missing argument to $1"
+            shift
+
+            OPTION_OUTPUT="$1"
+         ;;
+
+         --first-patch-zero)
+            OPTION_FIRST_PATCH="0"
+         ;;
+
+         -h|--help)
+            usage
+         ;;
+
+         -t)
+            set -x
+         ;;
+
+         -*)
+            usage
+         ;;
+
+         *)
+            break
+         ;;
+      esac
+
+      shift
+   done
+
+   [ $# -ne 1 ] && usage
+
+   local notes
+   local markers
+
+   markers="`compute_markers "$1"`"
+   notes="`emit_releasenotes "$1" "${markers}" `"
+
+   if [ -z "${OPTION_INPUT}" ]
+   then
+      OPTION_OUTPUT="${OPTION_INPUT}"
+   fi
+
+   if [ "${OPTION_INPUT}" = "${OPTION_OUTPUT}" ]
+   then
+      if [ "${OPTION_OUTPUT}" = "-" ]
+      then
+         echo "${notes}"
+         return 0
+      fi
+
+      if [ ! -f "${OPTION_OUTPUT}" ]
+      then
+         echo "${notes}" > "${OPTION_OUTPUT}"
+         return 0
+      fi
+   fi
+
+   local old_header
+   local new_header
+
+   local tmpfile
+
+   if [ ! -f "${OPTION_INPUT}" ]
+   then
+      fail "Input file \"${OPTION_INPUT}\" not found"
+   fi
+
+   tmpfile="`mktemp "RELEASENOTES.XXXXXXX"`"
+
+   #
+   # to be able to rerun this command, snip off
+   # previously generated notes
+   #
+   old_header="`head -1 "${OPTION_INPUT}"`"
+   new_header="`head -1 <<< "${notes}"`"
+
+   if [ "${old_header}" = "${new_header}" ]
+   then
+      copy_without_first_entry "${OPTION_INPUT}" "${tmpfile}" || exit 1
+   else
+      cp "${OPTION_INPUT}" "${tmpfile}" || exit 1
+   fi
+
+   if [ "${OPTION_OUTPUT}" = "-" ]
+   then
+      emit_prepended_notes_to_file "${markers}" "${notes}" "${tmpfile}"
+   else
+      emit_prepended_notes_to_file "${markers}" "${notes}" "${tmpfile}" > "${OPTION_OUTPUT}" || exit 1
+   fi
+
+   rm "${tmpfile}"
+}
+
+
+MULLE_EXECUTABLE="`basename -- $0`"
+MULLE_BOOTSTRAP_FAIL_PREFIX="${MULLE_EXECUTABLE}"
+
+mulle_homebrew_releasenotes_init
+
+main "$@"

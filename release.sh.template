@@ -49,12 +49,8 @@ generate_brew_formula()
 #######
 
 MULLE_BOOTSTRAP_FAIL_PREFIX="`basename -- $0`"
-MULLE_HOMEBREW_VERSION="5.0.1"
+MULLE_HOMEBREW_VERSION="5.1.0"
 
-#
-# prefer local mulle-homebrew if available
-# Do not embed it anymore!
-#
 if [ -z "`command -v mulle-homebrew-env`" ]
 then
    cat <<EOF >&2

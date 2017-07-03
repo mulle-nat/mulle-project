@@ -10,17 +10,18 @@ formula-info.sh.template
 )
 
 set( LIBRARY_SCRIPTS
-mulle-homebrew.sh
+mulle-environment.sh
 mulle-files.sh
 mulle-git.sh
+mulle-homebrew.sh
 mulle-version.sh
-mulle-environment.sh
 )
 
 set( SCRIPTS
-mulle-homebrew-init
+mulle-homebrew-debian
 mulle-homebrew-env
-mulle-homebrew-get-version
+mulle-homebrew-version
+mulle-homebrew-init
 mulle-homebrew-untag
 )
 

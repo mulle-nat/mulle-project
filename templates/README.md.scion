@@ -103,7 +103,7 @@ The version is under your control, **mulle-homebrew** will never change it.
 
 ### 3. Edit release-info.sh
 
-> Check if your version is picked up with `mulle-homebrew-get-version`.
+> Check if your version is picked up with `mulle-homebrew-version`.
 > If it is, you can skip this step.
 >
 

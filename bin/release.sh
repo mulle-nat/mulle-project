@@ -80,7 +80,7 @@ generate_brew_formula()
 #######
 
 MULLE_BOOTSTRAP_FAIL_PREFIX="`basename -- $0`"
-MULLE_HOMEBREW_VERSION="5.0.0"
+MULLE_HOMEBREW_VERSION="5.1.0"
 
 #
 # prefer local mulle-homebrew if available
