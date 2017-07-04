@@ -79,13 +79,34 @@ EOF
 }
 
 
+get_xcodeproj_version()
+{
+   local filename="$1/project.pbxproj"
+
+   if [ ! -f "${filename}" ]
+   then
+      fail "Xcode project file \"${filename}\" not found"
+   fi
+
+   egrep '^[[:space:]]*CURRENT_PROJECT_VERSION[[:space:]]*=' "${filename}" | \
+     head -1 | \
+     sed 's|^[[:space:]]*CURRENT_PROJECT_VERSION[[:space:]]*=[[:space:]]*["]*\([0-9][0-9]*.[0-9][0-9]*.[0-9][0-9]*\).*|\1|'
+}
+
+
 main()
 {
    local directory
 
    local OPTION_READ_INFO="YES"
    local OPTION_WRITE="NO"
-   local OPTION_ADD_PATCH="NO"
+   local OPTION_ADD_PATCH="0"
+   local OPTION_ADD_MINOR="0"
+   local OPTION_ADD_MAJOR="0"
+   local OPTION_FIRST_PATCH="1"
+   local OPTION_READ_XCODE_VERSION="NO"
+   local OPTION_WRITE_XCODE_VERSION="NO"
+   local OPTION_XCODEPROJ=""
 
    local OPTION_VERSIONNAME
    local OPTION_VERSIONFILE
@@ -97,7 +118,23 @@ main()
             OPTION_READ_INFO="NO"
          ;;
 
-         --increment)
+         --increment-minor)
+            OPTION_ADD_MAJOR="1"
+         ;;
+
+         --increment-minor)
+            OPTION_ADD_MINOR="1"
+         ;;
+
+         --increment-patch)
+            OPTION_ADD_PATCH="1"
+         ;;
+
+         --first-increment-zero)
+            OPTION_FIRST_PATCH="0"
+         ;;
+
+         --add-patch)
             [ $# -eq 1 ] && fail "missing argument to $1"
             shift
 
@@ -106,6 +143,21 @@ main()
 
          --write)
             OPTION_WRITE="YES"
+         ;;
+
+         --xcodeproj)
+            [ $# -eq 1 ] && fail "missing argument to $1"
+            shift
+
+            OPTION_XCODEPROJ="$1"
+         ;;
+
+         --read-xcode-version)
+            OPTION_READ_XCODE_VERSION="YES"
+         ;;
+
+         --write-xcode-version)
+            OPTION_WRITE_XCODE_VERSION="YES"
          ;;
 
          --language)
@@ -173,16 +225,39 @@ main()
    VERSIONNAME="${OPTION_VERSIONNAME:-${VERSIONNAME}}"
    VERSIONFILE="${OPTION_VERSIONFILE:-${VERSIONFILE}}"
 
+   if [ "${OPTION_READ_XCODE_VERSION}" = "YES" -o "${OPTION_WRITE_XCODE_VERSION}" = "YES" ]
+   then
+      if [ -z "${OPTION_XCODEPROJ}" ]
+      then
+         OPTION_XCODEPROJ="`ls -1d *.xcodeproj | head -1`" 2> /dev/null
+         if [ -z "${OPTION_XCODEPROJ}" ]
+         then
+            fail "No Xcode project found"
+         fi
+      fi
+
+      XCODE_VERSION="`get_xcodeproj_version "${OPTION_XCODEPROJ}"`"
+      if [ -z "${XCODE_VERSION}" ]
+      then
+         fail "could not read CURRENT_PROJECT_VERSION from \"${OPTION_XCODEPROJ}\""
+      fi
+
+      if [ "${OPTION_READ_XCODE_VERSION}" = "YES" ]
+      then
+         VERSION="${XCODE_VERSION}"
+      fi
+   fi
+
    #
    # these can usually be deduced, if you follow the conventions
    #
-   if [ -z "${LANGUAGE}" ]
-   then
-      LANGUAGE="`get_language_from_directoryname "${DIRECTORY_NAME}"`" || exit 1
-   fi
-
    if [ -z "${VERSION}" ]
    then
+      if [ -z "${LANGUAGE}" ]
+      then
+         LANGUAGE="`get_language_from_directoryname "${DIRECTORY_NAME}"`" || exit 1
+      fi
+
       if [ -z "${VERSIONFILE}" ]
       then
          VERSIONFILE="`get_header_from_project "${PROJECT}" "${LANGUAGE}"`" || exit 1
@@ -215,20 +290,46 @@ main()
       fail "Could not figure out the version for PROJECT=\"${PROJECT}\", LANGUAGE=\"${LANGUAGE}\", VERSIONNAME=\"${VERSIONNAME}\", VERSIONFILE=\"${VERSIONFILE}\". (hint: specify VERSIONNAME, VERSIONFILE)"
    fi
 
-   if [ "${OPTION_ADD_PATCH}" != "NO" ]
+   [ "${OPTION_ADD_MAJOR}" -ne 0 ] &&
+      [ "${OPTION_ADD_MINOR}" -ne 0 -o "${OPTION_ADD_PATCH}" -ne 0 ] &&
+         fail "only specify major to increment"
+
+   [ "${OPTION_ADD_MINOR}" -ne 0 ] &&
+      [ "${OPTION_ADD_PATCH}" -ne 0 ] &&
+         fail "only specify minor to increment"
+
+   OLDVERSION="${VERSION}"
+
+   if [ "${OPTION_ADD_MAJOR}" -ne 0 -o \
+        "${OPTION_ADD_MINOR}" -ne 0 -o \
+        "${OPTION_ADD_PATCH}" -ne 0 ]
    then
       if [ -z "${VERSIONFILE}" ]
       then
          fail "Don't know how to increment version"
       fi
 
-      VERSION="`project_version_add "${VERSION}" "${OPTION_ADD_PATCH}"`" || exit 1
+      VERSION="`project_version_add "${VERSION}" \
+                                    "${OPTION_ADD_MAJOR}" \
+                                    "${OPTION_ADD_MINOR}" \
+                                    "${OPTION_ADD_PATCH}" \
+                                    "0" \
+                                    "${OPTION_FIRST_PATCH}"`" || exit 1
+   fi
+
+   if [ "${OPTION_WRITE}" = "YES" -o "${OPTION_WRITE_XCODE_VERSION}" = "YES" ]
+   then
+      if [ "${OPTION_WRITE_XCODE_VERSION}" = "YES" ]
+      then
+         sed -i bak 's|^\([[:space:]]*CURRENT_PROJECT_VERSION[[:space:]]*=[[:space:]]*["]*\)'${XCODE_VERSION}'\(.*\)|\1'${VERSION}'\2|' "${OPTION_XCODEPROJ}/project.pbxproj"
+      fi
 
       if [ "${OPTION_WRITE}" = "YES" ]
       then
          set_project_version "${VERSION}" "${VERSIONFILE}" "${VERSIONNAME}"
-         return $?
       fi
+
+      return 0
    fi
 
    echo "${VERSION}"

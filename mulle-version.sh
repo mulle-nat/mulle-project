@@ -185,7 +185,11 @@ get_formula_name_from_project()
 project_version_add()
 {
    local version="$1"
-   local add="$2"
+   local add_major="$2"
+   local add_minor="$3"
+   local add_patch="$4"
+   local first_minor="${5:-0}"
+   local first_patch="${6:-0}"
 
    local major
    local minor
@@ -200,7 +204,39 @@ project_version_add()
    patch="`cut -d'.' -f 3 <<< "${version}"`"
    patch="${patch:-0}"
 
-   patch="$(expr $patch + $add)" || fail "wrong increment parameter \"${add}\""
+   if [ "${add_major}" -ne 0 ]
+   then
+      major="$(expr $major + $add_major)" ||
+         fail "wrong increment parameter \"${add_major}\""
+      minor="${first_minor}"
+      patch="${first_patch}"
+   else
+      if [ "${add_minor}" -ne 0  ]
+      then
+         minor="$(expr $minor + $add_minor)" ||
+            fail "wrong increment parameter \"${add_minor}\""
+         patch="${first_patch}"
+      else
+         if [ "${add_patch}" -ne 0  ]
+         then
+            patch="$(expr $patch + $add_patch)" ||
+               fail "wrong increment parameter \"${add_patch}\""
+         else
+            fail "Version would not change"
+         fi
+      fi
+   fi
+
+   if [ "${major}" -ge 4096 ]
+   then
+      fail "major field is exhausted. Start a new project."
+   fi
+
+   if [ "${minor}" -ge 4096 ]
+   then
+      fail "minor field is exhausted. Update the major."
+   fi
+
    if [ "${patch}" -ge 256 ]
    then
       fail "patch field is exhausted. Update the minor"

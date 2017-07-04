@@ -89,10 +89,23 @@ emit_releasenotes()
    then
       local start
 
-      start="`git_last_tag`" 2> /dev/null
-      if [ -z "${last_tag}" ]
+      if [ "${OPTION_MISSING}" = "YES" ]
       then
-         start="`git_any_first_commit`"
+         if [ "${OPTION_INPUT}" = "-" ]
+         then
+            fail "no input specified"
+         fi
+
+         start="`get_latest_releasenote_version "${OPTION_INPUT}"`"
+      fi
+
+      if [ -z "${start}" ]
+      then
+         start="`git_last_tag`" 2> /dev/null
+         if [ -z "${start}" ]
+         then
+            start="`git_any_first_commit`"
+         fi
       fi
 
       OPTION_MESSAGE="`git_commits_from_ref "${start}" | egrep '^ *\* '`"
@@ -190,6 +203,20 @@ EOF
 }
 
 
+get_latest_releasenote_version()
+{
+   local filename
+
+   if [ ! -f "${filename}" ]
+   then
+      return 1
+   fi
+
+   grep -v '^ *$' "${filename}" | head -1 | sed -n 's/^#* *\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/'
+}
+
+
+
 main()
 {
    local start
@@ -233,6 +260,10 @@ main()
             OPTION_OUTPUT="$1"
          ;;
 
+         --missing)
+            OPTION_MISSING="YES"
+         ;;
+
          --first-patch-zero)
             OPTION_FIRST_PATCH="0"
          ;;
@@ -265,9 +296,14 @@ main()
    markers="`compute_markers "$1"`"
    notes="`emit_releasenotes "$1" "${markers}" `"
 
+   if [ -z "${OPTION_OUTPUT}" ]
+   then
+      fail "output must not be empty, use - for stdout"
+   fi
+
    if [ -z "${OPTION_INPUT}" ]
    then
-      OPTION_OUTPUT="${OPTION_INPUT}"
+      OPTION_INPUT="${OPTION_OUTPUT}"
    fi
 
    if [ "${OPTION_INPUT}" = "${OPTION_OUTPUT}" ]
