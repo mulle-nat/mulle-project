@@ -166,7 +166,7 @@ main()
 {
    local debian
 
-   VERSION="`mulle-homebrew-version`"
+   VERSION="`mulle-homebrew-version --no-tag-warning`"
 
    if [ -f "./bin/formula-info.sh" ]
    then

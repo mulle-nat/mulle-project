@@ -1,3 +1,7 @@
+### 5.1.1
+
+* Various small improvements
+
 ### 5.0.1
 
 * fix unsightly error, if publisher-tap is empty

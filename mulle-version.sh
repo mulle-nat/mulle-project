@@ -195,8 +195,6 @@ project_version_add()
    local minor
    local patch
 
-   [ -z "${add}" -o "${add}" = "NO" ] && internal_fail "wrong add \"${add}\""
-
    major="`cut -d'.' -f 1 <<< "${version}"`"
    major="${major:-0}"
    minor="`cut -d'.' -f 2 <<< "${version}"`"

@@ -49,7 +49,7 @@ fi
 #
 if [ -z "${VERSION}" ]
 then
-   options="--no-info"
+   options="--no-info --no-tag-warning"
    [ ! -z "${LANGUAGE}" ]    && options="${options} --language \"${LANGUAGE}\""
    [ ! -z "${VERSIONNAME}" ] && options="${options} --versionname \"${VERSIONNAME}\""
    [ ! -z "${VERSIONFILE}" ] && options="${options} --versionfile \"${VERSIONFILE}\""

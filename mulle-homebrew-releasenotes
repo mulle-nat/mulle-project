@@ -33,17 +33,28 @@
 usage()
 {
    cat <<EOF >&2
-Usage: mulle-homebrew-releasenotes [options] <version>
+Usage: mulle-homebrew-releasenotes [options] [releasenotes]
 
-   Emit Releasenotes for the next given version.
+   Emit markup releasenotes for the current version. If no version is given,
+   mulle-homebrew-version is used to determine the current version.
+
    All comments from the last tag till HEAD will be collected.
    All comment lines starting with a '*' are included in the release notes.
 
 Options:
-   --output <file>          : file where to prepend the releasenotes
-   --message <text>         : message to use instead of git comments
+   -a                       : prepend notes to first releasenote
+   -f                       : overwrite existing releasenotes for version
    --default-message <text> : text to use,if there are no suitable git comments
+   --filter <executable>    : use something else than egrep to filter comments
    --first-patch-zero       : consider patch 0 to be the first minor commit
+   --grep <arguments>       : specify egrep arguments (hackish)
+   --input <file>           : file to prepend comments to
+   --message <text>         : message to use instead of git comments
+   --missing                : emit all missing comments, not just from last tag
+   --output <file>          : where to output the releasenotes (- for stdout)
+   --tag <tag>              : git tag where to collect comments from
+   --unfiltered             : don't filter git commit comments
+   --version <version>      : specify version for releasenotes
 EOF
    exit 1
 }
@@ -80,6 +91,18 @@ compute_markers()
 }
 
 
+escaped_sed_replacement()
+{
+   sed -e 's|\\|\\\\|g' <<< "${1}"
+}
+
+
+filter_releasenotes()
+{
+   sed 's/'${RELEASENOTE_GREP}'\(.*\)/\1/'
+}
+
+
 emit_releasenotes()
 {
    local version="$1"
@@ -87,7 +110,7 @@ emit_releasenotes()
 
    if [ -z "${OPTION_MESSAGE}" ]
    then
-      local start
+      local start="${OPTION_TAG}"
 
       if [ "${OPTION_MISSING}" = "YES" ]
       then
@@ -96,22 +119,38 @@ emit_releasenotes()
             fail "no input specified"
          fi
 
+         if [ ! -z "${start}" ]
+         then
+            fail "missing and start specified at same time"
+         fi
+
          start="`get_latest_releasenote_version "${OPTION_INPUT}"`"
       fi
 
       if [ -z "${start}" ]
       then
-         start="`git_last_tag`" 2> /dev/null
+         start="`git_last_tag 2> /dev/null`"
          if [ -z "${start}" ]
          then
             start="`git_any_first_commit`"
          fi
       fi
 
-      OPTION_MESSAGE="`git_commits_from_ref "${start}" | egrep '^ *\* '`"
+      OPTION_MESSAGE="`git_commits_from_tag "${start}" | ${RELEASENOTE_FILTER}`"
       if [ -z "${OPTION_MESSAGE}" ]
       then
           OPTION_MESSAGE="${OPTION_DEFAULT_MESSAGE}"
+      fi
+
+      #
+      # now prefix
+      #
+      if [ ! -z "${OPTION_PREFIX}" ]
+      then
+         local pattern
+
+         pattern="`escaped_sed_replacement "${OPTION_PREFIX}"`"
+         OPTION_MESSAGE="`sed "s/^/${pattern}/" <<< "${OPTION_MESSAGE}"`"
       fi
    fi
 
@@ -132,7 +171,7 @@ copy_without_first_entry()
    local state
    local line
 
-   markers="`sed 's/^\(#+\).*/\1' <<< "${header}"`"
+   markers="`sed 's/^\(#+\).*/\1/' <<< "${header}"`"
 
    state="start"
    while read line
@@ -154,7 +193,15 @@ copy_without_first_entry()
             echo "${line}"
          ;;
       esac
-   done < "${OPTION_OUTPUT}"
+   done
+}
+
+
+copy_without_first_line()
+{
+   # also remove a first empty line if present
+
+   sed '1d' | sed '/./,$!d'
 }
 
 
@@ -183,21 +230,25 @@ emit_prepended_notes_to_file()
    local markers="$1"
    local notes="$2"
    local tmpfile="$3"
+   local edited_header="$4"
 
    cat <<EOF
 ${notes}
 EOF
 
-   echo
+   if [ "${edited_header}" = "NO" -o "${OPTION_APPEND}" = "NO" ]
+   then
+      echo
 
-   case "${markers}" in
-      "###"*)
-      ;;
+      case "${markers}" in
+         "###"*)
+         ;;
 
-      *)
-         echo
-      ;;
-   esac
+         *)
+            echo
+         ;;
+      esac
+   fi
 
    cat "${tmpfile}"
 }
@@ -212,9 +263,80 @@ get_latest_releasenote_version()
       return 1
    fi
 
-   grep -v '^ *$' "${filename}" | head -1 | sed -n 's/^#* *\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/'
+   egrep -v '^[[:space:]]*$' "${filename}" | \
+      head -1 | \
+      sed -n 's/^#*[[:space:]]*\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/'
 }
 
+
+merged_releasenotes()
+{
+   local markers="$1"
+   local notes="$2"
+   local version="$3"
+
+   local old_header
+   local new_header
+   local edited_header
+
+   local tmpfile
+
+   #
+   # to be able to rerun this command, snip off
+   # previously generated notes
+   #
+   if [ "${OPTION_INPUT}" = "-" ]
+   then
+      old_header="`head -1 | sed 's/^#*[[:space:]]*//'`"
+   else
+      if [ ! -f "${OPTION_INPUT}" ]
+      then
+         fail "Input file \"${OPTION_INPUT}\" not found"
+      fi
+
+      old_header="`head -1 "${OPTION_INPUT}" | sed 's/^#*[[:space:]]*//'`"
+   fi
+
+   new_header="`head -1 <<< "${notes}" | sed 's/^#*[[:space:]]*//'`"
+
+   tmpfile="`mktemp "tmp.XXXXXXXX"`"
+   if [ "${old_header}" = "${new_header}" ]
+   then
+      if [ "${OPTION_APPEND}" = "YES" ]
+      then
+         if [ "${OPTION_INPUT}" = "-" ]
+         then
+            copy_without_first_line "${old_header}" > "${tmpfile}" || exit 1
+         else
+            copy_without_first_line "${old_header}" < "${OPTION_INPUT}" > "${tmpfile}" || exit 1
+         fi
+      else
+         if [ "${OPTION_FORCE}" = "NO" ]
+         then
+            rm "${tmpfile}"
+            fail "Releasenotes already contain a leading entry for \"${version}\""
+         fi
+
+         if [ "${OPTION_INPUT}" = "-" ]
+         then
+            copy_without_first_entry "${old_header}" > "${tmpfile}" || exit 1
+         else
+            copy_without_first_entry "${old_header}" < "${OPTION_INPUT}" > "${tmpfile}" || exit 1
+         fi
+      fi
+      edited_header="YES"
+   else
+      cp "${OPTION_INPUT}" "${tmpfile}" || exit 1
+      edited_header="YES"
+   fi
+
+   emit_prepended_notes_to_file "${markers}" "${notes}" "${tmpfile}" "${edited_header}"
+
+   if [ "${OPTION_KEEP_TMP}" = "NO" ]
+   then
+      rm "${tmpfile}"
+   fi
+}
 
 
 main()
@@ -223,14 +345,59 @@ main()
 
    local directory
 
+   local OPTION_APPEND="NO"
    local OPTION_DEFAULT_MESSAGE="* Various small improvements"
+   local OPTION_FIRST_PATCH="0"
+   local OPTION_FORCE="NO"
+   local OPTION_INPUT=""
+   local OPTION_KEEP_TMP="YES"
    local OPTION_MESSAGE=""
-   local OPTION_OUTPUT="-"
-   local OPTION_FIRST_PATCH="1"
+   local OPTION_OUTPUT=""
+   local OPTION_PREFIX="* "
+   local OPTION_TAG=""
+
+   local custom_output="NO"
+
+   if [ -z "${RELEASENOTE_FILTER}" ]
+   then
+      RELEASENOTE_FILTER=filter_releasenotes
+   fi
+
+   if [ -z "${RELEASENOTE_GREP}" ]
+   then
+      RELEASENOTE_GREP='^[[:space:]]*\*[[:space:]]*'
+   fi
+
+   if [ -f ".first_patch" ]
+   then
+      OPTION_FIRST_PATCH="`cat ".first_patch"`"
+   fi
 
    while [ $# -ne 0 ]
    do
       case "$1" in
+         -a|--append)
+            OPTION_APPEND="YES"
+         ;;
+
+         -f|--force)
+            OPTION_FORCE="YES"
+         ;;
+
+         --filter)
+            [ $# -eq 1 ] && fail "missing argument to $1"
+            shift
+
+            RELEASENOTE_FILTER="$1"
+         ;;
+
+         -g|--grep)
+            [ $# -eq 1 ] && fail "missing argument to $1"
+            shift
+
+            RELEASENOTE_GREP="$1"
+         ;;
+
          -m|--message)
             [ $# -eq 1 ] && fail "missing argument to $1"
             shift
@@ -245,13 +412,16 @@ main()
             OPTION_DEFAULT_MESSAGE="$1"
          ;;
 
+         --keep-tmp)
+            OPTION_KEEP_TMP="YES"
+         ;;
+
          -i|--input)
             [ $# -eq 1 ] && fail "missing argument to $1"
             shift
 
             OPTION_INPUT="$1"
          ;;
-
 
          -o|--output)
             [ $# -eq 1 ] && fail "missing argument to $1"
@@ -260,13 +430,43 @@ main()
             OPTION_OUTPUT="$1"
          ;;
 
+         -u|--unfiltered)
+            RELEASENOTE_GREP='^'  # should match everything
+         ;;
+
          --missing)
             OPTION_MISSING="YES"
          ;;
 
-         --first-patch-zero)
+         --prefix)
+            [ $# -eq 1 ] && fail "missing argument to $1"
+            shift
+
+            OPTION_PREFIX="$1"
+         ;;
+
+         --tag)
+            [ $# -eq 1 ] && fail "missing argument to $1"
+            shift
+
+            OPTION_TAG="$1"
+         ;;
+
+         --version)
+            [ $# -eq 1 ] && fail "missing argument to $1"
+            shift
+
+            VERSION="$1"
+         ;;
+
+         -0|--first-patch-zero)
             OPTION_FIRST_PATCH="0"
          ;;
+
+         -0|--first-patch-one)
+            OPTION_FIRST_PATCH="1"
+         ;;
+
 
          -h|--help)
             usage
@@ -288,73 +488,71 @@ main()
       shift
    done
 
-   [ $# -ne 1 ] && usage
+   case $# in
+      0)
+         if [ -z "${OPTION_OUTPUT}" ]
+         then
+            OPTION_OUTPUT="-"
+         fi
+      ;;
 
-   local notes
-   local markers
+      1)
+         if [ -z "${OPTION_INPUT}" ]
+         then
+            OPTION_INPUT="$1"
+         fi
 
-   markers="`compute_markers "$1"`"
-   notes="`emit_releasenotes "$1" "${markers}" `"
+         if [ -z "${OPTION_OUTPUT}" ]
+         then
+            OPTION_OUTPUT="$1"
+         fi
+      ;;
+
+      *)
+         usage
+      ;;
+   esac
 
    if [ -z "${OPTION_OUTPUT}" ]
    then
       fail "output must not be empty, use - for stdout"
    fi
 
-   if [ -z "${OPTION_INPUT}" ]
+   if [ -z "${VERSION}" ]
    then
-      OPTION_INPUT="${OPTION_OUTPUT}"
+      VERSION="`mulle-homebrew-version --no-tag-warning`" || fail "Could not figure out current version"
    fi
 
-   if [ "${OPTION_INPUT}" = "${OPTION_OUTPUT}" ]
+   local notes
+   local markers
+
+   markers="`compute_markers "${VERSION}"`"
+   notes="`emit_releasenotes "${VERSION}" "${markers}"`"
+
+   #
+   # if no file is given, we don't merge
+   #
+   if [ -z "${OPTION_INPUT}" ]
    then
       if [ "${OPTION_OUTPUT}" = "-" ]
       then
          echo "${notes}"
-         return 0
-      fi
-
-      if [ ! -f "${OPTION_OUTPUT}" ]
-      then
+      else
          echo "${notes}" > "${OPTION_OUTPUT}"
-         return 0
       fi
+      return 0
    fi
 
-   local old_header
-   local new_header
+   local result
 
-   local tmpfile
-
-   if [ ! -f "${OPTION_INPUT}" ]
-   then
-      fail "Input file \"${OPTION_INPUT}\" not found"
-   fi
-
-   tmpfile="`mktemp "RELEASENOTES.XXXXXXX"`"
-
-   #
-   # to be able to rerun this command, snip off
-   # previously generated notes
-   #
-   old_header="`head -1 "${OPTION_INPUT}"`"
-   new_header="`head -1 <<< "${notes}"`"
-
-   if [ "${old_header}" = "${new_header}" ]
-   then
-      copy_without_first_entry "${OPTION_INPUT}" "${tmpfile}" || exit 1
-   else
-      cp "${OPTION_INPUT}" "${tmpfile}" || exit 1
-   fi
+   result="`merged_releasenotes "${markers}" "${notes}" "${VERSION}"`" || exit 1
 
    if [ "${OPTION_OUTPUT}" = "-" ]
    then
-      emit_prepended_notes_to_file "${markers}" "${notes}" "${tmpfile}"
+      echo "${result}"
    else
-      emit_prepended_notes_to_file "${markers}" "${notes}" "${tmpfile}" > "${OPTION_OUTPUT}" || exit 1
+      echo "${result}" > "${OPTION_OUTPUT}"
    fi
-
-   rm "${tmpfile}"
 }
 
 

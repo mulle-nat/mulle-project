@@ -30,16 +30,26 @@
 #   POSSIBILITY OF SUCH DAMAGE.
 #
 
+git_tag_exists()
+{
+   local tag="$1"
+
+   git rev-parse "${tag}" > /dev/null 2>&1
+}
+
+
 git_tag_must_not_exist()
 {
-   local tag
-
-   tag="$1"
-
-   if git rev-parse "${tag}" > /dev/null 2>&1
+   if git_tag_exists "${tag}"
    then
       fail "Tag \"${tag}\" already exists"
    fi
+}
+
+
+git_ref_for_tag()
+{
+   git show-ref --tags $1 | awk '{ print$1 }'
 }
 
 
@@ -57,7 +67,16 @@ git_last_tag()
 
 git_commits_from_ref()
 {
-   git log --format=%B -n 1 "${1}..HEAD"
+   git log --format=%B -n 1 "$1..HEAD"
+}
+
+
+git_commits_from_tag()
+{
+   local ref
+
+   ref="`git_ref_for_tag "$1"`"
+   git_commits_from_ref "$ref"
 }
 
 

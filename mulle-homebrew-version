@@ -35,15 +35,24 @@ usage()
    cat <<EOF >&2
 Usage: mulle-homebrew-version [options] [projectname]
 
-   Determine the project version.
+   Get or increment the project version.
 
 Options:
-   --no-info             : do not read -info.sh files
+   --add-patch <value>   : add value to patch version part
+   --first-increment-zero: set patch to 0 instead of 1 for minor/major adds
+   --increment-major     : add 1 to major versionpart
+   --increment-minor     : add 1 to minor version part
+   --increment-patch     : add 1 to patch version part
+   --read-xcode-version  : read version from Xcode project
+   --write-xcode-version : write version to Xcode project
+
    --language <name>     : project language, (c, obj, cpp, bash etc)
-   --versionname <name>  : version variable name
+   --no-info             : do not read -info.sh files
+   --no-tag-warning      : do not warn if git tag exists
    --versionfile <file>  : file containing version
-   --increment <value>   : amount to add to version
-   --write               : update versionfile with incremented value
+   --versionname <name>  : version variable name
+   --write               : update versionfile with new version
+   --xcodeproj <dir>     : specify path of .xcodeproj directory
 EOF
    exit 1
 }
@@ -76,6 +85,7 @@ EOF
    LIBEXEC_DIR="`mulle-homebrew-env libexec-path`" || exit 1
 
    . "${LIBEXEC_DIR}/mulle-version.sh" || exit 1
+   . "${LIBEXEC_DIR}/mulle-git.sh" || exit 1
 }
 
 
@@ -98,15 +108,16 @@ main()
 {
    local directory
 
-   local OPTION_READ_INFO="YES"
-   local OPTION_WRITE="NO"
-   local OPTION_ADD_PATCH="0"
-   local OPTION_ADD_MINOR="0"
    local OPTION_ADD_MAJOR="0"
+   local OPTION_ADD_MINOR="0"
+   local OPTION_ADD_PATCH="0"
    local OPTION_FIRST_PATCH="1"
+   local OPTION_READ_INFO="YES"
    local OPTION_READ_XCODE_VERSION="NO"
+   local OPTION_WRITE="NO"
    local OPTION_WRITE_XCODE_VERSION="NO"
    local OPTION_XCODEPROJ=""
+   local OPTION_TAG_WARNING="YES"
 
    local OPTION_VERSIONNAME
    local OPTION_VERSIONFILE
@@ -114,8 +125,13 @@ main()
    while [ $# -ne 0 ]
    do
       case "$1" in
+
          --no-info)
             OPTION_READ_INFO="NO"
+         ;;
+
+         --no-tag-warning)
+            OPTION_TAG_WARNING="NO"
          ;;
 
          --increment-minor)
@@ -315,6 +331,24 @@ main()
                                     "${OPTION_ADD_PATCH}" \
                                     "0" \
                                     "${OPTION_FIRST_PATCH}"`" || exit 1
+   fi
+
+   if [ "${OPTION_TAG_WARNING}" = "YES" ]
+   then
+      if git_tag_exists "${VERSION}"
+      then
+         echo "warning: ${VERSION} already exists as a git tag" >&2
+      else
+         local last
+
+         last="`git_last_tag`" 2> /dev/null
+         if [ ! -z "${last}" ]
+         then
+            echo "info: Last git tag is \"${last}\"" >&2
+         else
+            echo "info: No git tag \"${VERSION}\" exists." >&2
+         fi
+      fi
    fi
 
    if [ "${OPTION_WRITE}" = "YES" -o "${OPTION_WRITE_XCODE_VERSION}" = "YES" ]
