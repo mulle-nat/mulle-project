@@ -44,6 +44,7 @@ Usage: mulle-homebrew-releasenotes [options] [releasenotes]
 Options:
    -a                       : prepend notes to first releasenote
    -f                       : overwrite existing releasenotes for version
+   --commit                 : git commit --amend --no-edit releasenotes
    --default-message <text> : text to use,if there are no suitable git comments
    --filter <executable>    : use something else than egrep to filter comments
    --first-patch-zero       : consider patch 0 to be the first minor commit
@@ -346,15 +347,17 @@ main()
    local directory
 
    local OPTION_APPEND="NO"
-   local OPTION_DEFAULT_MESSAGE="* Various small improvements"
+   local OPTION_DEFAULT_MESSAGE="Various small improvements"
    local OPTION_FIRST_PATCH="0"
    local OPTION_FORCE="NO"
+   local OPTION_COMMIT="NO"
    local OPTION_INPUT=""
    local OPTION_KEEP_TMP="YES"
    local OPTION_MESSAGE=""
    local OPTION_OUTPUT=""
    local OPTION_PREFIX="* "
    local OPTION_TAG=""
+   local OPTION_COMMITFLAGS="--amend --no-edit"
 
    local custom_output="NO"
 
@@ -378,6 +381,10 @@ main()
       case "$1" in
          -a|--append)
             OPTION_APPEND="YES"
+         ;;
+
+         -c|--commit)
+            OPTION_COMMIT="YES"
          ;;
 
          -f|--force)
@@ -523,6 +530,14 @@ main()
       VERSION="`mulle-homebrew-version --no-tag-warning`" || fail "Could not figure out current version"
    fi
 
+   if [ "${OPTION_COMMIT}" = "YES" ]
+   then
+      if [ ! -z "`git status -s --untracked-files=no`" ]
+      then
+         fail "git repository is not in a pristine state, can not commit"
+      fi
+   fi
+
    local notes
    local markers
 
@@ -540,18 +555,26 @@ main()
       else
          echo "${notes}" > "${OPTION_OUTPUT}"
       fi
-      return 0
+   else
+      local result
+
+      result="`merged_releasenotes "${markers}" "${notes}" "${VERSION}"`" || exit 1
+
+      if [ "${OPTION_OUTPUT}" = "-" ]
+      then
+         echo "${result}"
+      else
+         echo "${result}" > "${OPTION_OUTPUT}"
+      fi
    fi
 
-   local result
-
-   result="`merged_releasenotes "${markers}" "${notes}" "${VERSION}"`" || exit 1
-
-   if [ "${OPTION_OUTPUT}" = "-" ]
+   if [ "${OPTION_COMMIT}" = "YES" ]
    then
-      echo "${result}"
-   else
-      echo "${result}" > "${OPTION_OUTPUT}"
+      changed="`git ls-files -m "${OPTION_OUTPUT}"`"
+      if [ ! -z "${changed}" ]
+      then
+         git commit ${OPTION_COMMITFLAGS} "${OPTION_OUTPUT}"
+      fi
    fi
 }
 

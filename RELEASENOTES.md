@@ -1,3 +1,8 @@
+## 5.1.0
+
+* new options and bug fixes
+
+
 ### 5.1.1
 
 * Various small improvements

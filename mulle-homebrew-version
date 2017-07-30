@@ -135,7 +135,7 @@ main()
          ;;
 
          --increment-minor)
-            OPTION_ADD_MAJOR="1"
+            OPTION_ADD_MINOR="1"
          ;;
 
          --increment-minor)
