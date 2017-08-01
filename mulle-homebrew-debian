@@ -7,9 +7,13 @@ usage()
 {
    cat <<EOF >&2
 Usage:
-   mulle-homebrew-debian
+   mulle-homebrew-debian [options]
 
    Produce debian packages for bash projects.
+
+   Options:
+      --root <path> : default is /usr
+
 EOF
    exit 1
 }
@@ -149,7 +153,7 @@ create_debian()
 
    mkdir -p "${directory}/DEBIAN" || exit 1
 
-   mulle-install --prefix "${PWD}/${directory}" >&2 || exit 1
+   mulle-install --prefix "${PWD}/${directory}${OPTION_ROOT}" >&2 || exit 1
 
    write_control > "${directory}/DEBIAN/control"
 
@@ -165,6 +169,10 @@ create_debian()
 main()
 {
    local debian
+
+   local OPTION_PREFIX
+
+   OPTION_ROOT="/usr"
 
    VERSION="`mulle-homebrew-version --no-tag-warning`"
 
@@ -196,6 +204,13 @@ main()
       case "$1" in
          -t)
             set -x
+         ;;
+
+         --root)
+            [ $# -eq 1 ] && fail "missing argument to $1"
+            shift
+
+            OPTION_ROOT="$1"
          ;;
 
          -*)
