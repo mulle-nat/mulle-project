@@ -1,3 +1,10 @@
+## 5.2.0
+
+* --first-increment-zero renamed to --first-patch-zero
+* zero is now the new default for patch
+* will now read a file called post-release.sh and execute a function called post_release on a successful install
+
+
 ## 5.1.0
 
 * new options and bug fixes

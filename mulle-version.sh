@@ -295,7 +295,7 @@ set_project_version()
       ;;
 
       "1.2.3")
-         value="$major.$minor.$patch)"
+         value="$major.$minor.$patch"
          sed -i bak 's|^\(.*\)'"${versionname}"'\([^0-9]*\)[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\(.*\)$|\1'"${versionname}"'\2'"${value}"'\3|' "${versionfile}" || fail "could not set version number"
       ;;
 

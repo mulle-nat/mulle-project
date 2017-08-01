@@ -68,3 +68,10 @@ if [ -f "${EXE_DIR}/tap-info.sh" ]
 then
    . "${EXE_DIR}/tap-info.sh"
 fi
+
+
+# if there is a post-release.sh file read it
+if [ -f "${EXE_DIR}/post-release.sh" ]
+then
+   . "${EXE_DIR}/post-release.sh"
+fi

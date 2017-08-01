@@ -470,10 +470,9 @@ main()
             OPTION_FIRST_PATCH="0"
          ;;
 
-         -0|--first-patch-one)
+         -1|--first-patch-one)
             OPTION_FIRST_PATCH="1"
          ;;
-
 
          -h|--help)
             usage

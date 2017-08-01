@@ -39,7 +39,8 @@ Usage: mulle-homebrew-version [options] [projectname]
 
 Options:
    --add-patch <value>   : add value to patch version part
-   --first-increment-zero: set patch to 0 instead of 1 for minor/major adds
+   --first-patch-zero    : set patch to 0 for minor/major increments
+   --first-patch-one     : set patch to 1 for minor/major increments
    --increment-major     : add 1 to major versionpart
    --increment-minor     : add 1 to minor version part
    --increment-patch     : add 1 to patch version part
@@ -111,7 +112,7 @@ main()
    local OPTION_ADD_MAJOR="0"
    local OPTION_ADD_MINOR="0"
    local OPTION_ADD_PATCH="0"
-   local OPTION_FIRST_PATCH="1"
+   local OPTION_FIRST_PATCH="0"
    local OPTION_READ_INFO="YES"
    local OPTION_READ_XCODE_VERSION="NO"
    local OPTION_WRITE="NO"
@@ -121,6 +122,11 @@ main()
 
    local OPTION_VERSIONNAME
    local OPTION_VERSIONFILE
+
+   if [ -f ".first_patch" ]
+   then
+      OPTION_FIRST_PATCH="`cat ".first_patch"`"
+   fi
 
    while [ $# -ne 0 ]
    do
@@ -146,8 +152,12 @@ main()
             OPTION_ADD_PATCH="1"
          ;;
 
-         --first-increment-zero)
+         --first-patch-zero)
             OPTION_FIRST_PATCH="0"
+         ;;
+
+         --first-patch-one)
+            OPTION_FIRST_PATCH="1"
          ;;
 
          --add-patch)
