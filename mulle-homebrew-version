@@ -35,7 +35,16 @@ usage()
    cat <<EOF >&2
 Usage: mulle-homebrew-version [options] [projectname]
 
-   Get or increment the project version.
+   Get or increment the project version. The version must be readable from
+   a variable or constant in  either of two formats:
+
+   `major.minor.patch` or `((major << 20) | (minor << 8) | patch)`, where
+   other shift integer values are possible.
+
+   Examples:
+      static int   version = ((1 << 16) | (2 << 5) | 3)
+      VERSION="1.2.3"
+      #define VERSION   "1.2.3"
 
 Options:
    --add-patch <value>   : add value to patch version part
@@ -354,7 +363,7 @@ main()
          last="`git_last_tag`" 2> /dev/null
          if [ ! -z "${last}" ]
          then
-            echo "info: Last git tag is \"${last}\"" >&2
+            echo "info: Version is ${VERSION}. Last git tag is \"${last}\"." >&2
          else
             echo "info: No git tag \"${VERSION}\" exists." >&2
          fi

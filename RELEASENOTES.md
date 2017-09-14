@@ -1,5 +1,6 @@
 ## 5.2.0
 
+* mulle-homebrew-debian installs into /usr instead of / by default
 * --first-increment-zero renamed to --first-patch-zero
 * zero is now the new default for patch
 * will now read a file called post-release.sh and execute a function called post_release on a successful install

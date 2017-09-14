@@ -67,7 +67,7 @@ git_last_tag()
 
 git_commits_from_ref()
 {
-   git log --format=%B -n 1 "$1..HEAD"
+   git log --format=%B "$1..HEAD"
 }
 
 

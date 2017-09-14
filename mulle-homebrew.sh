@@ -85,6 +85,8 @@ generate_brew_formula_header()
 
    if [ ! -f "${tmparchive}" ]
    then
+      log_verbose "Downloading \"${archiveurl}\" to \"${tmparchive}\"..."
+
       exekutor curl -L -o "${tmparchive}" "${archiveurl}"
       if [ -z "${MULLE_FLAG_EXEKUTOR_DRY_RUN}" ]
       then
@@ -115,6 +117,7 @@ generate_brew_formula_header()
    local hash
 
    hash="`exekutor shasum -p -a 256 "${tmparchive}" | exekutor awk '{ print $1 }'`"
+   log_verbose "Calculated shasum256 \"${hash}\" for \"${tmparchive}\"."
 
    local formula
 
@@ -190,6 +193,35 @@ generate_brew_formula_dependencies()
    then
       _print_dependencies "${builddependencies}" " => :build"
    fi
+}
+
+
+generate_brew_formula_xcodebuild()
+{
+   local project="$1"; shift
+   local name="$1" ; shift
+   local version="$1" ; shift
+   local configuration="${1:-Release}" ; [ $# -ne 0 ] && shift
+
+   local aux_args
+   local option
+
+   for option in "$@"
+   do
+      aux_args="\"${option}\", ${aux_args}"
+   done
+
+   local lines
+
+   lines="`cat <<EOF
+
+${INDENTATION}def install
+${INDENTATION}${INDENTATION}system "xcodebuild", "-configuration", "${configuration}", \
+"DSTROOT=#{prefix}",${aux_args} "install"
+${INDENTATION}end
+EOF
+`"
+   exekutor echo "${lines}"
 }
 
 

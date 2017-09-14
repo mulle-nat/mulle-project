@@ -100,7 +100,7 @@ escaped_sed_replacement()
 
 filter_releasenotes()
 {
-   sed 's/'${RELEASENOTE_GREP}'\(.*\)/\1/'
+   sed -n 's/'${RELEASENOTE_GREP}'\(.*\)/\1/p'
 }
 
 
