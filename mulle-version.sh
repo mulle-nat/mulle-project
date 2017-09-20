@@ -291,12 +291,12 @@ set_project_version()
       "<<")
          value="(($major << 20) \| ($minor << 8) \| $patch)"
 
-         sed -i bak 's|^\(.*\)'"${versionname}"'\([^0-9()]*\)( *( *[0-9][0-9]* *\<\< *20 *) *\| *( *[0-9][0-9]* *\<\< *8 *) *\| *[0-9][0-9]* *)\(.*\)$|\1'"${versionname}"'\2'"${value}"'\3|' "${versionfile}" || fail "could not set version number"
+         sed -i ".bak" 's|^\(.*\)'"${versionname}"'\([^0-9()]*\)( *( *[0-9][0-9]* *\<\< *20 *) *\| *( *[0-9][0-9]* *\<\< *8 *) *\| *[0-9][0-9]* *)\(.*\)$|\1'"${versionname}"'\2'"${value}"'\3|' "${versionfile}" || fail "could not set version number"
       ;;
 
       "1.2.3")
          value="$major.$minor.$patch"
-         sed -i bak 's|^\(.*\)'"${versionname}"'\([^0-9]*\)[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\(.*\)$|\1'"${versionname}"'\2'"${value}"'\3|' "${versionfile}" || fail "could not set version number"
+         sed -i ".bak" 's|^\(.*\)'"${versionname}"'\([^0-9]*\)[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\(.*\)$|\1'"${versionname}"'\2'"${value}"'\3|' "${versionfile}" || fail "could not set version number"
       ;;
 
       *)

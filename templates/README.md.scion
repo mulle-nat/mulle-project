@@ -280,3 +280,42 @@ prefixed name. If your tap is supposed to be accessed as "software" call it
 "homebrew-software". If your github user name is `{{PUBLISHER}}`, you could then
 access this tap with `brew tap {{PUBLISHER}}/software`.
 
+### My typical release scenario
+
+After I have done various commits like this:
+
+```
+git commit -m "* commit on master. comment prefixed by * for releasenotes"
+...
+git commit -m "boring commit"
+...
+git commit -m "* another interesting commit"
+```
+
+
+I update the version number:
+
+```
+mulle-homebrew-version --increment-patch --write
+```
+
+Then I produce updated RELEASENOTES.md:
+
+```
+mulle-homebrew-releasenotes RELEASENOTES.md
+```
+
+Then add the new version and releasenotes to last commit:
+
+```
+git add -u
+git commit --amend --no-edit
+```
+
+Now release it to the world:
+
+```
+./bin/release.sh
+```
+
+

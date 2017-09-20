@@ -114,167 +114,24 @@ get_xcodeproj_version()
 }
 
 
-main()
+get_version()
 {
-   local directory
-
-   local OPTION_ADD_MAJOR="0"
-   local OPTION_ADD_MINOR="0"
-   local OPTION_ADD_PATCH="0"
-   local OPTION_FIRST_PATCH="0"
-   local OPTION_READ_INFO="YES"
-   local OPTION_READ_XCODE_VERSION="NO"
-   local OPTION_WRITE="NO"
-   local OPTION_WRITE_XCODE_VERSION="NO"
-   local OPTION_XCODEPROJ=""
-   local OPTION_TAG_WARNING="YES"
-
-   local OPTION_VERSIONNAME
-   local OPTION_VERSIONFILE
-
-   if [ -f ".first_patch" ]
-   then
-      OPTION_FIRST_PATCH="`cat ".first_patch"`"
-   fi
-
-   while [ $# -ne 0 ]
-   do
-      case "$1" in
-
-         --no-info)
-            OPTION_READ_INFO="NO"
-         ;;
-
-         --no-tag-warning)
-            OPTION_TAG_WARNING="NO"
-         ;;
-
-         --increment-minor)
-            OPTION_ADD_MINOR="1"
-         ;;
-
-         --increment-minor)
-            OPTION_ADD_MINOR="1"
-         ;;
-
-         --increment-patch)
-            OPTION_ADD_PATCH="1"
-         ;;
-
-         --first-patch-zero)
-            OPTION_FIRST_PATCH="0"
-         ;;
-
-         --first-patch-one)
-            OPTION_FIRST_PATCH="1"
-         ;;
-
-         --add-patch)
-            [ $# -eq 1 ] && fail "missing argument to $1"
-            shift
-
-            OPTION_ADD_PATCH="$1"
-         ;;
-
-         --write)
-            OPTION_WRITE="YES"
-         ;;
-
-         --xcodeproj)
-            [ $# -eq 1 ] && fail "missing argument to $1"
-            shift
-
-            OPTION_XCODEPROJ="$1"
-         ;;
-
-         --read-xcode-version)
-            OPTION_READ_XCODE_VERSION="YES"
-         ;;
-
-         --write-xcode-version)
-            OPTION_WRITE_XCODE_VERSION="YES"
-         ;;
-
-         --language)
-            [ $# -eq 1 ] && fail "missing argument to $1"
-            shift
-            LANGUAGE="$1"
-         ;;
-
-         --versionname)
-            [ $# -eq 1 ] && fail "missing argument to $1"
-            shift
-            OPTION_VERSIONNAME="$1"
-         ;;
-
-         --versionfile)
-            [ $# -eq 1 ] && fail "missing argument to $1"
-            shift
-            OPTION_VERSIONFILE="$1"
-         ;;
-
-         -h|--help)
-            usage
-         ;;
-
-         -t)
-            set -x
-         ;;
-
-         -*)
-            usage
-         ;;
-
-         *)
-            break
-         ;;
-      esac
-
-      shift
-   done
-
-   if [ "${OPTION_READ_INFO}" = "YES" ]
-   then
-      if [ -f "./bin/version-info.sh" ]
-      then
-         . ./bin/version-info.sh
-      fi
-      if [ -f "./bin/release-info.sh" ]
-      then
-         . ./bin/release-info.sh
-      fi
-      if [ -f "./bin/formula-info.sh" ]
-      then
-         . ./bin/formula-info.sh
-      fi
-   fi
-
-   DIRECTORY_NAME="`basename -- "$PWD"`"
-
-   if [ -z "${PROJECT}" ]
-   then
-      PROJECT="${1:-${DIRECTORY_NAME}}"
-      [ $# -ne 0 ] && shift
-   fi
-
-   VERSIONNAME="${OPTION_VERSIONNAME:-${VERSIONNAME}}"
-   VERSIONFILE="${OPTION_VERSIONFILE:-${VERSIONFILE}}"
-
    if [ "${OPTION_READ_XCODE_VERSION}" = "YES" -o "${OPTION_WRITE_XCODE_VERSION}" = "YES" ]
    then
-      if [ -z "${OPTION_XCODEPROJ}" ]
+      ACTUAL_XCODEPROJ="${OPTION_XCODEPROJ}"
+      if [ -z "${ACTUAL_XCODEPROJ}" ]
       then
-         OPTION_XCODEPROJ="`ls -1d *.xcodeproj | head -1`" 2> /dev/null
-         if [ -z "${OPTION_XCODEPROJ}" ]
+         ACTUAL_XCODEPROJ="`ls -1d *.xcodeproj | head -1`" 2> /dev/null
+         if [ -z "${ACTUAL_XCODEPROJ}" ]
          then
             fail "No Xcode project found"
          fi
       fi
 
-      XCODE_VERSION="`get_xcodeproj_version "${OPTION_XCODEPROJ}"`"
+      XCODE_VERSION="`get_xcodeproj_version "${ACTUAL_XCODEPROJ}"`"
       if [ -z "${XCODE_VERSION}" ]
       then
-         fail "could not read CURRENT_PROJECT_VERSION from \"${OPTION_XCODEPROJ}\""
+         fail "could not read CURRENT_PROJECT_VERSION from \"${ACTUAL_XCODEPROJ}\""
       fi
 
       if [ "${OPTION_READ_XCODE_VERSION}" = "YES" ]
@@ -324,7 +181,11 @@ main()
    then
       fail "Could not figure out the version for PROJECT=\"${PROJECT}\", LANGUAGE=\"${LANGUAGE}\", VERSIONNAME=\"${VERSIONNAME}\", VERSIONFILE=\"${VERSIONFILE}\". (hint: specify VERSIONNAME, VERSIONFILE)"
    fi
+}
 
+
+edit_version_if_requested()
+{
    [ "${OPTION_ADD_MAJOR}" -ne 0 ] &&
       [ "${OPTION_ADD_MINOR}" -ne 0 -o "${OPTION_ADD_PATCH}" -ne 0 ] &&
          fail "only specify major to increment"
@@ -369,12 +230,16 @@ main()
          fi
       fi
    fi
+}
 
+
+write_version_if_requested()
+{
    if [ "${OPTION_WRITE}" = "YES" -o "${OPTION_WRITE_XCODE_VERSION}" = "YES" ]
    then
       if [ "${OPTION_WRITE_XCODE_VERSION}" = "YES" ]
       then
-         sed -i bak 's|^\([[:space:]]*CURRENT_PROJECT_VERSION[[:space:]]*=[[:space:]]*["]*\)'${XCODE_VERSION}'\(.*\)|\1'${VERSION}'\2|' "${OPTION_XCODEPROJ}/project.pbxproj"
+         sed -i ".bak" 's|^\([[:space:]]*CURRENT_PROJECT_VERSION[[:space:]]*=[[:space:]]*["]*\)'${XCODE_VERSION}'\(.*\)|\1'${VERSION}'\2|' "${ACTUAL_XCODEPROJ}/project.pbxproj"
       fi
 
       if [ "${OPTION_WRITE}" = "YES" ]
@@ -382,13 +247,199 @@ main()
          set_project_version "${VERSION}" "${VERSIONFILE}" "${VERSIONNAME}"
       fi
 
-      return 0
+      VERIFY_VERSION="`"${MULLE_EXECUTABLE_PATH}" "$@" --reset`"
+
+      if [ "${VERSION}" != "${VERIFY_VERSION}" ]
+      then
+         fail "Version could not be set"
+      else
+         log_info "Version successfully set to ${VERSION}"
+      fi
+
+      exit 0
    fi
+}
+
+
+parse_arguments()
+{
+   while [ $# -ne 0 ]
+   do
+      case "$1" in
+         --no-info)
+            OPTION_READ_INFO="NO"
+         ;;
+
+         --no-tag-warning)
+            OPTION_TAG_WARNING="NO"
+         ;;
+
+         --increment-minor)
+            OPTION_ADD_MINOR="1"
+         ;;
+
+         --increment-minor)
+            OPTION_ADD_MINOR="1"
+         ;;
+
+         --increment-patch)
+            OPTION_ADD_PATCH="1"
+         ;;
+
+         --reset) # stupid option for verify must be last
+            OPTION_ADD_PATCH="0"
+            OPTION_ADD_MINOR="0"
+            OPTION_ADD_MAJOR="0"
+            OPTION_WRITE_XCODE_VERSION="NO"
+            OPTION_WRITE="NO"
+            OPTION_TAG_WARNING="NO"
+         ;;
+
+         --first-patch-zero)
+            OPTION_FIRST_PATCH="0"
+         ;;
+
+         --first-patch-one)
+            OPTION_FIRST_PATCH="1"
+         ;;
+
+         --add-patch)
+            [ $# -eq 1 ] && fail "missing argument to $1"
+            shift
+
+            OPTION_ADD_PATCH="$1"
+         ;;
+
+         --write)
+            OPTION_WRITE="YES"
+         ;;
+
+         --no-write)
+            OPTION_WRITE="NO"
+         ;;
+
+         --xcodeproj)
+            [ $# -eq 1 ] && fail "missing argument to $1"
+            shift
+
+            OPTION_XCODEPROJ="$1"
+         ;;
+
+         --read-xcode-version)
+            OPTION_READ_XCODE_VERSION="YES"
+         ;;
+
+         --write-xcode-version)
+            OPTION_WRITE_XCODE_VERSION="YES"
+         ;;
+
+         --no-write-xcode-version)
+            OPTION_WRITE_XCODE_VERSION="NO"
+         ;;
+
+         --language)
+            [ $# -eq 1 ] && fail "missing argument to $1"
+            shift
+            LANGUAGE="$1"
+         ;;
+
+         --versionname)
+            [ $# -eq 1 ] && fail "missing argument to $1"
+            shift
+            OPTION_VERSIONNAME="$1"
+         ;;
+
+         --versionfile)
+            [ $# -eq 1 ] && fail "missing argument to $1"
+            shift
+            OPTION_VERSIONFILE="$1"
+         ;;
+
+         -h|--help)
+            usage
+         ;;
+
+         -t)
+            set -x
+         ;;
+
+         -*)
+            usage
+         ;;
+
+         *)
+            break
+         ;;
+      esac
+
+      shift
+   done
+
+   DIRECTORY_NAME="`basename -- "$PWD"`"
+
+   if [ -z "${PROJECT}" ]
+   then
+      PROJECT="${1:-${DIRECTORY_NAME}}"
+      [ $# -ne 0 ] && shift
+   fi
+}
+
+
+main()
+{
+   local directory
+
+   local OPTION_ADD_MAJOR="0"
+   local OPTION_ADD_MINOR="0"
+   local OPTION_ADD_PATCH="0"
+   local OPTION_FIRST_PATCH="0"
+   local OPTION_READ_INFO="YES"
+   local OPTION_READ_XCODE_VERSION="NO"
+   local OPTION_WRITE="NO"
+   local OPTION_WRITE_XCODE_VERSION="NO"
+   local OPTION_XCODEPROJ=""
+   local OPTION_TAG_WARNING="YES"
+
+   local OPTION_VERSIONNAME
+   local OPTION_VERSIONFILE
+
+   if [ -f ".first_patch" ]
+   then
+      OPTION_FIRST_PATCH="`cat ".first_patch"`"
+   fi
+
+   parse_arguments "$@"
+
+   if [ "${OPTION_READ_INFO}" = "YES" ]
+   then
+      if [ -f "./bin/version-info.sh" ]
+      then
+         . ./bin/version-info.sh
+      fi
+      if [ -f "./bin/release-info.sh" ]
+      then
+         . ./bin/release-info.sh
+      fi
+      if [ -f "./bin/formula-info.sh" ]
+      then
+         . ./bin/formula-info.sh
+      fi
+   fi
+
+   VERSIONNAME="${OPTION_VERSIONNAME:-${VERSIONNAME}}"
+   VERSIONFILE="${OPTION_VERSIONFILE:-${VERSIONFILE}}"
+
+   get_version
+
+   edit_version_if_requested
+
+   write_version_if_requested "$@"
 
    echo "${VERSION}"
 }
 
 
+MULLE_EXECUTABLE_PATH="$0"
 MULLE_EXECUTABLE="`basename -- $0`"
 MULLE_BOOTSTRAP_FAIL_PREFIX="${MULLE_EXECUTABLE}"
 

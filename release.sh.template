@@ -49,7 +49,7 @@ generate_brew_formula()
 #######
 
 MULLE_BOOTSTRAP_FAIL_PREFIX="`basename -- $0`"
-MULLE_HOMEBREW_VERSION="5.2.0"
+MULLE_HOMEBREW_VERSION="5.2.1"
 
 if [ -z "`command -v mulle-homebrew-env`" ]
 then

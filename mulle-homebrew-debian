@@ -13,7 +13,8 @@ Usage:
 
    Options:
       --root <path> : default is /usr
-
+      --no-update   : don't execute did-update.sh in the taps directory
+      --no-publish  : don't publish to tap
 EOF
    exit 1
 }
@@ -160,7 +161,10 @@ create_debian()
    # brew install dpkg
    dpkg-deb -b "${directory}" >&2 || exit 1
 
-   rm -rf "${directory}"
+   if [ "${OPTION_REMOVE_TMP}" = "YES" ]
+   then
+      rm -rf "${directory}"
+   fi
 
    echo "${directory}.deb"
 }
@@ -171,8 +175,10 @@ main()
    local debian
 
    local OPTION_PREFIX
-
-   OPTION_ROOT="/usr"
+   local OPTION_ROOT="/usr"
+   local OPTION_UPDATE="YES"
+   local OPTION_PUBLISH="YES"
+   local OPTION_REMOVE_TMP="YES"
 
    VERSION="`mulle-homebrew-version --no-tag-warning`"
 
@@ -185,6 +191,51 @@ main()
    then
       . ./bin/tap-info.sh
    fi
+
+   while [ $# -ne 0 ]
+   do
+      case "$1" in
+         -h|-help|--help)
+            usage
+         ;;
+
+         -t)
+            set -x
+         ;;
+
+         --no-update)
+            OPTION_UPDATE="NO"
+         ;;
+
+         --no-publish)
+            OPTION_PUBLISH="NO"
+         ;;
+
+         --no-remove-tmp)
+            OPTION_REMOVE_TMP="NO"
+         ;;
+
+         --root)
+            [ $# -eq 1 ] && fail "missing argument to $1"
+            shift
+
+            OPTION_ROOT="$1"
+         ;;
+
+         -*)
+            log_error "unknown option $1"
+            usage
+         ;;
+
+         *)
+            break
+         ;;
+      esac
+
+      shift
+   done
+
+   [ -z "${PROJECT}" ] && fail "PROJECT not specified, probably because of missing bin/formula-info.sh"
 
    if [ -z "`command -v dpkg-deb`" ]
    then
@@ -199,37 +250,9 @@ main()
       esac
    fi
 
-   while [ $# -ne 0 ]
-   do
-      case "$1" in
-         -t)
-            set -x
-         ;;
-
-         --root)
-            [ $# -eq 1 ] && fail "missing argument to $1"
-            shift
-
-            OPTION_ROOT="$1"
-         ;;
-
-         -*)
-            fail "unknown option $1"
-         ;;
-
-         *)
-            break
-         ;;
-      esac
-
-      shift
-   done
-
-   [ -z "${PROJECT}" ] && fail "PROJECT not specified, probably because of missing bin/formula-info.sh"
-
    debianfile="`create_debian`" || exit 1
 
-   if [ ! -z "${PUBLISHER_TAP}" ]
+   if [ "${OPTION_PUBLISH}" = "YES" ] && [ ! -z "${PUBLISHER_TAP}" ]
    then
       TAPS_LOCATION="${TAPS_LOCATION:-..}"
 
@@ -243,7 +266,8 @@ main()
 
          log_info "Publishing \"${debianfile}\"..."
          mv "${debianfile}" "${DEBIAN_TAP}/all/"
-         if [ -x "${DEBIAN_TAP}/did-update.sh" ]
+
+         if [ "${OPTION_UPDATE}" = "YES" ] && [ -x "${DEBIAN_TAP}/did-update.sh" ]
          then
             (
               log_info "Executing ./did-update.sh in ..."
