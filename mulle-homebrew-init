@@ -79,6 +79,12 @@ _template_path()
 }
 
 
+generate_formula_template_path()
+{
+   _template_path "generate-formula.sh.template"
+}
+
+
 release_template_path()
 {
    _template_path "release.sh.template"
@@ -216,23 +222,20 @@ EOF
 }
 
 
-write_version_info_template()
+generic_write_template()
 {
-   local directory="$1"
+   local template="$1"
+   local filename="$2"
 
-   local template
+   local directory
 
-   # try to avoid creating empty release.sh if things go awry
-   template="`version_info_template_path`"
+   directory="`dirname -- "${filename}"`"
 
    if [ ! -d "${directory}" ]
    then
       mkdir -p "${directory}" || exit 1
    fi
 
-   local filename
-
-   filename="${directory}/version-info.sh"
    if [ ! -e "${filename}" -o "${OPTION_FORCE}" = "YES" ]
    then
       (
@@ -240,6 +243,22 @@ write_version_info_template()
          chmod 755 "${filename}"
       ) || exit 1
    fi
+}
+
+
+write_version_info_template()
+{
+   local directory="$1"
+
+   generic_write_template "`version_info_template_path`" "${directory}"
+}
+
+
+write_generate_formula_template()
+{
+   local directory="$1"
+
+   generic_write_template "`generate_formula_template_path`" "${directory}"
 }
 
 
@@ -257,7 +276,7 @@ write_formula_info_template()
    project="`basename -- "${projectdir}"`"
 
    result="`sed "s/^# PROJECT=\\\"MyProject\\\"/PROJECT=\\\"${project}\\\"/" "${template}"`" || exit 1
-   [ -z "${result}" ] && fail "release.sh generation failed"
+   [ -z "${result}" ] && fail "formula-info.sh generation failed"
    result="`echo "${result}" | sed "s/^# DESC=\\\".*\\\"/DESC=\\\"${project} is ...\\\"/"`" || exit 1
 
    if [ -f "${projectdir}/CMakeLists.txt" ]
@@ -371,6 +390,7 @@ main()
    write_release_template "${directory}"
    write_formula_info_template "${directory}" "${projectdir}" # write first
    write_version_info_template "${directory}"
+   write_generate_formula_template "${directory}"
 }
 
 

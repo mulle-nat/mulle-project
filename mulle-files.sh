@@ -60,6 +60,14 @@ then
    . "${EXE_DIR}/formula-info.sh"
 fi
 
+
+# if there is a generate-formula.sh file read it
+if [ -f "${EXE_DIR}/generate-formula.sh" ]
+then
+   DO_GENERATE_FORMULA="YES"
+   . "${EXE_DIR}/generate-formula.sh"
+fi
+
 #
 # If there is a - possibly .gitignored - tap-info.sh file read it.
 # It could store PUBLISHER and PUBLISHER_TAP
