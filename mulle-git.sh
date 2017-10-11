@@ -61,7 +61,7 @@ git_any_first_commit()
 
 git_last_tag()
 {
-   git describe --tags --abbrev=0
+   git describe --tags --abbrev=0 2> /dev/null
 }
 
 

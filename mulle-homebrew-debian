@@ -187,9 +187,14 @@ main()
       . ./bin/formula-info.sh
    fi
 
-   if [ -f "./bin/tap-info.sh" ]
+   if [ -f "./bin/publisher-info.sh" ]
    then
-      . ./bin/tap-info.sh
+      . ./bin/publisher-info.sh
+   else
+      if [ -f "./bin/tap-info.sh" ]
+      then
+         . ./bin/tap-info.sh
+      fi
    fi
 
    while [ $# -ne 0 ]
@@ -252,34 +257,31 @@ main()
 
    debianfile="`create_debian`" || exit 1
 
-   if [ "${OPTION_PUBLISH}" = "YES" ] && [ ! -z "${PUBLISHER_TAP}" ]
+   if [ "${OPTION_PUBLISH}" = "YES" ] && [ ! -z "${PUBLISHER_DEBIAN_DISTNAME}" ]
    then
-      TAPS_LOCATION="${TAPS_LOCATION:-..}"
+      DISTS_LOCATION="${DISTS_LOCATION:-..}"
+      DEBIAN_DISTS="${DEBIAN_DISTS:-${DISTS_LOCATION}/debian-${PUBLISHER_DEBIAN_DISTNAME}}"
 
-      tmp="`basename -- ${PUBLISHER_TAP}`"
-
-      DEBIAN_TAP="${DEBIAN_TAP:-${TAPS_LOCATION}/debian-${tmp}}"
-
-      if [ -d "${DEBIAN_TAP}" ]
+      if [ -d "${DEBIAN_DISTS}" ]
       then
-         mkdir "${DEBIAN_TAP}/all" 2> /dev/null
+         mkdir "${DEBIAN_DISTS}/all" 2> /dev/null
 
          log_info "Publishing \"${debianfile}\"..."
-         mv "${debianfile}" "${DEBIAN_TAP}/all/"
+         mv "${debianfile}" "${DEBIAN_DISTS}/all/"
 
-         if [ "${OPTION_UPDATE}" = "YES" ] && [ -x "${DEBIAN_TAP}/did-update.sh" ]
+         if [ "${OPTION_UPDATE}" = "YES" ] && [ -x "${DEBIAN_DISTS}/did-update.sh" ]
          then
             (
               log_info "Executing ./did-update.sh in ..."
 
-              cd "${DEBIAN_TAP}"
+              cd "${DEBIAN_DISTS}"
               # let some script take over
               ./did-update.sh "${debianfile}"
             ) || exit 1
          fi
       fi
    else
-      log_verbose "No PUBLISHER_TAP set"
+      log_verbose "No PUBLISHER_DEBIAN_DISTNAME set"
    fi
 }
 

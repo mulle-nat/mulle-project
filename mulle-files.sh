@@ -36,11 +36,21 @@
 
 EXE_DIR="`dirname -- $0`"
 
+source_file()
+{
+   if [ "${VERBOSE}" = "YES" ]
+   then
+      echo "Read \"$1\"" >&2
+   fi
+   . "$1"
+}
+
+
 # if there is a version-info.sh file read it
 if [ -f "${EXE_DIR}/version-info.sh" ]
 then
    DO_GIT_RELEASE="YES"
-   . "${EXE_DIR}/version-info.sh"
+   source_file "${EXE_DIR}/version-info.sh"
 fi
 
 #
@@ -57,7 +67,7 @@ fi
 if [ -f "${EXE_DIR}/formula-info.sh" ]
 then
    DO_GENERATE_FORMULA="YES"
-   . "${EXE_DIR}/formula-info.sh"
+   source_file "${EXE_DIR}/formula-info.sh"
 fi
 
 
@@ -65,21 +75,27 @@ fi
 if [ -f "${EXE_DIR}/generate-formula.sh" ]
 then
    DO_GENERATE_FORMULA="YES"
-   . "${EXE_DIR}/generate-formula.sh"
+   source_file "${EXE_DIR}/generate-formula.sh"
 fi
 
 #
 # If there is a - possibly .gitignored - tap-info.sh file read it.
 # It could store PUBLISHER and PUBLISHER_TAP
 #
-if [ -f "${EXE_DIR}/tap-info.sh" ]
+# but publisher-info.sh is really a much better name than tap-info.sh
+if [ -f "${EXE_DIR}/publisher-info.sh" ]
 then
-   . "${EXE_DIR}/tap-info.sh"
+   source_file "${EXE_DIR}/publisher-info.sh"
+else
+   if [ -f "${EXE_DIR}/tap-info.sh" ]
+   then
+      source_file "${EXE_DIR}/tap-info.sh"
+   fi
 fi
 
 
 # if there is a post-release.sh file read it
 if [ -f "${EXE_DIR}/post-release.sh" ]
 then
-   . "${EXE_DIR}/post-release.sh"
+   source_file "${EXE_DIR}/post-release.sh"
 fi

@@ -221,12 +221,12 @@ edit_version_if_requested()
       else
          local last
 
-         last="`git_last_tag`" 2> /dev/null
+         last="`git_last_tag`"
          if [ ! -z "${last}" ]
          then
             echo "info: Version is ${VERSION}. Last git tag is \"${last}\"." >&2
          else
-            echo "info: No git tag \"${VERSION}\" exists." >&2
+            echo "info: No git tag \"${VERSION}\" exists. (git fetch --tags maybe ?)" >&2
          fi
       fi
    fi

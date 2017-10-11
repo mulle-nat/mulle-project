@@ -130,7 +130,7 @@ emit_releasenotes()
 
       if [ -z "${start}" ]
       then
-         start="`git_last_tag 2> /dev/null`"
+         start="`git_last_tag`"
          if [ -z "${start}" ]
          then
             start="`git_any_first_commit`"

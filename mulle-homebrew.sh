@@ -102,7 +102,7 @@ generate_brew_formula_header()
    #
    # anything less than 2 KB is wrong
    #
-   size="`exekutor du -k "${tmparchive}" | exekutor awk '{ print $ 1}'`"
+   size="`exekutor du -k "${tmparchive}" | exekutor awk '{ print $1 }'`"
    if [ -z "${MULLE_FLAG_EXEKUTOR_DRY_RUN}" ]
    then
       if [ "$size" -lt "${ARCHIVE_MINSIZE:-2}" ]
@@ -205,10 +205,13 @@ generate_brew_formula_xcodebuild()
 
    local aux_args
    local option
+   local seperator
+
 
    for option in "$@"
    do
       aux_args="\"${option}\", ${aux_args}"
+      seperator=", "
    done
 
    local lines
@@ -217,7 +220,7 @@ generate_brew_formula_xcodebuild()
 
 ${INDENTATION}def install
 ${INDENTATION}${INDENTATION}system "xcodebuild", "-configuration", "${configuration}", \
-"DSTROOT=#{prefix}",${aux_args} "install"
+"DSTROOT=#{prefix}", ${aux_args}${seperator}"install"
 ${INDENTATION}end
 EOF
 `"
@@ -340,7 +343,7 @@ formula_push()
 #
 homebrew_parse_options()
 {
-   OPTION_NO_FORMULA="NO"
+   DO_PUSH_FORMULA="YES"
 
    while [ $# -ne 0 ]
    do
@@ -386,20 +389,24 @@ homebrew_parse_options()
          ;;
 
          # single arg long (kinda lame)
-         -cache)
+         --cache)
             USE_CACHE="YES"
          ;;
 
-         -echo)
+         --echo)
             OPTION_ECHO="YES"
          ;;
 
-         -no-formula)
-            OPTION_NO_FORMULA="YES"
+         --no-git)
+            DO_GIT_RELEASE="NO"
          ;;
 
-         -no-push|-no-tap-push)
-            OPTION_NO_TAP_PUSH="YES"
+         --no-formula)
+            DO_GENERATE_FORMULA="NO"
+         ;;
+
+         --no-push)
+            DO_PUSH_FORMULA="NO"
          ;;
 
          # arg long
@@ -551,8 +558,6 @@ homebrew_main()
 # DESC must not be empty
    [ -z "${desc}" ]  && fail "DESC is empty"
 
-   [ "${OPTION_NO_FORMULA}" = "YES" ] && return
-
    [ -z "${project}" ]     && internal_fail "missing project"
    [ -z "${name}" ]        && internal_fail "missing name"
    [ -z "${version}" ]     && internal_fail "missing version"
@@ -592,7 +597,7 @@ homebrew_main()
 
    redirect_exekutor "${homebrewtap}/${rbfile}" echo "${formula}"
 
-   if [ "${OPTION_NO_TAP_PUSH}" != "YES" ]
+   if [ "${DO_PUSH_FORMULA}" = "YES" ]
    then
       formula_push "${rbfile}" "${version}" "${name}" "${homebrewtap}"
    fi

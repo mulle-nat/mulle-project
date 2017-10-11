@@ -33,10 +33,9 @@
 usage()
 {
    cat <<EOF >&2
-Usage: mulle-homebrew-install [directory]
+Usage: ${MULLE_EXECUTABLE} [directory]
 
-   Use it to install a release.sh in your bin
-   directory and version-info.sh and formula-info.sh in your project directory.
+   Use it to install release scripts in your "./bin" directory.
 
 EOF
    exit 1
@@ -47,6 +46,15 @@ fail()
 {
    echo "Error:" "$*" >&2
    exit 1
+}
+
+
+log_verbose()
+{
+   if [ "${OPTION_VERBOSE}" = "YES" ]
+   then
+      echo "$*" >&2
+   fi
 }
 
 
@@ -122,10 +130,11 @@ _prepend_path_if_relative()
    case "$2" in
       /*)
          echo "$2"
-         ;;
+      ;;
+
       *)
          echo "$1/$2"
-         ;;
+      ;;
    esac
 }
 
@@ -137,7 +146,7 @@ resolve_symlinks()
 
    if linkpath="`readlink "$1"`"
    then
-      dir_context=`dirname -- "$1"`
+      dir_context="`dirname -- "$1"`"
       resolve_symlinks "`_prepend_path_if_relative "${dir_context}" "${linkpath}"`"
    else
       echo "$1"
@@ -176,6 +185,8 @@ write_release_template()
          esac
       fi
    fi
+
+   log_verbose "Write \"${directory}/release.sh\""
 
    cat << EOF > "${directory}/release.sh"
 #! /usr/bin/env bash
@@ -238,6 +249,7 @@ generic_write_template()
 
    if [ ! -e "${filename}" -o "${OPTION_FORCE}" = "YES" ]
    then
+      log_verbose "Write \"${filename}\""
       (
          cat "${template}" > "${filename}" &&
          chmod 755 "${filename}"
@@ -250,7 +262,7 @@ write_version_info_template()
 {
    local directory="$1"
 
-   generic_write_template "`version_info_template_path`" "${directory}"
+   generic_write_template "`version_info_template_path`" "${directory}/version-info.sh"
 }
 
 
@@ -258,7 +270,7 @@ write_generate_formula_template()
 {
    local directory="$1"
 
-   generic_write_template "`generate_formula_template_path`" "${directory}"
+   generic_write_template "`generate_formula_template_path`" "${directory}/generate-formula.sh"
 }
 
 
@@ -299,6 +311,8 @@ write_formula_info_template()
    if [ ! -e "${directory}/version-info.sh" -o "${OPTION_FORCE}" = "YES" ]
    then
       (
+         log_verbose "Write \"${filename}\""
+
          echo "${result}" > "${filename}" &&
          chmod 755 "${filename}"
       ) || exit 1
@@ -317,8 +331,8 @@ main()
 
    # resolve symlinks if there
    executable="`resolve_symlinks "$0"`"
-   exedirpath="`dirname "${executable}"`"
-   prefix="`dirname "${exedirpath}"`"
+   exedirpath="`dirname -- "${executable}"`"
+   prefix="`dirname -- "${exedirpath}"`"
 
    local libexecpath
    local sharepath
@@ -335,6 +349,7 @@ main()
    fi
 
    local OPTION_FORCE
+   local OPTION_VERBOSE
 
    # the option prefix is kinda historic now
    while [ $# -ne 0 ]
@@ -361,6 +376,10 @@ main()
 
          -t)
             set -x
+         ;;
+
+         -v)
+            OPTION_VERBOSE="YES"
          ;;
 
          -*)
@@ -393,7 +412,7 @@ main()
    write_generate_formula_template "${directory}"
 }
 
-
-MULLE_EXECUTABLE_FAIL_PREFIX="`basename -- "$0"`"
+MULLE_EXECUTABLE="`basename -- "$0"`"
+MULLE_EXECUTABLE_FAIL_PREFIX="${MULLE_EXECUTABLE}"
 main "$@"
 
