@@ -2,12 +2,19 @@
 
 ![mulle-project logo](mulle-project-128x128.png)
 
-**mulle-project** provides a convenience script to tag and release your
-[cmake](//cmake.org) based project and publish it on a [homebrew](//brew.sh)
-tap. It has been designed, so that it can be used with multiple forks.
+**mulle-project** is a collection of scripts `mulle-project-release` to
+facilitate project management.
+
+Command                      | Description
+-----------------------------|-----------------------
+`mulle-project-init`         | Initial setup and update
+`mulle-project-release`      | Create and publish releases
+`mulle-project-version`      | Examine and change project versions
+`mulle-project-releasenotes` | Create releasenotes from git logs
+`mulle-project-untag`        | Remove tags from multiple repositories
 
 
-#### What the script does
+#### What `mulle-project-release` does
 
 1. Checks that the repository state is clean, no modified files exist
 2. Checks that a tag with the current version does not exist
@@ -61,12 +68,10 @@ This will create the following files
 
 File                  | Mode      | Description
 ----------------------|-----------|------------------
-`bin/release.sh`      | Overwrite | The release script
-`bin/release-info.sh` | Preserve  | Configuration options for git as a shell script
+`bin/version-info.sh` | Preserve  | Configuration options for git as a shell script
 `bin/formula-info.sh` | Preserve  | Configuration options for project as a shell script
 
-The `...-info.sh` files are just shell scripts that are included by
-`bin/release.sh`. Within them you can define the following variables
+In the `...-info.sh` files you define various configuration  variables.
 
 
 ### 2. Configure versioning
@@ -101,7 +106,7 @@ in your project root.
 The version is under your control, **mulle-project** will never change it.
 
 
-### 3. Edit release-info.sh
+### 3. Edit version-info.sh
 
 > Check if your version is picked up with `mulle-project-version`.
 > If it is, you can skip this step.
@@ -137,16 +142,18 @@ Variable             | Description
 `NAME`               | Formula filename without .rb extension
 
 
-### 5. Test your release.sh script
+### 5. Test your configuration
 
-Test the script from your project root. You need to give it the publisher,
-which is your user name, and the homebrew tap to publish the release to
-(note the trailing slash character `/`). The `release.sh` can be started with
-`-n`, which performs a dry run without doing anything to your project or
-repository. Also you need to specify where the generate formula should be put. That is done somewhat indirectly with `--taps-location` and `--tap`.
+Test your configuration from the project root. You need to give
+`mulle-project-release` the publisher,
+which is your github user name, and the homebrew tap to publish the release to
+(note the trailing slash character `/`). With the option `-n`
+`mulle-project-release` performs a dry run without doing anything to your
+project or repository. Also you need to specify where the generated formula
+should be put. That is done somewhat indirectly with `--taps-location` and `--tap`.
 
 ```
-./bin/release.sh -v -n --taps-location ~/taps --publisher  --tap ''
+mulle-project-release -v -n --taps-location ~/taps --publisher  --tap ''
 ```
 
 > #### Tip
@@ -163,10 +170,10 @@ repository. Also you need to specify where the generate formula should be put. T
 If the output looks good, then do the release:
 
 ```
-./bin/release.sh --taps-location ~/taps --publisher  --tap ''
+mulle-project-release --taps-location ~/taps --publisher  --tap ''
 ```
 
-## Optional: Edit release.sh to build without mulle-build
+## Optional: Edit generate-formula.sh to build without mulle-build
 
 You will have to change `generate_brew_formula_build` so
 that proper build stages of
@@ -210,10 +217,11 @@ EOF
 ...
 ```
 
-## Optional: Create tap-info.sh to set tap information
+## Optional: Create publisher-info.sh to set publishing information
 
 Instead of passing in parameters, you can place the required information
-into `tap-info.sh`.  It is recommended to place this file into `.gitignore`
+into `mulle-project/publisher-info.sh`.  It is recommended to place this
+file into `.gitignore`
 
 Variable               | Description
 -----------------------|------------------------------
@@ -315,7 +323,7 @@ git commit --amend --no-edit
 Now release it to the world:
 
 ```
-./bin/release.sh
+mulle-project-release
 ```
 
 
