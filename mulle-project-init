@@ -29,13 +29,13 @@
 #   ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 #   POSSIBILITY OF SUCH DAMAGE.
 #
-
 usage()
 {
    cat <<EOF >&2
 Usage: ${MULLE_EXECUTABLE} [directory]
 
-   Use it to install release scripts in your "./bin" directory.
+   Install release and versioning information scripts in your
+   "./mulle-project" directory.
 
 EOF
    exit 1
@@ -93,12 +93,6 @@ generate_formula_template_path()
 }
 
 
-release_template_path()
-{
-   _template_path "release.sh.template"
-}
-
-
 version_info_template_path()
 {
    _template_path "version-info.sh.template"
@@ -110,14 +104,6 @@ formula_info_template_path()
    _template_path "formula-info.sh.template"
 }
 
-
-version()
-{
-   local filename
-
-   filename="`release_template_path`"
-   egrep -s "^MULLE_HOMEBREW_VERSION=" "${filename}" | cut -d= -f2 | tr -d '"'
-}
 
 
 #
@@ -151,85 +137,6 @@ resolve_symlinks()
    else
       echo "$1"
    fi
-}
-
-
-write_release_template()
-{
-   local directory="$1"
-
-   local template
-
-   # try to avoid creating empty release.sh if things go awry
-   template="`release_template_path`"
-
-   if [ ! -d "${directory}" ]
-   then
-      mkdir -p "${directory}" || exit 1
-   fi
-
-   if [ -z "${AUTHOR}" ]
-   then
-      AUTHOR="${USER:-${LOGNAME}}"
-
-      if [ "${LOGNAME}" = "nat" -a "`id -u`" = "955" ]
-      then
-         case `hostname` in
-            kempe*)
-               AUTHOR='Nat! - Mulle kybernetiK'
-            ;;
-
-            *)
-               AUTHOR='Nat! - Codeon GmbH'
-            ;;
-         esac
-      fi
-   fi
-
-   log_verbose "Write \"${directory}/release.sh\""
-
-   cat << EOF > "${directory}/release.sh"
-#! /usr/bin/env bash
-#
-#   Copyright (c) `date '+%Y'` ${AUTHOR}
-#   All rights reserved.
-#
-EOF
-
-   if [ -z "${NO_BSD3}" ]
-   then
-      cat << EOF >> "${directory}/release.sh"
-#   Redistribution and use in source and binary forms, with or without
-#   modification, are permitted provided that the following conditions are met:
-#
-#   Redistributions of source code must retain the above copyright notice, this
-#   list of conditions and the following disclaimer.
-#
-#   Redistributions in binary form must reproduce the above copyright notice,
-#   this list of conditions and the following disclaimer in the documentation
-#   and/or other materials provided with the distribution.
-#
-#   Neither the name of Mulle kybernetiK nor the names of its contributors
-#   may be used to endorse or promote products derived from this software
-#   without specific prior written permission.
-#
-#   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-#   AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-#   IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-#   ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
-#   LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-#   CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-#   SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-#   INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-#   CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-#   ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-#   POSSIBILITY OF SUCH DAMAGE.
-#
-EOF
-   fi
-
-   cat "${template}" >> "${directory}/release.sh"
-   chmod 755 "${directory}/release.sh"
 }
 
 
@@ -282,7 +189,6 @@ write_formula_info_template()
    local template
    local project
 
-   # try to avoid creating empty release.sh if things go awry
    template="`formula_info_template_path`"
 
    project="`basename -- "${projectdir}"`"
@@ -339,7 +245,7 @@ main()
    local directory
 
    # allow local execution from project
-   if [ -e "${exedirpath}/mulle-homebrew.sh" -a -e "${exedirpath}/release.sh.template" ]
+   if [ -e "${exedirpath}/mulle-homebrew.sh" -a -e "${exedirpath}/formula-info.sh.template" ]
    then
       libexecpath="${exedirpath}"
       sharepath="${exedirpath}"
@@ -394,7 +300,7 @@ main()
    done
 
 
-   directory="${1:-bin}"
+   directory="${1:-mulle-project}"
 
    case "${directory}" in
       /*)
@@ -406,7 +312,6 @@ main()
       ;;
    esac
 
-   write_release_template "${directory}"
    write_formula_info_template "${directory}" "${projectdir}" # write first
    write_version_info_template "${directory}"
    write_generate_formula_template "${directory}"

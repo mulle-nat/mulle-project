@@ -29,18 +29,19 @@
 #   ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 #   POSSIBILITY OF SUCH DAMAGE.
 #
+MULLE_PROJECT_VERSION={{VERSION}}
 
 usage()
 {
    cat <<EOF >&2
-Usage: mulle-homebrew-env [command]
+Usage: mulle-project-env [command]
 
-   Prints the configuration of various mulle-homebrew related values.
+   Prints the configuration of various mulle-project related values.
 
 Commands:
    libexec-path     : print path to support scripts (default)
    share-path       : print path to resources
-   version          : print version of installed scripts
+   version          : print version of mulle-project
    path             : path of the executable
 
 EOF
@@ -70,31 +71,6 @@ share_path()
 
    cd "${sharepath}" || exit 1
    pwd -P
-}
-
-_template_path()
-{
-   local name="$1"
-
-   [ ! -f "${sharepath}/${name}" ] && fail "template \"${sharepath}/${name}\" missing"
-
-   cd "${sharepath}" || exit 1
-   echo "`pwd -P`/${name}"
-}
-
-
-release_template_path()
-{
-   _template_path "release.sh.template"
-}
-
-
-version()
-{
-   local filename
-
-   filename="`release_template_path`"
-   egrep -s "^MULLE_HOMEBREW_VERSION=" "${filename}" | cut -d= -f2 | tr -d '"'
 }
 
 
@@ -150,13 +126,13 @@ main()
    local directory
 
    # allow local execution from project
-   if [ -e "${exedirpath}/mulle-homebrew.sh" -a -e "${exedirpath}/release.sh.template" ]
+   if [ -e "${exedirpath}/mulle-project-release" -a -e "${exedirpath}/formula-info.sh.template" ]
    then
       libexecpath="${exedirpath}"
       sharepath="${exedirpath}"
    else
-      libexecpath="${prefix}/libexec/mulle-homebrew"
-      sharepath="${prefix}/share/mulle-homebrew"
+      libexecpath="${prefix}/libexec/mulle-project"
+      sharepath="${prefix}/share/mulle-project"
    fi
 
    local OPTION_FORCE
@@ -175,17 +151,16 @@ main()
             projectdir="$1"
          ;;
 
-         "--version")
-            version
-            exit 0
-         ;;
-
          -f)
             OPTION_FORCE="YES"
          ;;
 
          -t)
             set -x
+         ;;
+
+         "--version")
+            echo "${MULLE_PROJECT_VERSION}"
          ;;
 
          -*)
@@ -210,7 +185,7 @@ main()
       ;;
 
       "version")
-         version
+         echo "${MULLE_PROJECT_VERSION}"
       ;;
 
       path)

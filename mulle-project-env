@@ -1,0 +1,204 @@
+#! /usr/bin/env bash
+#
+#   Copyright (c) 2017 Nat! - Mulle kybernetiK
+#   All rights reserved.
+#
+#   Redistribution and use in source and binary forms, with or without
+#   modification, are permitted provided that the following conditions are met:
+#
+#   Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+#   Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+#   Neither the name of Mulle kybernetiK nor the names of its contributors
+#   may be used to endorse or promote products derived from this software
+#   without specific prior written permission.
+#
+#   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+#   AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+#   IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+#   ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+#   LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+#   CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+#   SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+#   INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+#   CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+#   ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+#   POSSIBILITY OF SUCH DAMAGE.
+#
+MULLE_PROJECT_VERSION=0.0.1
+
+usage()
+{
+   cat <<EOF >&2
+Usage: mulle-project-env [command]
+
+   Prints the configuration of various mulle-project related values.
+
+Commands:
+   libexec-path     : print path to support scripts (default)
+   share-path       : print path to resources
+   version          : print version of mulle-project
+   path             : path of the executable
+
+EOF
+   exit 1
+}
+
+
+fail()
+{
+   echo "Error:" "$*" >&2
+   exit 1
+}
+
+
+libexec_path()
+{
+   [ ! -d "${libexecpath}" ] && fail "libexec folder \"${libexecpath}\" missing"
+
+   cd "${libexecpath}" || exit 1
+   pwd -P
+}
+
+
+share_path()
+{
+   [ ! -d "${sharepath}" ] && fail "share folder \"${sharepath}\" missing"
+
+   cd "${sharepath}" || exit 1
+   pwd -P
+}
+
+
+#
+# stolen from:
+# http://stackoverflow.com/questions/1055671/how-can-i-get-the-behavior-of-gnus-readlink-f-on-a-mac
+# ----
+#
+_prepend_path_if_relative()
+{
+   case "$2" in
+      /*)
+         echo "$2"
+         ;;
+      *)
+         echo "$1/$2"
+         ;;
+   esac
+}
+
+
+resolve_symlinks()
+{
+   local dir_context
+   local linkpath
+
+   if linkpath="`readlink "$1"`"
+   then
+      dir_context=`dirname -- "$1"`
+      resolve_symlinks "`_prepend_path_if_relative "${dir_context}" "${linkpath}"`"
+   else
+      echo "$1"
+   fi
+}
+
+
+main()
+{
+   local projectdir
+   local executable
+   local exedirpath
+   local prefix
+
+   projectdir="`pwd -P`"
+
+   # resolve symlinks if there
+   executable="`resolve_symlinks "$0"`"
+   exedirpath="`dirname "${executable}"`"
+   prefix="`dirname "${exedirpath}"`"
+
+   local libexecpath
+   local sharepath
+   local directory
+
+   # allow local execution from project
+   if [ -e "${exedirpath}/mulle-project-release" -a -e "${exedirpath}/formula-info.sh.template" ]
+   then
+      libexecpath="${exedirpath}"
+      sharepath="${exedirpath}"
+   else
+      libexecpath="${prefix}/libexec/mulle-project"
+      sharepath="${prefix}/share/mulle-project"
+   fi
+
+   local OPTION_FORCE
+
+   # the option prefix is kinda historic now
+   while [ $# -ne 0 ]
+   do
+      case "$1" in
+         "--help"|"-h"|"help")
+            usage
+         ;;
+
+         "-d"|"--directory")
+            [ $# -eq 1 ] && fail "missing argument for $1"
+            shift
+            projectdir="$1"
+         ;;
+
+         -f)
+            OPTION_FORCE="YES"
+         ;;
+
+         -t)
+            set -x
+         ;;
+
+         "--version")
+            echo "${MULLE_PROJECT_VERSION}"
+         ;;
+
+         -*)
+            fail "unknown option \"$1\""
+         ;;
+
+         *)
+            break
+         ;;
+      esac
+      shift
+   done
+
+
+   case "$1" in
+      "libexec-path"|"")
+         libexec_path
+      ;;
+
+      "share-path")
+         share_path
+      ;;
+
+      "version")
+         echo "${MULLE_PROJECT_VERSION}"
+      ;;
+
+      path)
+         echo "${executable}"
+      ;;
+
+      *)
+         usage
+      ;;
+   esac
+}
+
+
+MULLE_EXECUTABLE_FAIL_PREFIX="`basename -- "$0"`"
+main "$@"
+

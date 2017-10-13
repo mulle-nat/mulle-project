@@ -34,7 +34,12 @@
 # Load in some user file, that define permanent info
 #######
 
-EXE_DIR="`dirname -- $0`"
+INFO_DIR="${INFO_DIR:-mulle-project}"
+
+if [ "${VERBOSE}" = "YES" ]
+then
+   echo "INFO_DIR=\"${INFO_DIR}\"" >&2
+fi
 
 source_file()
 {
@@ -47,55 +52,28 @@ source_file()
 
 
 # if there is a version-info.sh file read it
-if [ -f "${EXE_DIR}/version-info.sh" ]
+if [ -f "${INFO_DIR}/version-info.sh" ]
 then
    DO_GIT_RELEASE="YES"
-   source_file "${EXE_DIR}/version-info.sh"
-fi
-
-#
-# if there is a release-info.sh file read it
-# this an old fashioned name for version-info.sh
-#
-if [ -f "${EXE_DIR}/release-info.sh" ]
-then
-   DO_GIT_RELEASE="YES"
-   . "${EXE_DIR}/release-info.sh"
+   source_file "${INFO_DIR}/version-info.sh"
 fi
 
 # if there is a formula-info.sh file read it
-if [ -f "${EXE_DIR}/formula-info.sh" ]
+if [ -f "${INFO_DIR}/formula-info.sh" ]
 then
    DO_GENERATE_FORMULA="YES"
-   source_file "${EXE_DIR}/formula-info.sh"
+   source_file "${INFO_DIR}/formula-info.sh"
 fi
-
 
 # if there is a generate-formula.sh file read it
-if [ -f "${EXE_DIR}/generate-formula.sh" ]
+if [ -f "${INFO_DIR}/generate-formula.sh" ]
 then
    DO_GENERATE_FORMULA="YES"
-   source_file "${EXE_DIR}/generate-formula.sh"
+   source_file "${INFO_DIR}/generate-formula.sh"
 fi
-
-#
-# If there is a - possibly .gitignored - tap-info.sh file read it.
-# It could store PUBLISHER and PUBLISHER_TAP
-#
-# but publisher-info.sh is really a much better name than tap-info.sh
-if [ -f "${EXE_DIR}/publisher-info.sh" ]
-then
-   source_file "${EXE_DIR}/publisher-info.sh"
-else
-   if [ -f "${EXE_DIR}/tap-info.sh" ]
-   then
-      source_file "${EXE_DIR}/tap-info.sh"
-   fi
-fi
-
 
 # if there is a post-release.sh file read it
-if [ -f "${EXE_DIR}/post-release.sh" ]
+if [ -f "${INFO_DIR}/post-release.sh" ]
 then
-   source_file "${EXE_DIR}/post-release.sh"
+   source_file "${INFO_DIR}/post-release.sh"
 fi

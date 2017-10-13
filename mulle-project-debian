@@ -7,7 +7,7 @@ usage()
 {
    cat <<EOF >&2
 Usage:
-   mulle-homebrew-debian [options]
+   mulle-project-debian [options]
 
    Produce debian packages for bash projects.
 
@@ -154,6 +154,8 @@ create_debian()
 
    mkdir -p "${directory}/DEBIAN" || exit 1
 
+   log_verbose "Run mulle-install  --prefix \"${PWD}/${directory}${OPTION_ROOT}\""
+
    mulle-install --prefix "${PWD}/${directory}${OPTION_ROOT}" >&2 || exit 1
 
    write_control > "${directory}/DEBIAN/control"
@@ -180,28 +182,34 @@ main()
    local OPTION_PUBLISH="YES"
    local OPTION_REMOVE_TMP="YES"
 
-   VERSION="`mulle-homebrew-version --no-tag-warning`"
+   VERSION="`mulle-project-version --no-tag-warning`"
 
-   if [ -f "./bin/formula-info.sh" ]
+   if [ -f "./mulle-project/formula-info.sh" ]
    then
-      . ./bin/formula-info.sh
+      . ./mulle-project/formula-info.sh
    fi
 
-   if [ -f "./bin/publisher-info.sh" ]
-   then
-      . ./bin/publisher-info.sh
-   else
-      if [ -f "./bin/tap-info.sh" ]
-      then
-         . ./bin/tap-info.sh
-      fi
-   fi
+   EXE_DIR="`dirname -- "$0"`"
+   LIBEXEC_DIR="`"${EXE_DIR}/mulle-project-env" libexec-path`" || exit 1
 
    while [ $# -ne 0 ]
    do
       case "$1" in
          -h|-help|--help)
             usage
+         ;;
+
+         -v)
+            MULLE_FLAG_LOG_VERBOSE="YES"
+         ;;
+         -vv)
+            MULLE_FLAG_LOG_VERBOSE="YES"
+            MULLE_FLAG_LOG_FLUFF="YES"
+         ;;
+         -vvv)
+            MULLE_FLAG_LOG_VERBOSE="YES"
+            MULLE_FLAG_LOG_FLUFF="YES"
+            MULLE_FLAG_LOG_TRACE="YES"
          ;;
 
          -t)
@@ -227,6 +235,31 @@ main()
             OPTION_ROOT="$1"
          ;;
 
+            # allow user to specify own parameters for his
+            # generate_formula scripts w/o having to modify this file
+         --*)
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
+
+            local key
+
+            key="`sed 's/^..//' <<< "$1"`"
+            key="`tr '-' '_' <<< "${key}"`"
+            key="`tr '[a-z]' '[A-Z]' <<< "${key}"`"
+            if ! egrep -q -s '^[A-Z_][A-Z0-9_]*$' <<< "${key}" > /dev/null
+            then
+               fail "invalid variable specification \"${key}\", created by \"$1\""
+            fi
+
+            shift
+
+            local value
+
+            value="$1"
+
+            eval ${key}='${value}'
+            log_info "Variable ${key} set to \"${value}\""
+         ;;
+
          -*)
             log_error "unknown option $1"
             usage
@@ -240,7 +273,14 @@ main()
       shift
    done
 
-   [ -z "${PROJECT}" ] && fail "PROJECT not specified, probably because of missing bin/formula-info.sh"
+   # assume mulle-project debian is called from ./bin/release.sh
+
+   . "${LIBEXEC_DIR}/mulle-publisher.sh"
+
+   if [ -z "${PROJECT}" ]
+   then
+      PROJECT="`basename -- "$PWD"`"
+   fi
 
    if [ -z "`command -v dpkg-deb`" ]
    then
@@ -257,10 +297,9 @@ main()
 
    debianfile="`create_debian`" || exit 1
 
-   if [ "${OPTION_PUBLISH}" = "YES" ] && [ ! -z "${PUBLISHER_DEBIAN_DISTNAME}" ]
+   if [ "${OPTION_PUBLISH}" = "YES" ]
    then
-      DISTS_LOCATION="${DISTS_LOCATION:-..}"
-      DEBIAN_DISTS="${DEBIAN_DISTS:-${DISTS_LOCATION}/debian-${PUBLISHER_DEBIAN_DISTNAME}}"
+      DEBIAN_DISTS="${DEBIAN_DISTS:-${DISTS_LOCATION:-..}/debian-${PUBLISHER_DEBIAN_DISTNAME:-software}}"
 
       if [ -d "${DEBIAN_DISTS}" ]
       then
@@ -279,6 +318,8 @@ main()
               ./did-update.sh "${debianfile}"
             ) || exit 1
          fi
+      else
+         log_info "No folder \"${DEBIAN_DISTS}\" found. No update will run"
       fi
    else
       log_verbose "No PUBLISHER_DEBIAN_DISTNAME set"

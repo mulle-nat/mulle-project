@@ -17,8 +17,8 @@ before_install:
    - git clone https://github.com/Linuxbrew/brew.git /home/linuxbrew/.linuxbrew
    - PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"
    - brew update
-   - brew install {{PUBLISHER_TAP}}/mulle-homebrew
+   - brew install {{PUBLISHER_TAP}}/mulle-project
 
 script:
-   - mulle-homebrew-env install xxx
+   - mulle-project-env install xxx
 

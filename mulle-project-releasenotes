@@ -33,10 +33,10 @@
 usage()
 {
    cat <<EOF >&2
-Usage: mulle-homebrew-releasenotes [options] [releasenotes]
+Usage: mulle-project-releasenotes [options] [releasenotes]
 
    Emit markup releasenotes for the current version. If no version is given,
-   mulle-homebrew-version is used to determine the current version.
+   mulle-project-version is used to determine the current version.
 
    All comments from the last tag till HEAD will be collected.
    All comment lines starting with a '*' are included in the release notes.
@@ -206,20 +206,20 @@ copy_without_first_line()
 }
 
 
-mulle_homebrew_releasenotes_init()
+mulle_project_releasenotes_init()
 {
-   if [ -z "`command -v mulle-homebrew-env`" ]
+   if [ -z "`command -v mulle-project-env`" ]
    then
       cat <<EOF >&2
-   mulle-homebrew-env not found in PATH.
+   mulle-project-env not found in PATH.
    Visit the homepage for installation instructions:
-      https://github.com/mulle-nat/mulle-homebrew
+      https://github.com/mulle-nat/mulle-project
 EOF
       exit 1
    fi
 
-   INSTALLED_MULLE_HOMEBREW_VERSION="`mulle-homebrew-env version`" || exit 1
-   LIBEXEC_DIR="`mulle-homebrew-env libexec-path`" || exit 1
+   INSTALLED_MULLE_PROJECT_VERSION="`mulle-project-env version`" || exit 1
+   LIBEXEC_DIR="`mulle-project-env libexec-path`" || exit 1
 
    . "${LIBEXEC_DIR}/mulle-git.sh" || exit 1
    . "${LIBEXEC_DIR}/mulle-version.sh" || exit 1
@@ -526,7 +526,7 @@ main()
 
    if [ -z "${VERSION}" ]
    then
-      VERSION="`mulle-homebrew-version --no-tag-warning`" || fail "Could not figure out current version"
+      VERSION="`mulle-project-version --no-tag-warning`" || fail "Could not figure out current version"
    fi
 
    if [ "${OPTION_COMMIT}" = "YES" ]
@@ -552,7 +552,7 @@ main()
       then
          echo "${notes}"
       else
-         echo "${notes}" > "${OPTION_OUTPUT}"
+         echo "${notes}" > "${OPTION_OUTPUT}" || exit 1
       fi
    else
       local result
@@ -563,7 +563,7 @@ main()
       then
          echo "${result}"
       else
-         echo "${result}" > "${OPTION_OUTPUT}"
+         echo "${result}" > "${OPTION_OUTPUT}" || exit 1
       fi
    fi
 
@@ -581,6 +581,6 @@ main()
 MULLE_EXECUTABLE="`basename -- $0`"
 MULLE_BOOTSTRAP_FAIL_PREFIX="${MULLE_EXECUTABLE}"
 
-mulle_homebrew_releasenotes_init
+mulle_project_releasenotes_init
 
 main "$@"

@@ -1,8 +1,8 @@
-# mulle-homebrew
+# mulle-project
 
-![mulle-homebrew.iconset/icon_128x128-png](mulle-homebrew.iconset/icon_128x128.png)
+![mulle-project logo](mulle-project-128x128.png)
 
-**mulle-homebrew** provides a convenience script to tag and release your
+**mulle-project** provides a convenience script to tag and release your
 [cmake](//cmake.org) based project and publish it on a [homebrew](//brew.sh)
 tap. It has been designed, so that it can be used with multiple forks.
 
@@ -27,7 +27,7 @@ In essence making a tagged release, publishing the release branch and
 updating your homebrew formula, reduces to a one-liner like:
 
 ```
-./bin/release.sh --publisher mulle-nat --publisher-tap 'mulle-kybernetik/software'
+./bin/release.sh --publisher  --publisher-tap ''
 ```
 
 
@@ -42,10 +42,10 @@ updating your homebrew formula, reduces to a one-liner like:
 Install it via [homebrew](//brew.sh).
 
 ```
-brew install mulle-kybernetik/software/mulle-homebrew
+brew install /mulle-project
 ```
 
-## Prepare your project for mulle-homebrew
+## Prepare your project for mulle-project
 
 
 ### 1. Create scripts
@@ -54,7 +54,7 @@ brew install mulle-kybernetik/software/mulle-homebrew
 Create the default configuration using:
 
 ```
-mulle-homebrew-env install
+mulle-project-env install
 ```
 
 This will create the following files
@@ -63,7 +63,7 @@ File                  | Mode      | Description
 ----------------------|-----------|------------------
 `bin/release.sh`      | Overwrite | The release script
 `bin/release-info.sh` | Preserve  | Configuration options for git as a shell script
-`bin/formula-info.sh` | Preserve  | Configuration options for homebrew as a shell script
+`bin/formula-info.sh` | Preserve  | Configuration options for project as a shell script
 
 The `...-info.sh` files are just shell scripts that are included by
 `bin/release.sh`. Within them you can define the following variables
@@ -75,7 +75,7 @@ If you keep your version in a header file, it is assumed to be in a
 **major.minor.patch** format. The header file's name by default is
 `src/version.h`, but that can be changed with `VERSIONFILE`. The name
 of the version identifier can be changed with `VERSIONNAME`, if
-**mulle-homebrew** can not deduce it from the `PROJECT_NAME` setting.
+**mulle-project** can not deduce it from the `PROJECT_NAME` setting.
 
 There are various variations possible, you can use the shifted form and
 various unshifted forms:
@@ -98,12 +98,12 @@ in your project root.
 1.7.10
 ```
 
-The version is under your control, **mulle-homebrew** will never change it.
+The version is under your control, **mulle-project** will never change it.
 
 
 ### 3. Edit release-info.sh
 
-> Check if your version is picked up with `mulle-homebrew-version`.
+> Check if your version is picked up with `mulle-project-version`.
 > If it is, you can skip this step.
 >
 
@@ -146,7 +146,7 @@ which is your user name, and the homebrew tap to publish the release to
 repository. Also you need to specify where the generate formula should be put. That is done somewhat indirectly with `--taps-location` and `--tap`.
 
 ```
-./bin/release.sh -v -n --taps-location ~/taps --publisher mulle-nat --tap 'mulle-kybernetik/software'
+./bin/release.sh -v -n --taps-location ~/taps --publisher  --tap ''
 ```
 
 > #### Tip
@@ -155,15 +155,15 @@ repository. Also you need to specify where the generate formula should be put. T
 > the `--taps-location` option.
 >
 > Here is an example if the taps are located elsewhere. If your taps path is
-> `/home/nat/mulle-kybernetik/taps/homebrew-software`
+> `/home/nat/mulle-kybernetik/taps/project-software`
 > the `--taps-location` is the parent directory `/home/nat/mulle-kybernetik/taps`.
-> and `--tap` is `mulle-kybernetik/software`
+> and `--tap` is ``
 
 
 If the output looks good, then do the release:
 
 ```
-./bin/release.sh --taps-location ~/taps --publisher mulle-nat --tap 'mulle-kybernetik/software'
+./bin/release.sh --taps-location ~/taps --publisher  --tap ''
 ```
 
 ## Optional: Edit release.sh to build without mulle-build
@@ -277,8 +277,8 @@ An option `--foo 'VfL Bochum 1848'` will create a global variable called
 
 On [github.com](https://github.com) create a repository with a "homebrew-"
 prefixed name. If your tap is supposed to be accessed as "software" call it
-"homebrew-software". If your github user name is `mulle-nat`, you could then
-access this tap with `brew tap mulle-nat/software`.
+"homebrew-software". If your github user name is ``, you could then
+access this tap with `brew tap /software`.
 
 ### My typical release scenario
 
@@ -296,13 +296,13 @@ git commit -m "* another interesting commit"
 I update the version number:
 
 ```
-mulle-homebrew-version --increment-patch --write
+mulle-project-version --increment-patch --write
 ```
 
 Then I produce updated RELEASENOTES.md:
 
 ```
-mulle-homebrew-releasenotes RELEASENOTES.md
+mulle-project-releasenotes RELEASENOTES.md
 ```
 
 Then add the new version and releasenotes to last commit:

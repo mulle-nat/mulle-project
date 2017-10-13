@@ -33,12 +33,12 @@
 usage()
 {
    cat <<EOF >&2
-Usage: mulle-homebrew-version [options] [projectname]
+Usage: mulle-project-version [options] [projectname]
 
    Get or increment the project version. The version must be readable from
    a variable or constant in  either of two formats:
 
-   `major.minor.patch` or `((major << 20) | (minor << 8) | patch)`, where
+   \`major.minor.patch\` or \`((major << 20) | (minor << 8) | patch)\`, where
    other shift integer values are possible.
 
    Examples:
@@ -75,24 +75,24 @@ fail()
 }
 
 
-mulle_homebrew_version_init()
+mulle_project_version_init()
 {
    #
-   # prefer local mulle-homebrew if available
+   # prefer local mulle-project if available
    # Do not embed it anymore!
    #
-   if [ -z "`command -v mulle-homebrew-env`" ]
+   if [ -z "`command -v mulle-project-env`" ]
    then
       cat <<EOF >&2
-mulle-homebrew-env not found in PATH.
+mulle-project-env not found in PATH.
 Visit the homepage for installation instructions:
-   https://github.com/mulle-nat/mulle-homebrew
+   https://github.com/mulle-nat/mulle-project
 EOF
       exit 1
    fi
 
-   INSTALLED_MULLE_HOMEBREW_VERSION="`mulle-homebrew-env version`" || exit 1
-   LIBEXEC_DIR="`mulle-homebrew-env libexec-path`" || exit 1
+   INSTALLED_MULLE_PROJECT_VERSION="`mulle-project-env version`" || exit 1
+   LIBEXEC_DIR="`mulle-project-env libexec-path`" || exit 1
 
    . "${LIBEXEC_DIR}/mulle-version.sh" || exit 1
    . "${LIBEXEC_DIR}/mulle-git.sh" || exit 1
@@ -186,31 +186,36 @@ get_version()
 
 edit_version_if_requested()
 {
-   [ "${OPTION_ADD_MAJOR}" -ne 0 ] &&
-      [ "${OPTION_ADD_MINOR}" -ne 0 -o "${OPTION_ADD_PATCH}" -ne 0 ] &&
-         fail "only specify major to increment"
-
-   [ "${OPTION_ADD_MINOR}" -ne 0 ] &&
-      [ "${OPTION_ADD_PATCH}" -ne 0 ] &&
-         fail "only specify minor to increment"
-
-   OLDVERSION="${VERSION}"
-
-   if [ "${OPTION_ADD_MAJOR}" -ne 0 -o \
-        "${OPTION_ADD_MINOR}" -ne 0 -o \
-        "${OPTION_ADD_PATCH}" -ne 0 ]
+   if [ -z "${OPTION_VERSION_SET}" ]
    then
-      if [ -z "${VERSIONFILE}" ]
-      then
-         fail "Don't know how to increment version"
-      fi
+      [ "${OPTION_ADD_MAJOR}" -ne 0 ] &&
+         [ "${OPTION_ADD_MINOR}" -ne 0 -o "${OPTION_ADD_PATCH}" -ne 0 ] &&
+            fail "only specify major to increment"
 
-      VERSION="`project_version_add "${VERSION}" \
-                                    "${OPTION_ADD_MAJOR}" \
-                                    "${OPTION_ADD_MINOR}" \
-                                    "${OPTION_ADD_PATCH}" \
-                                    "0" \
-                                    "${OPTION_FIRST_PATCH}"`" || exit 1
+      [ "${OPTION_ADD_MINOR}" -ne 0 ] &&
+         [ "${OPTION_ADD_PATCH}" -ne 0 ] &&
+            fail "only specify minor to increment"
+
+      OLDVERSION="${VERSION}"
+
+      if [ "${OPTION_ADD_MAJOR}" -ne 0 -o \
+           "${OPTION_ADD_MINOR}" -ne 0 -o \
+           "${OPTION_ADD_PATCH}" -ne 0 ]
+      then
+         if [ -z "${VERSIONFILE}" ]
+         then
+            fail "Don't know how to increment version"
+         fi
+
+         VERSION="`project_version_add "${VERSION}" \
+                                       "${OPTION_ADD_MAJOR}" \
+                                       "${OPTION_ADD_MINOR}" \
+                                       "${OPTION_ADD_PATCH}" \
+                                       "0" \
+                                       "${OPTION_FIRST_PATCH}"`" || exit 1
+      fi
+   else
+      VERSION="${OPTION_VERSION_SET}"
    fi
 
    if [ "${OPTION_TAG_WARNING}" = "YES" ]
@@ -235,29 +240,36 @@ edit_version_if_requested()
 
 write_version_if_requested()
 {
-   if [ "${OPTION_WRITE}" = "YES" -o "${OPTION_WRITE_XCODE_VERSION}" = "YES" ]
+   if ! [ "${OPTION_WRITE}" = "YES" -o "${OPTION_WRITE_XCODE_VERSION}" = "YES" ]
    then
-      if [ "${OPTION_WRITE_XCODE_VERSION}" = "YES" ]
-      then
-         sed -i ".bak" 's|^\([[:space:]]*CURRENT_PROJECT_VERSION[[:space:]]*=[[:space:]]*["]*\)'${XCODE_VERSION}'\(.*\)|\1'${VERSION}'\2|' "${ACTUAL_XCODEPROJ}/project.pbxproj"
-      fi
-
-      if [ "${OPTION_WRITE}" = "YES" ]
-      then
-         set_project_version "${VERSION}" "${VERSIONFILE}" "${VERSIONNAME}"
-      fi
-
-      VERIFY_VERSION="`"${MULLE_EXECUTABLE_PATH}" "$@" --reset`"
-
-      if [ "${VERSION}" != "${VERIFY_VERSION}" ]
-      then
-         fail "Version could not be set"
-      else
-         log_info "Version successfully set to ${VERSION}"
-      fi
-
-      exit 0
+      return 1
    fi
+
+   if [ "${VERSIONIMMUTABLE}" = "YES" ]
+   then
+      fail "Version is immutable (VERSIONIMMUTABLE=${VERSIONIMMUTABLE})"
+   fi
+
+   if [ "${OPTION_WRITE_XCODE_VERSION}" = "YES" ]
+   then
+      sed -i ".bak" 's|^\([[:space:]]*CURRENT_PROJECT_VERSION[[:space:]]*=[[:space:]]*["]*\)'${XCODE_VERSION}'\(.*\)|\1'${VERSION}'\2|' "${ACTUAL_XCODEPROJ}/project.pbxproj"
+   fi
+
+   if [ "${OPTION_WRITE}" = "YES" ]
+   then
+      set_project_version "${VERSION}" "${VERSIONFILE}" "${VERSIONNAME}"
+   fi
+
+   VERIFY_VERSION="`"${MULLE_EXECUTABLE_PATH}" "$@" --reset`"
+
+   if [ "${VERSION}" != "${VERIFY_VERSION}" ]
+   then
+      fail "Version could not be set"
+   else
+      log_info "Version successfully set to ${VERSION}"
+   fi
+
+   return 0
 }
 
 
@@ -298,6 +310,14 @@ parse_arguments()
          --first-patch-zero)
             OPTION_FIRST_PATCH="0"
          ;;
+
+         --set-version)
+            [ $# -eq 1 ] && fail "missing argument to $1"
+            shift
+
+            OPTION_VERSION_SET="$1"
+         ;;
+
 
          --first-patch-one)
             OPTION_FIRST_PATCH="1"
@@ -363,6 +383,10 @@ parse_arguments()
             set -x
          ;;
 
+         -v|-vv|-vvv)
+            OPTION_VERBOSE="YES"
+         ;;
+
          -*)
             usage
          ;;
@@ -412,17 +436,17 @@ main()
 
    if [ "${OPTION_READ_INFO}" = "YES" ]
    then
-      if [ -f "./bin/version-info.sh" ]
+      if [ -f "./mulle-project/version-info.sh" ]
       then
-         . ./bin/version-info.sh
+         . ./mulle-project/version-info.sh
       fi
-      if [ -f "./bin/release-info.sh" ]
+      if [ -f "./mulle-project/release-info.sh" ]
       then
-         . ./bin/release-info.sh
+         . ./mulle-project/release-info.sh
       fi
-      if [ -f "./bin/formula-info.sh" ]
+      if [ -f "./mulle-project/formula-info.sh" ]
       then
-         . ./bin/formula-info.sh
+         . ./mulle-project/formula-info.sh
       fi
    fi
 
@@ -433,9 +457,17 @@ main()
 
    edit_version_if_requested
 
-   write_version_if_requested "$@"
+   if [ "${OPTION_VERBOSE}" = "YES" ]
+   then
+      echo "VERSION=${VERSION}" >&2
+      echo "VERSIONNAME=${VERSIONNAME}" >&2
+      echo "VERSIONFILE=${VERSIONFILE}" >&2
+   fi
 
-   echo "${VERSION}"
+   if ! write_version_if_requested "$@"
+   then
+      echo "${VERSION}"
+   fi
 }
 
 
@@ -443,6 +475,6 @@ MULLE_EXECUTABLE_PATH="$0"
 MULLE_EXECUTABLE="`basename -- $0`"
 MULLE_BOOTSTRAP_FAIL_PREFIX="${MULLE_EXECUTABLE}"
 
-mulle_homebrew_version_init
+mulle_project_version_init
 
 main "$@"
