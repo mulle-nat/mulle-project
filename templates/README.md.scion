@@ -9,9 +9,9 @@ Command                      | Description
 -----------------------------|-----------------------
 `mulle-project-init`         | Initial setup and update
 `mulle-project-release`      | Create and publish releases
-`mulle-project-version`      | Examine and change project versions
 `mulle-project-releasenotes` | Create releasenotes from git logs
 `mulle-project-untag`        | Remove tags from multiple repositories
+`mulle-project-version`      | Examine and change project versions
 
 
 #### What `mulle-project-release` does
@@ -31,10 +31,10 @@ Command                      | Description
 13. Commits the tap and pushes it to its default remote
 
 In essence making a tagged release, publishing the release branch and
-updating your homebrew formula, reduces to a one-liner like:
+updating your homebrew formula, reduces to the one-liner:
 
 ```
-./bin/release.sh --publisher {{PUBLISHER}} --publisher-tap '{{PUBLISHER_TAP}}'
+mulle-project-release
 ```
 
 

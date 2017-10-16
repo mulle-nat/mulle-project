@@ -245,17 +245,18 @@ main()
    local directory
 
    # allow local execution from project
-   if [ -e "${exedirpath}/mulle-homebrew.sh" -a -e "${exedirpath}/formula-info.sh.template" ]
+   if [ -e "${exedirpath}/mulle-publisher.sh" -a -e "${exedirpath}/formula-info.sh.template" ]
    then
       libexecpath="${exedirpath}"
       sharepath="${exedirpath}"
    else
-      libexecpath="${prefix}/libexec/mulle-homebrew"
-      sharepath="${prefix}/share/mulle-homebrew"
+      libexecpath="${prefix}/libexec/mulle-project"
+      sharepath="${prefix}/share/mulle-project"
    fi
 
    local OPTION_FORCE
    local OPTION_VERBOSE
+   local OPTION_FORMULA="YES"
 
    # the option prefix is kinda historic now
    while [ $# -ne 0 ]
@@ -288,6 +289,10 @@ main()
             OPTION_VERBOSE="YES"
          ;;
 
+         --no-formula)
+            OPTION_FORMULA="NO"
+         ;;
+
          -*)
             fail "unknown option \"$1\""
          ;;
@@ -312,9 +317,13 @@ main()
       ;;
    esac
 
-   write_formula_info_template "${directory}" "${projectdir}" # write first
+   if [ "${OPTION_FORMULA}" = "YES" ]
+   then
+      write_formula_info_template "${directory}" "${projectdir}" # write first
+      write_generate_formula_template "${directory}"
+   fi
+
    write_version_info_template "${directory}"
-   write_generate_formula_template "${directory}"
 }
 
 MULLE_EXECUTABLE="`basename -- "$0"`"
