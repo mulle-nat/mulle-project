@@ -6,6 +6,7 @@
 project_parse_options()
 {
    DO_PUSH_FORMULA="YES"
+   USE_CACHE="NO"
 
    while [ $# -ne 0 ]
    do
@@ -53,6 +54,10 @@ project_parse_options()
          # single arg long (kinda lame)
          --cache)
             USE_CACHE="YES"
+         ;;
+
+         --no-cache)
+            USE_CACHE="NO"
          ;;
 
          --echo)

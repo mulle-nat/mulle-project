@@ -77,7 +77,7 @@ generate_brew_formula_header()
 
    tmparchive="/tmp/${project}-${version}-archive"
 
-   if [ -z "${USE_CACHE}" -a -f "${tmparchive}" ]
+   if [ "${USE_CACHE}" = "NO" -a -f "${tmparchive}" ]
    then
       exekutor rm "${tmparchive}" || fail "could not delete old \"${tmparchive}\""
    fi
@@ -298,6 +298,17 @@ EOF
 }
 
 
+_generate_brew_formula_build()
+{
+   local project="$1"
+   local name="$2"
+   local version="$3"
+
+   generate_brew_formula_mulle_build "${project}" "${name}" "${version}"
+   generate_brew_formula_mulle_test  "${project}" "${name}" "${version}"
+}
+
+
 _generate_brew_formula()
 {
    local project="$1"
@@ -309,10 +320,19 @@ _generate_brew_formula()
    local desc="$7"
    local archiveurl="$8"
 
+   local generator
+
+   generator=_generate_brew_formula_build
+   if [ "`type -t generate_brew_formula_build`" = "function" ]
+   then
+      generator="generate_brew_formula_build"
+   fi
+
+
    generate_brew_formula_header "${project}" "${name}" "${version}" \
                                 "${homepage}" "${desc}" "${archiveurl}"  &&
    generate_brew_formula_dependencies "${dependencies}" "${builddependencies}" &&
-   generate_brew_formula_build "${project}" "${name}" "${version}" "${dependencies}" &&
+   ${generator} "${project}" "${name}" "${version}" "${dependencies}" &&
    generate_brew_formula_footer "${name}"
 }
 
@@ -376,14 +396,22 @@ homebrew_main()
    log_fluff "dependencies      = ${C_RESET}${dependencies}"
    log_fluff "builddependencies = ${C_RESET}${builddependencies}"
 
-   formula="`generate_brew_formula "${project}" \
-                                   "${name}" \
-                                   "${version}" \
-                                   "${dependencies}" \
-                                   "${builddependencies}" \
-                                   "${homepage}" \
-                                   "${desc}" \
-                                   "${archiveurl}"`" || exit 1
+   local generator
+
+   generator=_generate_brew_formula
+   if [ "`type -t generate_brew_formula`" = "function" ]
+   then
+      generator="generate_brew_formula"
+   fi
+
+   formula="`${generator} "${project}" \
+                          "${name}" \
+                          "${version}" \
+                          "${dependencies}" \
+                          "${builddependencies}" \
+                          "${homepage}" \
+                          "${desc}" \
+                          "${archiveurl}"`" || exit 1
 
    if [ "${OPTION_ECHO}" ]
    then
