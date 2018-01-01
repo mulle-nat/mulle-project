@@ -37,22 +37,22 @@ source_publisher_defaults()
          . "${PUBLISHER_INFO_SH}"
          return 0
       fi
+
       echo "PUBLISHER_INFO_SH is defined as \"${PUBLISHER_INFO_SH}\" but is missing as a file" >&2
       exit 1
    fi
 
-   local dependencydir
-
-   dependencydir="`mulle-bootstrap path dependencies 2> /dev/null`"
-
-   if [ -f "${dependencydir}/share/publisher-info.sh" ]
+   if [ ! -z "${DEPENDENCIES_DIR}" ]
    then
-      if [ "${VERBOSE}" = "YES" ]
+      if [ -f "${DEPENDENCIES_DIR}/share/publisher-info.sh" ]
       then
-         echo "reading \"${dependencydir}/share/publisher-info.sh\" via mulle-bootstrap" >&2
+         if [ "${VERBOSE}" = "YES" ]
+         then
+            echo "reading \"${DEPENDENCIES_DIR}/share/publisher-info.sh\"" >&2
+         fi
+         . "${DEPENDENCIES_DIR}/share/publisher-info.sh"
+         return 0
       fi
-      . "${dependencydir}/share/publisher-info.sh"
-      return 0
    fi
 
    return 1

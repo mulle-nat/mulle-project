@@ -2,19 +2,19 @@
 
 ![mulle-project logo](mulle-project-128x128.png)
 
-**mulle-project** is a collection of scripts `mulle-project-release` to
+**mulle-project** is a collection of scripts `mulle-project-distribute` to
 facilitate project management.
 
 Command                      | Description
 -----------------------------|-----------------------
 `mulle-project-init`         | Initial setup and update
-`mulle-project-release`      | Create and publish releases
+`mulle-project-distribute`   | Create and publish releases
 `mulle-project-releasenotes` | Create releasenotes from git logs
 `mulle-project-untag`        | Remove tags from multiple repositories
 `mulle-project-version`      | Examine and change project versions
 
 
-#### What `mulle-project-release` does
+#### What `mulle-project-distribute` does
 
 1. Checks that the repository state is clean, no modified files exist
 2. Checks that a tag with the current version does not exist
@@ -34,7 +34,7 @@ In essence making a tagged release, publishing the release branch and
 updating your homebrew formula, reduces to the one-liner:
 
 ```
-mulle-project-release
+mulle-project-distribute
 ```
 
 
@@ -145,15 +145,15 @@ Variable             | Description
 ### 5. Test your configuration
 
 Test your configuration from the project root. You need to give
-`mulle-project-release` the publisher,
+`mulle-project-distribute` the publisher,
 which is your github user name, and the homebrew tap to publish the release to
 (note the trailing slash character `/`). With the option `-n`
-`mulle-project-release` performs a dry run without doing anything to your
+`mulle-project-distribute` performs a dry run without doing anything to your
 project or repository. Also you need to specify where the generated formula
 should be put. That is done somewhat indirectly with `--taps-location` and `--tap`.
 
 ```
-mulle-project-release -v -n --taps-location ~/taps --publisher {{PUBLISHER}} --tap '{{PUBLISHER_TAP}}'
+mulle-project-distribute -v -n --taps-location ~/taps --publisher {{PUBLISHER}} --tap '{{PUBLISHER_TAP}}'
 ```
 
 > #### Tip
@@ -170,13 +170,21 @@ mulle-project-release -v -n --taps-location ~/taps --publisher {{PUBLISHER}} --t
 If the output looks good, then do the release:
 
 ```
-mulle-project-release --taps-location ~/taps --publisher {{PUBLISHER}} --tap '{{PUBLISHER_TAP}}'
+mulle-project-distribute --taps-location ~/taps --publisher {{PUBLISHER}} --tap '{{PUBLISHER_TAP}}'
 ```
 
 ## Optional: Edit generate-formula.sh to build without mulle-build
 
-You will have to change `generate_brew_formula_build` so
-that proper build stages of
+First you need to copy `generate-formula.sh`template to your `mulle-project`
+folder:
+
+```
+cp "`mulle-project-env share-path`/generate-formula.sh" ./mulle-project/generate-formula.sh
+chmod 755 ./mulle-project/generate-formula.sh
+```
+
+Then change the function `generate_brew_formula_build` so that proper build
+commands for a homebrew
 [formula](https://github.com/Homebrew/brew/blob/master/docs/Formula-Cookbook.md)
 are emitted.
 
@@ -196,7 +204,7 @@ generate_brew_formula_build()
 #   local name="$2"
 #   local version="$3"
 
-  echo <<EOF
+  cat <<EOF
 
   def install
     # ENV.deparallelize
@@ -252,7 +260,7 @@ Variable        | Option            | Description
 Variable         | Option             | Description
 -----------------|--------------------|------------------------------------------
 `ARCHIVE_URL`    | `--archive-url`    | URL of the source archive.
-`BOOTSTRAP_TAP`  | `--bootstrap-tap`  | Tap to use for depends_on => build in formulas
+`BOOTSTRAP_TAP`  | `--bootstrap-tap`  | (Outdated) same as TOOLS_TAP
 `BRANCH`         | `--branch`         | Branch to use as release branch
 `DEPENDENCY_TAP` | `--dependency-tap` | Tap to use for depends_on in formulas
 `GITHUB`         | `--github`         | Git remote github
@@ -263,6 +271,7 @@ Variable         | Option             | Description
 `TAG_PREFIX`     | `--tag-prefix`     | Prefix to use with version to create the tag
 `TAG`            | `--tag`            | Tag to use, instead of version
 `TAPS_LOCATION`  | `--taps-location`  | Where your taps are stored on your filesystem.
+`TOOLS_TAP`      | `--tools-tap`      | Tap to use for depends_on => build in formulas
 `VERSION`        |    none            | Version
 `VERSIONFILE`    |    none            | Location of the version file
 `VERSIONNAME`    |    none            | Name of the #define to search for
@@ -323,7 +332,7 @@ git commit --amend --no-edit
 Now release it to the world:
 
 ```
-mulle-project-release
+mulle-project-distribute
 ```
 
 

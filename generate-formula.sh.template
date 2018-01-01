@@ -1,42 +1,65 @@
 #
 # For documentation and help see:
-#    https://github.com/mulle-nat/mulle-homebrew
+#    https://github.com/mulle-nat/mulle-project
 #
 #
 
-#######
-# If you are using mulle-build, you don't hafta change anything
-#######
-
-#
-# Generate your `def install` `test do` lines here. echo them to stdout.
-#
-generate_brew_formula_build()
+generate_brew_formula_build
 {
    local project="$1"
    local name="$2"
    local version="$3"
 
-   generate_brew_formula_mulle_build "${project}" "${name}" "${version}"
-   generate_brew_formula_mulle_test  "${project}" "${name}" "${version}"
+   generate_brew_configure_formula_build
+#   generate_brew_cmake_formula_build
+#   generate_script_brew_formula_build
 }
 
 
-#
-# If you are unhappy with the formula in general, then change
-# this function. Print your formula to stdout.
-#
-generate_brew_formula()
+####
+#### Example code
+####
+generate_brew_configure_formula_build()
 {
-#   local project="$1"
-#   local name="$2"
-#   local version="$3"
-#   local dependencies="$4"
-#   local builddependencies="$5"
-#   local homepage="$6"
-#   local desc="$7"
-#   local archiveurl="$8"
+  cat <<EOF
 
-   _generate_brew_formula "$@"
+  def install
+    system "./configure", "--disable-debug",
+                          "--disable-dependency-tracking",
+                          "--disable-silent-rules",
+                          "--prefix=#{prefix}"
+    system "make", "install"
+  end
+
+  test do
+    system "false"
+  end
+EOF
+}
+
+
+generate_brew_cmake_formula_build()
+{
+  cat <<EOF
+
+  def install
+    system "cmake", ".", *std_cmake_args
+    system "make", "install"
+  end
+
+  test do
+    system "false"
+  end
+EOF
+}
+
+
+generate_script_brew_formula_build()
+{
+   cat <<EOF
+def install
+  system "./install.sh", "#{prefix}"
+end
+EOF
 }
 

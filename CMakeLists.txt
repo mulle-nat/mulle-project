@@ -1,7 +1,6 @@
 cmake_minimum_required (VERSION 3.0)
 
-# use C, because otherwise a CXX compiler is required
-project( mulle-project C)
+project( mulle-project NONE)
 
 set( TEMPLATES
 README.md
@@ -10,13 +9,13 @@ generate-formula.sh.template
 version-info.sh.template)
 
 set( LIBRARY_SCRIPTS
-mulle-environment.sh
-mulle-files.sh
-mulle-git.sh
-mulle-homebrew.sh
-mulle-publisher.sh
-mulle-version.sh
+src/mulle-git.sh
+src/mulle-homebrew.sh
+src/mulle-publisher.sh
+src/mulle-user-files.sh
+src/mulle-version.sh
 )
+
 
 set( SCRIPTS
 mulle-project-debian

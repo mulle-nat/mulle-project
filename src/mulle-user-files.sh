@@ -36,11 +36,6 @@
 
 INFO_DIR="${INFO_DIR:-mulle-project}"
 
-if [ "${VERBOSE}" = "YES" ]
-then
-   echo "INFO_DIR=\"${INFO_DIR}\"" >&2
-fi
-
 source_file()
 {
    if [ "${VERBOSE}" = "YES" ]
@@ -65,6 +60,8 @@ then
    source_file "${INFO_DIR}/formula-info.sh"
 fi
 
+
+
 # if there is a generate-formula.sh file read it
 if [ -f "${INFO_DIR}/generate-formula.sh" ]
 then
@@ -77,3 +74,4 @@ if [ -f "${INFO_DIR}/post-release.sh" ]
 then
    source_file "${INFO_DIR}/post-release.sh"
 fi
+

@@ -347,7 +347,7 @@ formula_push()
    HOMEBREW_TAP_BRANCH="${HOMEBREW_TAP_BRANCH:-master}"
    HOMEBREW_TAP_REMOTE="${HOMEBREW_TAP_REMOTE:-origin}"
 
-   log_info "Push brew fomula \"${rbfile}\" to \"${HOMEBREW_TAP_REMOTE}\""
+   log_info "Push brew formula \"${rbfile}\" to \"${HOMEBREW_TAP_REMOTE}\""
    (
       exekutor cd "${homebrewtap}" &&
       exekutor git add "${rbfile}" &&
@@ -359,6 +359,8 @@ formula_push()
 
 homebrew_main()
 {
+   log_entry "homebrew_main" "$@"
+
    local project="$1" ; shift
    local name="$1"; shift
    local version="$1"; shift
@@ -426,33 +428,3 @@ homebrew_main()
       formula_push "${rbfile}" "${version}" "${name}" "${homebrewtap}"
    fi
 }
-
-
-homebrew_initialize()
-{
-   local directory
-
-   if [ -z "${MULLE_EXECUTABLE_PID}" ]
-   then
-      MULLE_EXECUTABLE_PID=$$
-
-      if [ -z "${DEFAULT_IFS}" ]
-      then
-         DEFAULT_IFS="${IFS}"
-      fi
-
-      INDENTATION="  "  # ruby fascism
-
-      directory="`mulle-bootstrap library-path 2> /dev/null`"
-      [ ! -d "${directory}" ] && echo "Failed to locate mulle-bootstrap library. https://github.com/mulle-nat/mulle-bootstrap" >&2 && exit 1
-      PATH="${directory}:$PATH"
-
-      [ -z "${MULLE_BOOTSTRAP_LOGGING_SH}" ]   && . mulle-bootstrap-logging.sh
-      [ -z "${MULLE_BOOTSTRAP_FUNCTIONS_SH}" ] && . mulle-bootstrap-functions.sh
-      [ -z "${MULLE_BOOTSTRAP_ARRAY_SH}" ]     && . mulle-bootstrap-array.sh
-  fi
-}
-
-homebrew_initialize
-
-:

@@ -29,7 +29,13 @@
 #   ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 #   POSSIBILITY OF SUCH DAMAGE.
 #
-MULLE_PROJECT_VERSION=
+if [ "${TRACE}" = "YES" ]
+then
+   set -x
+fi
+
+
+MULLE_PROJECT_VERSION="0.1.0"
 
 usage()
 {
@@ -126,9 +132,9 @@ main()
    local directory
 
    # allow local execution from project
-   if [ -e "${exedirpath}/mulle-project-release" -a -e "${exedirpath}/formula-info.sh.template" ]
+   if [ -e "${exedirpath}/mulle-project-distribute" -a -e "${exedirpath}/formula-info.sh.template" ]
    then
-      libexecpath="${exedirpath}"
+      libexecpath="${exedirpath}/src"
       sharepath="${exedirpath}"
    else
       libexecpath="${prefix}/libexec/mulle-project"

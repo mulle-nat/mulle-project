@@ -305,29 +305,3 @@ set_project_version()
    esac
 }
 
-
-version_initialize()
-{
-   local directory
-
-   if [ -z "${MULLE_EXECUTABLE_PID}" ]
-   then
-      MULLE_EXECUTABLE_PID=$$
-
-      if [ -z "${DEFAULT_IFS}" ]
-      then
-         DEFAULT_IFS="${IFS}"
-      fi
-
-      directory="`mulle-bootstrap library-path 2> /dev/null`"
-      [ ! -d "${directory}" ] && echo "failed to locate mulle-bootstrap library" >&2 && exit 1
-      PATH="${directory}:$PATH"
-
-      [ -z "${MULLE_BOOTSTRAP_LOGGING_SH}" ] && . mulle-bootstrap-logging.sh
-   fi
-}
-
-version_initialize
-
-:
-

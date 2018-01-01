@@ -1,7 +1,11 @@
-#!/bin/sh
+#!/usr/bin/env bash
 #
 # Create debian package on OS X
 #
+if [ "${TRACE}" = "YES" ]
+then
+   set -x
+fi
 
 usage()
 {

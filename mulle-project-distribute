@@ -1,0 +1,567 @@
+#! /usr/bin/env bash
+#
+#   Copyright (c) 2017 Nat! - Mulle kybernetiK
+#   All rights reserved.
+#
+#   Redistribution and use in source and binary forms, with or without
+#   modification, are permitted provided that the following conditions are met:
+#
+#   Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+#   Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+#   Neither the name of Mulle kybernetiK nor the names of its contributors
+#   may be used to endorse or promote products derived from this software
+#   without specific prior written permission.
+#
+#   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+#   AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+#   IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+#   ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+#   LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+#   CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+#   SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+#   INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+#   CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+#   ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+#   POSSIBILITY OF SUCH DAMAGE.
+#
+#
+# For documentation and help see:
+#    https://github.com/mulle-nat/mulle-project
+#
+# Run this somewhat like this (for real: remove -n):
+#    mulle-project-release -v -n --publisher mulle-nat --publisher-tap mulle-kybernetik/software/
+#
+if [ "${TRACE}" = "YES" ]
+then
+    set -x
+fi
+
+
+usage()
+{
+   cat <<EOF >&2
+Usage: mulle-project-distribute [options]
+
+   Distribute the project via github, homebrew, debian.
+
+Options:
+   ****
+EOF
+   exit 1
+}
+
+
+source_file()
+{
+   log_verbose "Read \"$1\"" >&2
+   . "$@"
+}
+
+
+project_is_compatible_version()
+{
+   local installed="$1"
+   local script="$2"
+
+   local s_major
+   local s_minor
+   local i_major
+   local i_minor
+
+   s_major="`echo "${script}"    | head -1 | cut -d. -f1`"
+   s_minor="`echo "${script}"    | head -1 | cut -d. -f2`"
+   i_major="`echo "${installed}" | head -1 | cut -d. -f1`"
+   i_minor="`echo "${installed}" | head -1 | cut -d. -f2`"
+
+   if [ "${i_major}" = "" -o "${i_minor}" = "" -o \
+        "${s_major}" = "" -o "${s_minor}" = "" ]
+   then
+      return 2
+   fi
+
+   if [ "${i_major}" != "${s_major}" ]
+   then
+      return 1
+   fi
+
+   if [ "${i_minor}" -lt "${s_minor}" ]
+   then
+      return 1
+   fi
+
+   return 0
+}
+
+
+
+__environment_main()
+{
+   # --- COMMON ---
+
+   if [ -z "${PROJECT}" ]
+   then
+      PROJECT="`basename -- "$PWD"`"
+   fi
+
+   #
+   # NAME can usually be deduced, if you follow the conventions
+   #
+   if [ -z "${NAME}" ]
+   then
+      NAME="`get_formula_name_from_project "${PROJECT}" "${LANGUAGE}"`" || exit 1
+   fi
+
+   #
+   # Use mulle-project-version to determine version
+   #
+   if [ -z "${VERSION}" ]
+   then
+      options="--no-info --no-tag-warning"
+      [ ! -z "${LANGUAGE}" ]    && options="${options} --language \"${LANGUAGE}\""
+      [ ! -z "${VERSIONNAME}" ] && options="${options} --versionname \"${VERSIONNAME}\""
+      [ ! -z "${VERSIONFILE}" ] && options="${options} --versionfile \"${VERSIONFILE}\""
+
+      VERSION="`eval mulle-project-version ${options} "${PROJECT}"`" || exit 1
+   fi
+
+
+   # --- FORMULA  ---
+
+
+   # dependencies can be empty
+   if [ -z "${DEPENDENCIES}" -a -f  .DEPENDENCIES ]
+   then
+      log_verbose "Read DEPENDENCIES from \".DEPENDENCIES\""
+      DEPENDENCIES="`egrep -v '^#' .DEPENDENCIES`"
+   fi
+
+   BOOTSTRAP_TAP="${BOOTSTRAP_TAP:-mulle-kybernetik/software/}"
+   case "${BOOTSTRAP_TAP}" in
+      */)
+      ;;
+
+      *)
+         BOOTSTRAP_TAP="${BOOTSTRAP_TAP}/"
+      ;;
+   esac
+
+   TOOLS_TAP="${TOOLS_TAP:-mulle-kybernetik/software/}"
+   case "${TOOLS_TAP}" in
+      */)
+      ;;
+
+      *)
+         TOOLS_TAP="${TOOLS_TAP}/"
+      ;;
+   esac
+
+   DEPENDENCY_TAP="${DEPENDENCY_TAP:-${PUBLISHER_TAP}}"
+   case "${DEPENDENCY_TAP}" in
+      */)
+      ;;
+
+      *)
+         DEPENDENCY_TAP="${DEPENDENCY_TAP}/"
+      ;;
+   esac
+
+
+   # where to grab the archive off
+   ARCHIVE_URL="${ARCHIVE_URL:-https://github.com/${PUBLISHER}/${PROJECT}/archive/${VERSION}.tar.gz}"
+
+   # written into formula for project, will be evaled
+   HOMEPAGE_URL="${HOMEPAGE_URL:-https://github.com/${PUBLISHER}/${PROJECT}}"
+
+
+   # --- HOMEBREW TAP ---
+
+   #
+   # Specify to where and under what name to publish via your brew tap
+   #
+   # require PUBLISHER (and PUBLISHER_TAP) as command line parameter, so
+   # that forks don't have to edit this constantly
+   #
+   #
+   TAPS_LOCATION="${TAPS_LOCATION:-..}"
+
+   if [ ! -z "${PUBLISHER_TAP}" ]
+   then
+      tmp="`basename -- ${PUBLISHER_TAP}`"
+      HOMEBREW_TAP="${HOMEBREW_TAP:-${TAPS_LOCATION}/homebrew-${tmp}}"
+   fi
+
+   RBFILE="${RBFILE:-${NAME}.rb}"
+
+
+   # --- GIT ---
+
+   if [ -z "${VERSION}" ]
+   then
+      fail "Could not figure out the version. (hint: use VERSIONNAME, VERSIONFILE)"
+   fi
+
+   # tag to tag your release
+   TAG="${TAG:-${TAG_PREFIX}${VERSION}}"
+
+   # git remote to push to, usually origin
+   ORIGIN="${ORIGIN:-origin}"
+
+   # git remote to push to, usually github, can be empty
+   GITHUB="${GITHUB:-github}"
+
+   # git branch to release to, source is always current
+   BRANCH="${BRANCH:-release}"
+}
+
+
+main()
+{
+   DO_PUSH_FORMULA="YES"
+   USE_CACHE="NO"
+
+   while [ $# -ne 0 ]
+   do
+      if options_technical_flags "$1"
+      then
+         shift
+         continue
+      fi
+
+      case "$1" in
+         -h|--help)
+            usage
+         ;;
+
+         # single arg long (kinda lame)
+         --cache)
+            USE_CACHE="YES"
+         ;;
+
+         --no-cache)
+            USE_CACHE="NO"
+         ;;
+
+         --echo)
+            OPTION_ECHO="YES"
+         ;;
+
+         --no-git)
+            DO_GIT_RELEASE="NO"
+         ;;
+
+         --no-formula)
+            DO_GENERATE_FORMULA="NO"
+         ;;
+
+         --no-push)
+            DO_PUSH_FORMULA="NO"
+         ;;
+
+         # arg long
+
+         --bootstrap-tap)
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
+            shift
+            BOOTSTRAP_TAP="$1"
+         ;;
+
+         --tools-tap)
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
+            shift
+            TOOLS_TAP="$1"
+         ;;
+
+         --branch)
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
+            shift
+            BRANCH="$1"
+         ;;
+
+         --dependency-tap)
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
+            shift
+            DEPENDENCY_TAP="$1"
+         ;;
+
+         --github)
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
+            shift
+            GITHUB="$1"
+         ;;
+
+         --homepage-url)
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
+            shift
+            HOMEPAGE_URL="$1"
+         ;;
+
+         --origin)
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
+            shift
+            ORIGIN="$1"
+         ;;
+
+         --project)
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
+            shift
+            PROJECT="$1"
+         ;;
+
+         --publisher)
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
+            shift
+            PUBLISHER="$1"
+         ;;
+
+         --publisher-tap)
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
+            shift
+            PUBLISHER_TAP="$1"
+         ;;
+
+         --tag)
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
+            shift
+            TAG="$1"
+         ;;
+
+         --tag-prefix)
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
+            shift
+            TAG_PREFIX="$1"
+         ;;
+
+         --taps-location)
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
+            shift
+            TAPS_LOCATION="$1"
+         ;;
+
+            # allow user to specify own parameters for his
+            # generate_formula scripts w/o having to modify this file
+         --*)
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
+
+            varname="`sed 's/^..//' <<< "$1"`"
+            varname="`tr '-' '_' <<< "${varname}"`"
+            varname="`tr '[a-z]' '[A-Z]' <<< "${varname}"`"
+            if ! egrep -q -s '^[A-Z_][A-Z0-9_]*$' <<< "${varname}" > /dev/null
+            then
+               fail "invalid variable specification \"${varname}\", created by \"$1\""
+            fi
+
+            shift
+            eval "${varname}='$1'"
+            log_info "User variable ${varname} set to \"$1\""
+         ;;
+
+         -*)
+            log_error "unknown option \"$1\""
+            exit 1
+         ;;
+      esac
+
+      shift
+   done
+
+   if [ ! -d "mulle-project" ]
+   then
+      fail "No mulle-project folder found."
+   fi
+
+   #
+   # order of includes is important its a bit weird coded, due to being
+   # old
+   #
+   source_file "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-user-files.sh" "$@"   || exit 1
+   source_file "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-version.sh" "$@"      || exit 1
+   source_file "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-publisher.sh" "$@"    || exit 1
+
+  __environment_main
+
+   source_file "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-homebrew.sh" "$@"       || exit 1
+   source_file "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-git.sh" "$@"            || exit 1
+
+   #
+   # dial past options now as they have been parsed
+   #
+   if [ "${DO_GIT_RELEASE}" != "YES" -a "${DO_GENERATE_FORMULA}" != "YES" ]
+   then
+      fail "Nothing to do! mulle-project/version-info.sh and mulle-project/formula-info.sh are missing"
+   fi
+
+   if [ "${DO_GIT_RELEASE}" = "YES" ]
+   then
+     # do the release
+      git_main "${BRANCH}" "${ORIGIN}" "${TAG}" "${GITHUB}" || exit 1
+   fi
+
+   if [ "${DO_GENERATE_FORMULA}" = "YES" ]
+   then
+      if [ -z "${PUBLISHER}" ]
+      then
+         fail "You need to specify a publisher with --publisher (hint: https://github.com/<publisher>)"
+      fi
+
+      if [ -z "${PUBLISHER_TAP}" ]
+      then
+         fail "You need to specify a publisher tap with --tap (hint: <mulle-kybernetik/software>)"
+      fi
+
+      # generate the formula and push it
+      if ! homebrew_main "${PROJECT}" \
+                         "${NAME}" \
+                         "${VERSION}" \
+                         "${DEPENDENCIES}" \
+                         "${BUILD_DEPENDENCIES}" \
+                         "${HOMEPAGE_URL}" \
+                         "${DESC}" \
+                         "${ARCHIVE_URL}" \
+                         "${HOMEBREW_TAP}" \
+                         "${RBFILE}"
+      then
+         return 1
+      fi
+   fi
+
+   #
+   # check if someone installed a post_release function
+   # if yes call it (maybe calls mulle-project-debian)
+   #
+   if [ "`type -t post_release`" = "function" ]
+   then
+      post_release "${PROJECT}" \
+                   "${NAME}" \
+                   "${VERSION}" \
+                   "${DEPENDENCIES}" \
+                   "${BUILD_DEPENDENCIES}" \
+                   "${HOMEPAGE_URL}" \
+                   "${DESC}" \
+                   "${ARCHIVE_URL}" \
+                   "${DEBIAN_DEPENDENCIES}"
+   fi
+}
+
+
+########
+###
+### INIT
+###
+
+#
+# stolen from:
+# http://stackoverflow.com/questions/1055671/how-can-i-get-the-behavior-of-gnus-readlink-f-on-a-mac
+# ----
+#
+_prepend_path_if_relative()
+{
+   case "$2" in
+      /*)
+         echo "$2"
+      ;;
+      *)
+         echo "$1/$2"
+      ;;
+   esac
+}
+
+
+resolve_symlinks()
+{
+   local dir_context
+   local linkpath
+
+   if linkpath="`readlink "$1"`"
+   then
+      dir_context=`dirname -- "$1"`
+      resolve_symlinks "`_prepend_path_if_relative "${dir_context}" "${linkpath}"`"
+   else
+      echo "$1"
+   fi
+}
+
+
+project_libexec_path()
+{
+   local executablepath="$1"
+
+   local exedir
+   local exedirpath
+   local prefix
+   local libexecpath
+
+   case "${executablepath}" in
+      \.*|/*|~*)
+      ;;
+
+      *)
+         executablepath="`command -v "${executablepath}"`"
+      ;;
+   esac
+
+   executablepath="`resolve_symlinks "${executablepath}"`"
+   exedirpath="`dirname "${executablepath}"`"
+   prefix="`dirname "${exedirpath}"`"
+   libexecpath="${prefix}/libexec/mulle-project"
+
+   if [ ! -x "${libexecpath}/mulle-version.sh" ]
+   then
+      libexecpath="${exedirpath}/src"
+   fi
+
+   case "$libexecpath" in
+      /*|~*)
+      ;;
+
+      *)
+         libexecpath="$PWD/$libexecpath"
+      ;;
+   esac
+
+   if [ -x "${libexecpath}/mulle-version.sh" ]
+   then
+      echo "${libexecpath}"
+   fi
+}
+
+
+_init()
+{
+   if [ "$1" = "version" ]
+   then
+      echo "${MULLE_PROJECT_VERSION}"
+      exit 0
+   fi
+
+   MULLE_BASHFUNCTIONS_LIBEXEC_DIR="`mulle-bashfunctions-env libexec-path 2> /dev/null`"
+   [ -z "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}" ] && \
+      echo "mulle-bashfunctions-env not installed" >&2 && \
+      exit 1
+
+   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-bashfunctions.sh" || exit 1
+
+   MULLE_PROJECT_LIBEXEC_DIR="`project_libexec_path "$0"`"
+   if [ -z "${MULLE_PROJECT_LIBEXEC_DIR}" ]
+   then
+      fail "Fatal Error: Could not find libexec for ${MULLE_EXECUTABLE} ($PWD)"
+   fi
+
+   #
+   # minimal setup exit
+   #
+   if [ "$1" = "libexec-path" ]
+   then
+      echo "${MULLE_PROJECT_LIBEXEC_DIR}"
+      exit 0
+   fi
+
+   set -o pipefail
+}
+
+_init "$@"
+main "$@"
