@@ -19,9 +19,9 @@ src/mulle-version.sh
 
 set( SCRIPTS
 mulle-project-debian
+mulle-project-distribute
 mulle-project-env
 mulle-project-init
-mulle-project-release
 mulle-project-releasenotes
 mulle-project-untag
 mulle-project-version
