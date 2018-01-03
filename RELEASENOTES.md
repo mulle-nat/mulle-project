@@ -1,3 +1,9 @@
+# 1.0.0
+
+* move to mulle-sde, remove some obsolete stuff
+* remove obsolete files
+
+
 ## 0.1.0
 
 * Various small improvements
