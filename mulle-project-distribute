@@ -538,7 +538,7 @@ _init()
       exit 0
    fi
 
-   MULLE_BASHFUNCTIONS_LIBEXEC_DIR="`mulle-bashfunctions-env libexec-path 2> /dev/null`"
+   MULLE_BASHFUNCTIONS_LIBEXEC_DIR="`mulle-bashfunctions-env libexec-dir 2> /dev/null`"
    [ -z "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}" ] && \
       echo "mulle-bashfunctions-env not installed" >&2 && \
       exit 1
@@ -554,7 +554,7 @@ _init()
    #
    # minimal setup exit
    #
-   if [ "$1" = "libexec-path" ]
+   if [ "$1" = "libexec-dir" ]
    then
       echo "${MULLE_PROJECT_LIBEXEC_DIR}"
       exit 0

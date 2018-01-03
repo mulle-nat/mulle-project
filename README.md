@@ -2,19 +2,25 @@
 
 ![mulle-project logo](mulle-project-128x128.png)
 
-**mulle-project** is a collection of scripts `mulle-project-release` to
-facilitate project management.
+**mulle-project** facilitates project management tasks, such as 
+
+* versioning
+* releasenotes
+* commit and distribution
+* debian distribution
+
 
 Command                      | Description
 -----------------------------|-----------------------
+`mulle-project-debian`       | Create and upload debian packages (own server)
+`mulle-project-distribute`   | Create and publish releases (github)
 `mulle-project-init`         | Initial setup and update
-`mulle-project-release`      | Create and publish releases
 `mulle-project-releasenotes` | Create releasenotes from git logs
 `mulle-project-untag`        | Remove tags from multiple repositories
 `mulle-project-version`      | Examine and change project versions
 
 
-#### What `mulle-project-release` does
+#### What `mulle-project-distribute` does
 
 1. Checks that the repository state is clean, no modified files exist
 2. Checks that a tag with the current version does not exist
@@ -25,32 +31,20 @@ Command                      | Description
 7. Pushes the tagged **release** to **origin**
 8. Optionally pushes the tagged **release** to **github**
 9. Checks out the the current development branch (usually **master**) again (see 3.)
-10. Downloads the source archive for the created tag
-11. Calculates the sha256 for the archive
-12. Creates the homebrew formula for your project and places it into your tap
-13. Commits the tap and pushes it to its default remote
+10. Optional: Downloads the source archive for the created tag
+11. Optional: Calculates the sha256 for the archive
+12. Optional: Creates the homebrew formula for your project and places it into your tap
+13. Optional: Commits the tap and pushes it to its default remote
+14. Optional: Runs a post-release step
 
-In essence making a tagged release, publishing the release branch and
-updating your homebrew formula, reduces to the one-liner:
-
-```
-mulle-project-release
-```
-
-
-## Prerequisites
-
-* you need a homebrew tap (see [below](#below))
-* [mulle-build](//github.com/mulle-nat/mulle-build) is recommended, but not required
-
-
-## Installation
-
-Install it via [homebrew](//brew.sh).
+In essence making a tagged release, publishing the release branch,
+updating your homebrew formula and distributing an apt package, reduces to the 
+one-liner:
 
 ```
-brew install /mulle-project
+mulle-project-distribute
 ```
+
 
 ## Prepare your project for mulle-project
 
@@ -61,15 +55,15 @@ brew install /mulle-project
 Create the default configuration using:
 
 ```
-mulle-project-env install
+mulle-project-init
 ```
 
 This will create the following files
 
-File                  | Mode      | Description
-----------------------|-----------|------------------
-`bin/version-info.sh` | Preserve  | Configuration options for git as a shell script
-`bin/formula-info.sh` | Preserve  | Configuration options for project as a shell script
+File                  | Description
+----------------------|----------------------------
+`bin/version-info.sh` | Vesioning information
+`bin/formula-info.sh` | Information for the packages 
 
 In the `...-info.sh` files you define various configuration  variables.
 
@@ -108,20 +102,16 @@ The version is under your control, **mulle-project** will never change it.
 
 ### 3. Edit version-info.sh
 
-> Check if your version is picked up with `mulle-project-version`.
-> If it is, you can skip this step.
->
+First check if your version is picked up with `mulle-project-version`.
+If it is, you can skip this step.
 
-Variable               | Description
------------------------|------------------------------
-`VERSIONFILE`          | The filename containing the version variable
-`VERSIONNAME`          | The name of the version variable
 
-If you can use **mulle-brew** to build an install your project,
-then you are all done.
+Variable             | Description
+---------------------|------------------------------
+`VERSION`            | As a last resort you can specify the VERSION here
+`VERSIONFILE`        | The filename containing the version variable
+`VERSIONNAME`        | The name of the version variable
 
-> **mulle-brew** can build Xcode, cmake and autoconf projects. If you use **cmake**
-> don't forget to specify it as a dependency.
 
 
 ### 4. Edit formula-info.sh
@@ -145,15 +135,15 @@ Variable             | Description
 ### 5. Test your configuration
 
 Test your configuration from the project root. You need to give
-`mulle-project-release` the publisher,
+`mulle-project-distribute` the publisher,
 which is your github user name, and the homebrew tap to publish the release to
 (note the trailing slash character `/`). With the option `-n`
-`mulle-project-release` performs a dry run without doing anything to your
+`mulle-project-distribute` performs a dry run without doing anything to your
 project or repository. Also you need to specify where the generated formula
 should be put. That is done somewhat indirectly with `--taps-location` and `--tap`.
 
 ```
-mulle-project-release -v -n --taps-location ~/taps --publisher  --tap ''
+mulle-project-distribute -v -n -lx --taps-location ~/taps --publisher  --tap ''
 ```
 
 > #### Tip
@@ -170,7 +160,7 @@ mulle-project-release -v -n --taps-location ~/taps --publisher  --tap ''
 If the output looks good, then do the release:
 
 ```
-mulle-project-release --taps-location ~/taps --publisher  --tap ''
+mulle-project-distribute --taps-location ~/taps --publisher  --tap ''
 ```
 
 ## Optional: Edit generate-formula.sh to build without mulle-build
@@ -226,9 +216,9 @@ file into `.gitignore`
 Variable               | Description
 -----------------------|------------------------------
 `PUBLISHER`            | Your github name
+`PUBLISHER_EMAIL`      | Your email (required for debian)
 `PUBLISHER_FULLNAME`   | Your fullname (useful for other tools)
 `PUBLISHER_TAP`        | Your tap (like in brew install <tap>/project)
-`TAPS_LOCATION`        | The root folder of your taps
 
 
 ## Script Variables
@@ -280,17 +270,24 @@ An option `--foo 'VfL Bochum 1848'` will create a global variable called
 
 ## Miscellaneous
 
-### How to setup a homebrew tap on github.com
-
+### (OS X/Linux) How to setup a homebrew tap on github.com
 
 On [github.com](https://github.com) create a repository with a "homebrew-"
 prefixed name. If your tap is supposed to be accessed as "software" call it
-"homebrew-software". If your github user name is ``, you could then
-access this tap with `brew tap /software`.
+"homebrew-software". If your github user name is `jackson`, you could then
+access this tap with `brew tap jackson/software`.
 
-### My typical release scenario
 
-After I have done various commits like this:
+### A typical release scenario
+
+
+After the last release, you update the version number:
+
+```
+mulle-project-version --increment-patch --write
+```
+
+Then do various commits like this:
 
 ```
 git commit -m "* commit on master. comment prefixed by * for releasenotes"
@@ -300,20 +297,13 @@ git commit -m "boring commit"
 git commit -m "* another interesting commit"
 ```
 
-
-I update the version number:
-
-```
-mulle-project-version --increment-patch --write
-```
-
-Then I produce updated RELEASENOTES.md:
+Then produce the updated RELEASENOTES.md:
 
 ```
 mulle-project-releasenotes RELEASENOTES.md
 ```
 
-Then add the new version and releasenotes to last commit:
+Then add the releasenotes to last commit:
 
 ```
 git add -u
@@ -323,7 +313,8 @@ git commit --amend --no-edit
 Now release it to the world:
 
 ```
-mulle-project-release
+mulle-project-distribute -n -v -lx
+mulle-project-distribute -v
 ```
 
 

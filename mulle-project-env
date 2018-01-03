@@ -45,7 +45,7 @@ Usage: mulle-project-env [command]
    Prints the configuration of various mulle-project related values.
 
 Commands:
-   libexec-path     : print path to support scripts (default)
+   libexec-dir     : print path to support scripts (default)
    share-path       : print path to resources
    version          : print version of mulle-project
    path             : path of the executable
@@ -182,7 +182,7 @@ main()
 
 
    case "$1" in
-      "libexec-path"|"")
+      "libexec-dir"|"")
          libexec_path
       ;;
 

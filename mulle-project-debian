@@ -194,7 +194,7 @@ main()
    fi
 
    EXE_DIR="`dirname -- "$0"`"
-   LIBEXEC_DIR="`"${EXE_DIR}/mulle-project-env" libexec-path`" || exit 1
+   LIBEXEC_DIR="`"${EXE_DIR}/mulle-project-env" libexec-dir`" || exit 1
 
    while [ $# -ne 0 ]
    do

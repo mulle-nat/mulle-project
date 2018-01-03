@@ -223,7 +223,7 @@ EOF
    fi
 
    INSTALLED_MULLE_PROJECT_VERSION="`mulle-project-env version`" || exit 1
-   LIBEXEC_DIR="`mulle-project-env libexec-path`" || exit 1
+   LIBEXEC_DIR="`mulle-project-env libexec-dir`" || exit 1
 
    . "${LIBEXEC_DIR}/mulle-git.sh" || exit 1
    . "${LIBEXEC_DIR}/mulle-version.sh" || exit 1
