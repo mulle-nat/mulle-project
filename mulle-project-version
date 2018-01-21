@@ -183,7 +183,10 @@ get_version()
 
    if [ -z "${VERSION}" ]
    then
-      fail "Could not figure out the version for PROJECT=\"${PROJECT}\", LANGUAGE=\"${LANGUAGE}\", VERSIONNAME=\"${VERSIONNAME}\", VERSIONFILE=\"${VERSIONFILE}\". (hint: specify VERSIONNAME, VERSIONFILE)"
+      fail "Could not figure out the version for PROJECT=\"${PROJECT}\", \
+LANGUAGE=\"${LANGUAGE}\", VERSIONNAME=\"${VERSIONNAME}\", \
+VERSIONFILE=\"${VERSIONFILE}\".
+Hint: specify VERSIONNAME, VERSIONFILE in mulle-project/version-info.sh"
    fi
 }
 
@@ -477,7 +480,7 @@ main()
 
 MULLE_EXECUTABLE_PATH="$0"
 MULLE_EXECUTABLE="`basename -- $0`"
-MULLE_BOOTSTRAP_FAIL_PREFIX="${MULLE_EXECUTABLE}"
+MULLE_BUILDTOOLS_FAIL_PREFIX="${MULLE_EXECUTABLE}"
 
 mulle_project_version_init
 

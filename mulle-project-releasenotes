@@ -583,7 +583,7 @@ main()
 
 
 MULLE_EXECUTABLE="`basename -- $0`"
-MULLE_BOOTSTRAP_FAIL_PREFIX="${MULLE_EXECUTABLE}"
+MULLE_BUILDTOOLS_FAIL_PREFIX="${MULLE_EXECUTABLE}"
 
 mulle_project_releasenotes_init
 

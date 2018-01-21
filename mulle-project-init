@@ -29,18 +29,16 @@
 #   ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 #   POSSIBILITY OF SUCH DAMAGE.
 #
-if [ "${TRACE}" = "YES" ]
-then
-   set -x
-fi
+[ "${TRACE}" = "YES" ] && set -x
+
 
 usage()
 {
    cat <<EOF >&2
 Usage: ${MULLE_EXECUTABLE} [directory]
 
-   Install release and versioning information scripts in your
-   "./mulle-project" directory.
+   Install release and versioning information scripts in a
+   "./mulle-project" subdirectory.
 
 EOF
    exit 1
@@ -250,7 +248,7 @@ main()
    local directory
 
    # allow local execution from project
-   if [ -e "${exedirpath}/mulle-publisher.sh" -a -e "${exedirpath}/formula-info.sh.template" ]
+   if [ -e "${exedirpath}/mulle-project-untag" -a -e "${exedirpath}/formula-info.sh.template" ]
    then
       libexecpath="${exedirpath}"
       sharepath="${exedirpath}"
@@ -275,11 +273,6 @@ main()
             [ $# -eq 1 ] && fail "missing argument for $1"
             shift
             projectdir="$1"
-         ;;
-
-         "--version")
-            version
-            exit 0
          ;;
 
          -f)
@@ -310,17 +303,11 @@ main()
    done
 
 
-   directory="${1:-mulle-project}"
-
-   case "${directory}" in
-      /*)
-         # absolute ? keep as is
-      ;;
-
-      *)
-         directory="${projectdir}/${directory}"
-      ;;
-   esac
+   directory="mulle-project"
+   if [ ! -z "$1" ]
+   then
+      directory="$1/mulle-project"
+   fi
 
    if [ "${OPTION_FORMULA}" = "YES" ]
    then
@@ -331,7 +318,9 @@ main()
    write_version_info_template "${directory}"
 }
 
+
 MULLE_EXECUTABLE="`basename -- "$0"`"
 MULLE_EXECUTABLE_FAIL_PREFIX="${MULLE_EXECUTABLE}"
+
 main "$@"
 

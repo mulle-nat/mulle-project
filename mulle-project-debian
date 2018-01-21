@@ -2,10 +2,7 @@
 #
 # Create debian package on OS X
 #
-if [ "${TRACE}" = "YES" ]
-then
-   set -x
-fi
+[ "${TRACE}" = "YES" ] && set -x && : "$0" "$@"
 
 usage()
 {
@@ -115,7 +112,7 @@ write_control()
 
 debian_init()
 {
-   if [ "${MULLE_BOOTSTRAP_NO_COLOR}" != "YES" ]
+   if [ "${MULLE_BUILDTOOLS_NO_COLOR}" != "YES" ]
    then
       case "${UNAME}" in
          *)

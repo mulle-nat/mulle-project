@@ -1,3 +1,7 @@
+### 1.0.1
+
+* wean of mulle-bootstrap a little
+
 # 1.0.0
 
 * move to mulle-sde, remove some obsolete stuff
@@ -56,8 +60,8 @@
 
 mulle-hombrew used to be used as an embedded project. This is no more.
 You can install it via `brew` for example or put it into your regular
-dependencies (`.bootstrap/repositories` instead of
-`.bootstrap/embedded_repositories)
+dependencies (`.buildtools/repositories` instead of
+`.buildtools/embedded_repositories)
 
 
 #### The meaning of PROJECT and NAME has changed

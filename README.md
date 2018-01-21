@@ -60,10 +60,10 @@ mulle-project-init
 
 This will create the following files
 
-File                  | Description
-----------------------|----------------------------
-`bin/version-info.sh` | Vesioning information
-`bin/formula-info.sh` | Information for the packages 
+File                            | Description
+--------------------------------|----------------------------
+`mulle-project/version-info.sh` | Versioning information
+`mulle-project/formula-info.sh` | Information for package creation
 
 In the `...-info.sh` files you define various configuration  variables.
 
@@ -242,7 +242,7 @@ Variable        | Option            | Description
 Variable         | Option             | Description
 -----------------|--------------------|------------------------------------------
 `ARCHIVE_URL`    | `--archive-url`    | URL of the source archive.
-`BOOTSTRAP_TAP`  | `--bootstrap-tap`  | Tap to use for depends_on => build in formulas
+`BUILDTOOLS_TAP` | `--buildtools-tap` | Tap to use for depends_on => build in formulas
 `BRANCH`         | `--branch`         | Branch to use as release branch
 `DEPENDENCY_TAP` | `--dependency-tap` | Tap to use for depends_on in formulas
 `GITHUB`         | `--github`         | Git remote github

@@ -24,7 +24,9 @@
 # edit bin/release.sh. Need to specify mulle-build dependencies
 # so that brew picks up the internal path!
 #
-BUILD_DEPENDENCIES='${BOOTSTRAP_TAP}mulle-build
-${BOOTSTRAP_TAP}mulle-bootstrap
+BUILD_DEPENDENCIES='${BUILDTOOLS_TAP}mulle-craft
+${BUILDTOOLS_TAP}mulle-make
+${BUILDTOOLS_TAP}mulle-sourcetree
+${BUILDTOOLS_TAP}mulle-fetch
 ' # cmake may be useful to add
 

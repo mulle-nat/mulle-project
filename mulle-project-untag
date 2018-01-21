@@ -89,7 +89,7 @@ fail()
 
 untag_init()
 {
-   if [ "${MULLE_BOOTSTRAP_NO_COLOR}" != "YES" ]
+   if [ "${MULLE_BUILDTOOLS_NO_COLOR}" != "YES" ]
    then
       case "${UNAME}" in
          *)

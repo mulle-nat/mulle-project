@@ -140,13 +140,13 @@ __environment_main()
       DEPENDENCIES="`egrep -v '^#' .DEPENDENCIES`"
    fi
 
-   BOOTSTRAP_TAP="${BOOTSTRAP_TAP:-mulle-kybernetik/software/}"
-   case "${BOOTSTRAP_TAP}" in
+   BUILDTOOLS_TAP="${BUILDTOOLS_TAP:-mulle-kybernetik/software/}"
+   case "${BUILDTOOLS_TAP}" in
       */)
       ;;
 
       *)
-         BOOTSTRAP_TAP="${BOOTSTRAP_TAP}/"
+         BUILDTOOLS_TAP="${BUILDTOOLS_TAP}/"
       ;;
    esac
 
@@ -264,10 +264,10 @@ main()
 
          # arg long
 
-         --bootstrap-tap)
+         --buildtools-tap)
             [ $# -eq 1 ] && fail "missing parameter for \"$1\""
             shift
-            BOOTSTRAP_TAP="$1"
+            BUILDTOOLS_TAP="$1"
          ;;
 
          --tools-tap)

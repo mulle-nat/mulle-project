@@ -45,3 +45,9 @@ PERMISSIONS OWNER_WRITE OWNER_READ
             GROUP_READ
             WORLD_READ
 DESTINATION "share/mulle-project")
+
+######
+#
+# must be after CPACK_PACKAGE_VERSION
+include( CMakePackage.txt)
+include( CPack)
