@@ -29,10 +29,8 @@
 #   ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 #   POSSIBILITY OF SUCH DAMAGE.
 #
-if [ "${TRACE}" = "YES" ]
-then
-   set -x
-fi
+[ "${TRACE}" = "YES" ] && set -x && : "$0" "$@"
+
 
 usage()
 {
@@ -166,15 +164,20 @@ get_version()
 
       if [ -f VERSION ]
       then
-         VERSIONFILE="VERSION"
-         VERSIONNAME=""
-         VERSION="`head -1 "${VERSIONFILE}"`"
+         VERSION="`egrep -v '^#' "VERSION"`"
+         if [ ! -z "${VERSION}" ]
+         then
+            VERSIONFILE="VERSION"
+         fi
       else
          VERSION="`get_project_version "${VERSIONFILE}" "${VERSIONNAME}"`" || exit 1
          if [ -z "${VERSION}" ]
          then
-            VERSIONFILE="src/version.h"
-            VERSION="`get_project_version "${VERSIONFILE}" "${VERSIONNAME}"`" || exit 1
+            VERSION="`get_project_version "src/version.h" "${VERSIONNAME}"`" || exit 1
+            if [ ! -z "${VERSION}" ]
+            then
+               VERSIONFILE="src/version.h"
+            fi
          fi
       fi
    else
@@ -259,7 +262,7 @@ write_version_if_requested()
 
    if [ "${OPTION_WRITE_XCODE_VERSION}" = "YES" ]
    then
-      sed -i ".bak" 's|^\([[:space:]]*CURRENT_PROJECT_VERSION[[:space:]]*=[[:space:]]*["]*\)'${XCODE_VERSION}'\(.*\)|\1'${VERSION}'\2|' "${ACTUAL_XCODEPROJ}/project.pbxproj"
+      sed -i.bak -e 's|^\([[:space:]]*CURRENT_PROJECT_VERSION[[:space:]]*=[[:space:]]*["]*\)'${XCODE_VERSION}'\(.*\)|\1'${VERSION}'\2|' "${ACTUAL_XCODEPROJ}/project.pbxproj"
    fi
 
    if [ "${OPTION_WRITE}" = "YES" ]
@@ -273,7 +276,7 @@ write_version_if_requested()
    then
       fail "Version could not be set"
    else
-      log_info "Version successfully set to ${VERSION}"
+      echo "Version successfully set to ${VERSION}" >&2
    fi
 
    return 0

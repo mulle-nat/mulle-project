@@ -4,6 +4,7 @@
 #
 [ "${TRACE}" = "YES" ] && set -x && : "$0" "$@"
 
+
 usage()
 {
    cat <<EOF >&2
@@ -148,28 +149,32 @@ create_debian()
 
    directory="${PROJECT}_${VERSION}"
 
-   if [ -d "${directory}" ]
+   if [ -d "/tmp/${directory}" ]
    then
-      rm -rf "${directory}"
+      rm -rf "/tmp/${directory}"
    fi
 
-   mkdir -p "${directory}/DEBIAN" || exit 1
+   mkdir -p "/tmp/${directory}/DEBIAN" || exit 1
 
-   log_verbose "Run mulle-install  --prefix \"${PWD}/${directory}${OPTION_ROOT}\""
+   log_verbose "Run mulle-install  --prefix \"/tmp/${directory}${OPTION_ROOT}\""
 
-   mulle-install --prefix "${PWD}/${directory}${OPTION_ROOT}" >&2 || exit 1
+   mulle-install --prefix "/tmp/${directory}${OPTION_ROOT}" >&2 || exit 1
 
-   write_control > "${directory}/DEBIAN/control"
+   write_control > "/tmp/${directory}/DEBIAN/control"
 
    # brew install dpkg
-   dpkg-deb -b "${directory}" >&2 || exit 1
+   (
+      cd "/tmp" ;
 
-   if [ "${OPTION_REMOVE_TMP}" = "YES" ]
-   then
-      rm -rf "${directory}"
-   fi
+      dpkg-deb -b "${directory}" >&2 || exit 1
 
-   echo "${directory}.deb"
+      if [ "${OPTION_REMOVE_TMP}" = "YES" ]
+      then
+         rm -rf "${directory}"
+      fi
+   )
+
+   echo "/tmp/${directory}.deb"
 }
 
 

@@ -130,6 +130,25 @@ _git_check_remote()
 }
 
 
+git_untag_all()
+{
+   local tag="$1"
+
+   local i
+   local remote
+
+   log_info "Trying to remove local tag \"${tag}\""
+   git tag -d "$tag"
+
+   for i in .git/refs/remotes/*
+   do
+      remote="`basename -- "${i}"`"
+      log_info "Trying to remove tag \"${tag}\" on remote \"${remote}\""
+      git push "${remote}" ":${tag}" # failure is OK
+   done
+}
+
+
 # Parameters!
 #
 # BRANCH
@@ -143,6 +162,7 @@ _git_main()
    local origin
    local tag
    local github
+   local latesttag
 
    branch="${1:-master}"
    [ $# -ne 0 ] && shift
@@ -157,6 +177,9 @@ _git_main()
    [ $# -ne 0 ] && shift
 
    github="$1"
+   [ $# -ne 0 ] && shift
+
+   latesttag="$1"
    [ $# -ne 0 ] && shift
 
    case "${tag}" in
@@ -233,6 +256,15 @@ _git_main()
 
    log_info "Tag \"${dstbranch}\" with \"${tag}\""
    exekutor git tag "${tag}"                  || return 1
+
+   if [ ! -z "${latesttag}" ]
+   then
+      log_info "Untag \"${dstbranch}\" with \"${latesttag}\""
+      git_untag_all "${latesttag}"
+
+      log_info "Tag \"${dstbranch}\" with \"${latesttag}\""
+      exekutor git tag "${latesttag}"                  || return 1
+   fi
 
    log_info "Push \"${dstbranch}\" with tags to \"${origin}\""
    exekutor git push "${origin}" "${dstbranch}" --tags || return 1

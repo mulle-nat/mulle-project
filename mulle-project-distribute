@@ -36,10 +36,7 @@
 # Run this somewhat like this (for real: remove -n):
 #    mulle-project-release -v -n --publisher mulle-nat --publisher-tap mulle-kybernetik/software/
 #
-if [ "${TRACE}" = "YES" ]
-then
-    set -x
-fi
+[ "${TRACE}" = "YES" ] && set -x && : "$0" "$@"
 
 
 usage()
@@ -223,6 +220,7 @@ main()
 {
    DO_PUSH_FORMULA="YES"
    USE_CACHE="NO"
+   OPTION_LATEST_TAG="latest"
 
    while [ $# -ne 0 ]
    do
@@ -256,6 +254,10 @@ main()
 
          --no-formula)
             DO_GENERATE_FORMULA="NO"
+         ;;
+
+         --no-latest-tag)
+            OPTION_LATEST_TAG=""
          ;;
 
          --no-push)
@@ -397,8 +399,12 @@ main()
 
    if [ "${DO_GIT_RELEASE}" = "YES" ]
    then
+      log_info "Git release..."
+
      # do the release
-      git_main "${BRANCH}" "${ORIGIN}" "${TAG}" "${GITHUB}" || exit 1
+      git_main "${BRANCH}" "${ORIGIN}" "${TAG}" "${GITHUB}" "${OPTION_LATEST_TAG}" || exit 1
+   else
+      log_fluff "No git release"
    fi
 
    if [ "${DO_GENERATE_FORMULA}" = "YES" ]
@@ -413,6 +419,8 @@ main()
          fail "You need to specify a publisher tap with --tap (hint: <mulle-kybernetik/software>)"
       fi
 
+      log_info "Homebrew formula..."
+
       # generate the formula and push it
       if ! homebrew_main "${PROJECT}" \
                          "${NAME}" \
@@ -425,8 +433,11 @@ main()
                          "${HOMEBREW_TAP}" \
                          "${RBFILE}"
       then
+         log_error "Homebrew generation failed!"
          return 1
       fi
+   else
+      log_fluff "No homebrew formula"
    fi
 
    #
@@ -435,6 +446,7 @@ main()
    #
    if [ "`type -t post_release`" = "function" ]
    then
+      log_info "Post release..."
       post_release "${PROJECT}" \
                    "${NAME}" \
                    "${VERSION}" \
@@ -444,6 +456,8 @@ main()
                    "${DESC}" \
                    "${ARCHIVE_URL}" \
                    "${DEBIAN_DEPENDENCIES}"
+   else
+      log_fluff "No post release"
    fi
 }
 

@@ -27,15 +27,16 @@ Command                      | Description
 3. Checks that the remote branches aren't ahead and push would fail
 4. Pushes the current development branch (usually **master**) to its **origin** (can be configured)
 5. Rebases your **release** (can be configured) branch on your current development branch
-6. Tags your repository with the current version
-7. Pushes the tagged **release** to **origin**
-8. Optionally pushes the tagged **release** to **github**
-9. Checks out the the current development branch (usually **master**) again (see 3.)
-10. Optional: Downloads the source archive for the created tag
-11. Optional: Calculates the sha256 for the archive
-12. Optional: Creates the homebrew formula for your project and places it into your tap
-13. Optional: Commits the tap and pushes it to its default remote
-14. Optional: Runs a post-release step
+6. Remove "latest" tag from participating repositories
+7. Tags your repository with the current version and with "latest"
+8. Pushes the tagged **release** to **origin**
+9. Optionally pushes the tagged **release** to **github**
+10. Checks out the the current development branch (usually **master**) again (see 3.)
+11. Optional: Downloads the source archive for the created tag
+12. Optional: Calculates the sha256 for the archive
+13. Optional: Creates the homebrew formula for your project and places it into your tap
+14. Optional: Commits the tap and pushes it to its default remote
+15. Optional: Runs a post-release step
 
 In essence making a tagged release, publishing the release branch,
 updating your homebrew formula and distributing an apt package, reduces to the 

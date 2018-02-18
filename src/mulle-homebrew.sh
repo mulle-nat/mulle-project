@@ -32,6 +32,8 @@
 
 get_class_from_name()
 {
+   log_entry "get_class_from_name" "$@"
+
    local name="$1"
 
    local formula
@@ -63,6 +65,8 @@ get_class_from_name()
 
 generate_brew_formula_header()
 {
+   log_entry "generate_brew_formula_header" "$@"
+
    local project="$1"
    local name="$2"
    local version="$3"
@@ -150,6 +154,8 @@ ${INDENTATION}${line}"
 
 _print_dependencies()
 {
+   log_entry "_print_dependencies" "$@"
+
    local dependencies="$1"
    local epilog="$2"
 
@@ -180,6 +186,8 @@ ${line}"
 
 generate_brew_formula_dependencies()
 {
+   log_entry "generate_brew_formula_dependencies" "$@"
+
    local dependencies="$1"
    local builddependencies="$2"
 
@@ -197,6 +205,8 @@ generate_brew_formula_dependencies()
 
 generate_brew_formula_xcodebuild()
 {
+   log_entry "generate_brew_formula_xcodebuild" "$@"
+
    local project="$1"; shift
    local name="$1" ; shift
    local version="$1" ; shift
@@ -229,6 +239,8 @@ EOF
 
 generate_brew_formula_mulle_build()
 {
+   log_entry "generate_brew_formula_mulle_build" "$@"
+
    local project="$1"; shift
    local name="$1" ; shift
    local version="$1" ; shift
@@ -256,6 +268,8 @@ EOF
 
 generate_brew_formula_mulle_test()
 {
+   log_entry "generate_brew_formula_mulle_test" "$@"
+
    local project="$1"; shift
    local name="$1" ; shift
    local version="$1" ; shift
@@ -285,6 +299,8 @@ EOF
 
 generate_brew_formula_footer()
 {
+   log_entry "generate_brew_formula_footer" "$@"
+
    local name="$1"
 
    local lines
@@ -300,6 +316,8 @@ EOF
 
 _generate_brew_formula_build()
 {
+   log_entry "_generate_brew_formula_build" "$@"
+
    local project="$1"
    local name="$2"
    local version="$3"
@@ -311,6 +329,8 @@ _generate_brew_formula_build()
 
 _generate_brew_formula()
 {
+   log_entry "_generate_brew_formula" "$@"
+
    local project="$1"
    local name="$2"
    local version="$3"
@@ -339,6 +359,8 @@ _generate_brew_formula()
 
 formula_push()
 {
+   log_entry "formula_push" "$@"
+
    local rbfile="$1" ; shift
    local version="$1" ; shift
    local name="$1" ; shift
@@ -347,13 +369,19 @@ formula_push()
    HOMEBREW_TAP_BRANCH="${HOMEBREW_TAP_BRANCH:-master}"
    HOMEBREW_TAP_REMOTE="${HOMEBREW_TAP_REMOTE:-origin}"
 
+   #
+   # this may fail if the formula didn't change (during untag/tag)
+   # cycle
+   #
+
    log_info "Push brew formula \"${rbfile}\" to \"${HOMEBREW_TAP_REMOTE}\""
    (
       exekutor cd "${homebrewtap}" &&
       exekutor git add "${rbfile}" &&
-      exekutor git commit -m "${version} release of ${name}" "${rbfile}" &&
+      exekutor git commit -m "${version} release of ${name}" "${rbfile}"
       exekutor git push "${HOMEBREW_TAP_REMOTE}" "${HOMEBREW_TAP_BRANCH}"
-   )  || exit 1
+   )
+   :
 }
 
 

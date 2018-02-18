@@ -29,10 +29,8 @@
 #   ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 #   POSSIBILITY OF SUCH DAMAGE.
 #
-if [ "${TRACE}" = "YES" ]
-then
-   set -x
-fi
+[ "${TRACE}" = "YES" ] && set -x && : "$0" "$@"
+
 
 usage()
 {
@@ -172,12 +170,8 @@ main()
    for i in .git/refs/remotes/*
    do
       remote="`basename -- "${i}"`"
-      case "$remote" in
-         "${ORIGIN}"|github) #
-            log_info "Trying to remove tag on remote \"${remote}\""
-            git push "${remote}" ":${TAG}" # failure is OK
-         ;;
-      esac
+      log_info "Trying to remove tag \"${TAG}\" on remote \"${remote}\""
+      git push "${remote}" ":${TAG}" # failure is OK
    done
 }
 
