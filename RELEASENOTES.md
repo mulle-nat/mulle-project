@@ -1,3 +1,7 @@
+### 1.2.1
+
+* remove obsolete file mulle-project-init
+
 ## 1.2.0
 
 * use mulle-bashfunctions more and some more improvements

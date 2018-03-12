@@ -4,5 +4,5 @@
 # enough for you. If you don't have this file, there will be
 # no git operations.
 #
-VERSION="`./mulle-project-env version`"
-# VERSIONNAME=
+VERSIONFILE="mulle-project-env"
+VERSIONNAME="MULLE_PROJECT_VERSION"
