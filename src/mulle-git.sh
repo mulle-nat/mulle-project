@@ -32,6 +32,8 @@
 
 git_tag_exists()
 {
+   log_entry "git_tag_exists" "$@"
+
    local tag="$1"
 
    git rev-parse "${tag}" > /dev/null 2>&1
@@ -40,6 +42,8 @@ git_tag_exists()
 
 git_tag_must_not_exist()
 {
+   log_entry "git_tag_must_not_exist" "$@"
+
    if git_tag_exists "${tag}"
    then
       fail "Tag \"${tag}\" already exists"
@@ -49,30 +53,48 @@ git_tag_must_not_exist()
 
 git_ref_for_tag()
 {
+   log_entry "git_ref_for_tag" "$@"
+
    git show-ref --tags $1 | awk '{ print$1 }'
 }
 
 
 git_any_first_commit()
 {
+   log_entry "git_any_first_commit" "$@"
+
    git rev-list HEAD | tail -n 1
 }
 
 
 git_last_tag()
 {
+   log_entry "git_last_tag" "$@"
+
    git describe --tags --abbrev=0 2> /dev/null
+}
+
+
+git_commits_from_start()
+{
+   log_entry "git_commits_from_start" "$@"
+
+   git log --format=%B
 }
 
 
 git_commits_from_ref()
 {
+   log_entry "git_commits_from_ref" "$@"
+
    git log --format=%B "$1..HEAD"
 }
 
 
 git_commits_from_tag()
 {
+   log_entry "git_commits_from_tag" "$@"
+
    local ref
 
    ref="`git_ref_for_tag "$1"`"
@@ -82,6 +104,8 @@ git_commits_from_tag()
 
 git_must_be_clean()
 {
+   log_entry "git_must_be_clean" "$@"
+
    local name
 
    name="${1:-${PWD}}"
@@ -104,6 +128,8 @@ git_must_be_clean()
 # more convenient if not exekutored!
 git_repo_can_push()
 {
+   log_entry "git_repo_can_push" "$@"
+
    local remote="${1:-origin}"
    local branch="${2:-release}"
 
@@ -123,6 +149,8 @@ git_repo_can_push()
 
 _git_check_remote()
 {
+   log_entry "_git_check_remote" "$@"
+
    local name="$1"
 
    log_info "Check if remote \"${name}\" is present"
@@ -132,6 +160,8 @@ _git_check_remote()
 
 git_untag_all()
 {
+   log_entry "git_untag_all" "$@"
+
    local tag="$1"
 
    local i
@@ -157,6 +187,8 @@ git_untag_all()
 #
 _git_main()
 {
+   log_entry "_git_main" "$@"
+
    local branch
    local dstbranch
    local origin
@@ -279,6 +311,8 @@ _git_main()
 
 git_main()
 {
+   log_entry "git_main" "$@"
+
    local branch
    local rval
 

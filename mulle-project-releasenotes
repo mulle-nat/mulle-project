@@ -34,6 +34,8 @@
 
 usage()
 {
+   [ "$#" -ne 0 ] && log_error "$1"
+
    cat <<EOF >&2
 Usage: mulle-project-releasenotes [options] [releasenotes]
 
@@ -46,6 +48,7 @@ Usage: mulle-project-releasenotes [options] [releasenotes]
 Options:
    -a                       : prepend notes to first releasenote
    -f                       : overwrite existing releasenotes for version
+   --all                    : dump all releasenotes from the beginning
    --commit                 : git commit --amend --no-edit releasenotes
    --default-message <text> : text to use,if there are no suitable git comments
    --filter <executable>    : use something else than egrep to filter comments
@@ -63,15 +66,10 @@ EOF
 }
 
 
-fail()
-{
-   echo "Error:" "$*" >&2
-   exit 1
-}
-
-
 compute_markers()
 {
+   log_entry "compute_markers" "$@"
+
    local version="$1"
 
    local major
@@ -94,79 +92,141 @@ compute_markers()
 }
 
 
-escaped_sed_replacement()
+filter_releasenotes()
 {
-   sed -e 's|\\|\\\\|g' <<< "${1}"
+   log_entry "filter_releasenotes" "$@"
+
+   sed -n 's/'${RELEASENOTE_GREP}'\(.*\)/\1/p'
 }
 
 
-filter_releasenotes()
+get_releasenote_commits()
 {
-   sed -n 's/'${RELEASENOTE_GREP}'\(.*\)/\1/p'
+   log_entry "get_releasenote_commits" "$@"
+
+   if [ "${OPTION_ALL}" = "YES" ]
+   then
+      git_commits_from_start
+      return
+   fi
+
+   local start
+
+   start="${OPTION_TAG}"
+
+   if [ "${OPTION_MISSING}" = "YES" ]
+   then
+      if [ "${OPTION_INPUT}" = "-" ]
+      then
+         fail "no input specified"
+      fi
+
+      if [ ! -z "${start}" ]
+      then
+         fail "missing and start specified at same time"
+      fi
+
+      start="`get_latest_releasenote_version "${OPTION_INPUT}"`"
+      log_debug "latest releasenote version is \"${start}\""
+   fi
+
+   if [ -z "${start}" ]
+   then
+      start="`git_last_tag`"
+      log_debug "last tag is \"${start}\""
+      if [ -z "${start}" ]
+      then
+         start="`git_any_first_commit`"
+         log_debug "any first commit is \"${start}\""
+      fi
+   fi
+
+   log_debug "start is \"${start}\""
+
+   git_commits_from_tag "${start}"
+}
+
+
+determine_message()
+{
+   log_entry "determine_message" "$@"
+
+   local prefix="$1"
+   local defaultmessage="$2"
+
+   local message
+   local commits
+
+   commits="`get_releasenote_commits`"
+   log_debug "Commits: ${commits}"
+
+   message="`"${RELEASENOTE_FILTER}" <<< "${commits}"`"
+
+   if [ -z "${message}" ]
+   then
+       message="${defaultmessage}"
+   fi
+
+   #
+   # now prefix
+   #
+   if [ ! -z "${prefix}" ]
+   then
+      local pattern
+
+      pattern="`escaped_sed_pattern "${prefix}"`"
+      message="`sed "s/^/${pattern}/" <<< "${message}"`"
+   fi
+
+   echo "${message}"
+}
+
+
+markdown_escape_message()
+{
+   log_entry "markdown_escape_message" "$@"
+
+   #
+   # envelope underscore words as backticks
+   # also envelope lozenges
+   #
+   sed -e 's/\([^ ]*_[^ _]*\)/`\1`/g' \
+       -e 's/\(<[^<>]*>\)/`\1`/g'
 }
 
 
 emit_releasenotes()
 {
+   log_entry "emit_releasenotes" "$@"
+
    local version="$1"
    local markers="$2"
+   local prefix="$3"
+   local message="$4"
+   local defaultmessage="$5"
 
-   if [ -z "${OPTION_MESSAGE}" ]
+   if [ -z "${message}" ]
    then
-      local start="${OPTION_TAG}"
-
-      if [ "${OPTION_MISSING}" = "YES" ]
-      then
-         if [ "${OPTION_INPUT}" = "-" ]
-         then
-            fail "no input specified"
-         fi
-
-         if [ ! -z "${start}" ]
-         then
-            fail "missing and start specified at same time"
-         fi
-
-         start="`get_latest_releasenote_version "${OPTION_INPUT}"`"
-      fi
-
-      if [ -z "${start}" ]
-      then
-         start="`git_last_tag`"
-         if [ -z "${start}" ]
-         then
-            start="`git_any_first_commit`"
-         fi
-      fi
-
-      OPTION_MESSAGE="`git_commits_from_tag "${start}" | ${RELEASENOTE_FILTER}`"
-      if [ -z "${OPTION_MESSAGE}" ]
-      then
-          OPTION_MESSAGE="${OPTION_DEFAULT_MESSAGE}"
-      fi
-
-      #
-      # now prefix
-      #
-      if [ ! -z "${OPTION_PREFIX}" ]
-      then
-         local pattern
-
-         pattern="`escaped_sed_replacement "${OPTION_PREFIX}"`"
-         OPTION_MESSAGE="`sed "s/^/${pattern}/" <<< "${OPTION_MESSAGE}"`"
-      fi
+      message="`determine_message "${prefix}" "${defaultmessage}"`" || exit 1
    fi
 
-   cat <<EOF
+   if [ "${OPTION_MD_ESCAPE}" = "YES" ]
+   then
+      message="`markdown_escape_message <<< "${message}"`"
+   fi
+
+   exekutor cat <<EOF
 ${markers} ${version}
 
-${OPTION_MESSAGE}
+${message}
 EOF
 }
 
 
 copy_without_first_entry()
 {
+   log_entry "copy_without_first_entry" "$@"
+
    local header="$1"
 
    # remove old comments for same version
@@ -188,12 +248,12 @@ copy_without_first_entry()
             if egrep -s "^${markers} *" <<< "${line}"
             then
                state="copy"
-               echo "${line}"
+               exekutor echo "${line}"
             fi
          ;;
 
          copy)
-            echo "${line}"
+            exekutor echo "${line}"
          ;;
       esac
    done
@@ -202,34 +262,18 @@ copy_without_first_entry()
 
 copy_without_first_line()
 {
+   log_entry "copy_without_first_line" "$@"
+
    # also remove a first empty line if present
 
    sed '1d' | sed '/./,$!d'
 }
 
 
-mulle_project_releasenotes_init()
-{
-   if [ -z "`command -v mulle-project-env`" ]
-   then
-      cat <<EOF >&2
-   mulle-project-env not found in PATH.
-   Visit the homepage for installation instructions:
-      https://github.com/mulle-nat/mulle-project
-EOF
-      exit 1
-   fi
-
-   INSTALLED_MULLE_PROJECT_VERSION="`mulle-project-env version`" || exit 1
-   LIBEXEC_DIR="`mulle-project-env libexec-dir`" || exit 1
-
-   . "${LIBEXEC_DIR}/mulle-git.sh" || exit 1
-   . "${LIBEXEC_DIR}/mulle-version.sh" || exit 1
-}
-
-
 emit_prepended_notes_to_file()
 {
+   log_entry "emit_prepended_notes_to_file" "$@"
+
    local markers="$1"
    local notes="$2"
    local tmpfile="$3"
@@ -259,6 +303,8 @@ EOF
 
 get_latest_releasenote_version()
 {
+   log_entry "get_latest_releasenote_version" "$@"
+
    local filename
 
    if [ ! -f "${filename}" ]
@@ -274,6 +320,8 @@ get_latest_releasenote_version()
 
 merged_releasenotes()
 {
+   log_entry "merged_releasenotes" "$@"
+
    local markers="$1"
    local notes="$2"
    local version="$3"
@@ -314,7 +362,7 @@ merged_releasenotes()
             copy_without_first_line "${old_header}" < "${OPTION_INPUT}" > "${tmpfile}" || exit 1
          fi
       else
-         if [ "${OPTION_FORCE}" = "NO" ]
+         if [ "${MULLE_FLAG_MAGNUM_FORCE}" = "NO" ]
          then
             rm "${tmpfile}"
             fail "Releasenotes already contain a leading entry for \"${version}\""
@@ -329,7 +377,7 @@ merged_releasenotes()
       fi
       edited_header="YES"
    else
-      cp "${OPTION_INPUT}" "${tmpfile}" || exit 1
+      exekutor cp "${OPTION_INPUT}" "${tmpfile}" || exit 1
       edited_header="YES"
    fi
 
@@ -337,7 +385,7 @@ merged_releasenotes()
 
    if [ "${OPTION_KEEP_TMP}" = "NO" ]
    then
-      rm "${tmpfile}"
+      exekutor rm "${tmpfile}"
    fi
 }
 
@@ -351,7 +399,7 @@ main()
    local OPTION_APPEND="NO"
    local OPTION_DEFAULT_MESSAGE="Various small improvements"
    local OPTION_FIRST_PATCH="0"
-   local OPTION_FORCE="NO"
+   local MULLE_FLAG_MAGNUM_FORCE="NO"
    local OPTION_COMMIT="NO"
    local OPTION_INPUT=""
    local OPTION_KEEP_TMP="YES"
@@ -360,6 +408,8 @@ main()
    local OPTION_PREFIX="* "
    local OPTION_TAG=""
    local OPTION_COMMITFLAGS="--amend --no-edit"
+   local OPTION_ALL
+   local OPTION_MD_ESCAPE="YES"
 
    local custom_output="NO"
 
@@ -378,9 +428,22 @@ main()
       OPTION_FIRST_PATCH="`cat ".first_patch"`"
    fi
 
+   #
+   # simple option handling
+   #
    while [ $# -ne 0 ]
    do
+      if options_technical_flags "$1"
+      then
+         shift
+         continue
+      fi
+
       case "$1" in
+         -h|--help|help)
+            usage
+         ;;
+
          -a|--append)
             OPTION_APPEND="YES"
          ;;
@@ -389,33 +452,33 @@ main()
             OPTION_COMMIT="YES"
          ;;
 
-         -f|--force)
-            OPTION_FORCE="YES"
+         --all)
+            OPTION_ALL="YES"
          ;;
 
          --filter)
-            [ $# -eq 1 ] && fail "missing argument to $1"
+            [ $# -eq 1 ] && usage "missing argument for \"$1\""
             shift
 
             RELEASENOTE_FILTER="$1"
          ;;
 
          -g|--grep)
-            [ $# -eq 1 ] && fail "missing argument to $1"
+            [ $# -eq 1 ] && usage "missing argument for \"$1\""
             shift
 
             RELEASENOTE_GREP="$1"
          ;;
 
          -m|--message)
-            [ $# -eq 1 ] && fail "missing argument to $1"
+            [ $# -eq 1 ] && usage "missing argument for \"$1\""
             shift
 
             OPTION_MESSAGE="$1"
          ;;
 
          -dm|--default_message)
-            [ $# -eq 1 ] && fail "missing argument to $1"
+            [ $# -eq 1 ] && usage "missing argument for \"$1\""
             shift
 
             OPTION_DEFAULT_MESSAGE="$1"
@@ -426,14 +489,14 @@ main()
          ;;
 
          -i|--input)
-            [ $# -eq 1 ] && fail "missing argument to $1"
+            [ $# -eq 1 ] && usage "missing argument for \"$1\""
             shift
 
             OPTION_INPUT="$1"
          ;;
 
          -o|--output)
-            [ $# -eq 1 ] && fail "missing argument to $1"
+            [ $# -eq 1 ] && usage "missing argument to $1"
             shift
 
             OPTION_OUTPUT="$1"
@@ -447,22 +510,26 @@ main()
             OPTION_MISSING="YES"
          ;;
 
+         --no-md-escape)
+            OPTION_MD_ESCAPE="NO"
+         ;;
+
          --prefix)
-            [ $# -eq 1 ] && fail "missing argument to $1"
+            [ $# -eq 1 ] && usage "missing argument for \"$1\""
             shift
 
             OPTION_PREFIX="$1"
          ;;
 
          --tag)
-            [ $# -eq 1 ] && fail "missing argument to $1"
+            [ $# -eq 1 ] && usage "missing argument for \"$1\""
             shift
 
             OPTION_TAG="$1"
          ;;
 
          --version)
-            [ $# -eq 1 ] && fail "missing argument to $1"
+            [ $# -eq 1 ] && usage "missing argument for \"$1\""
             shift
 
             VERSION="$1"
@@ -476,16 +543,8 @@ main()
             OPTION_FIRST_PATCH="1"
          ;;
 
-         -h|--help)
-            usage
-         ;;
-
-         -t)
-            set -x
-         ;;
-
          -*)
-            usage
+            usage "unknown option \"$1\""
          ;;
 
          *)
@@ -495,6 +554,8 @@ main()
 
       shift
    done
+
+   options_setup_trace "${MULLE_TRACE}"
 
    case $# in
       0)
@@ -528,12 +589,12 @@ main()
 
    if [ -z "${VERSION}" ]
    then
-      VERSION="`mulle-project-version --no-tag-warning`" || fail "Could not figure out current version"
+      VERSION="`rexekutor mulle-project-version --no-tag-warning`" || fail "Could not figure out current version"
    fi
 
    if [ "${OPTION_COMMIT}" = "YES" ]
    then
-      if [ ! -z "`git status -s --untracked-files=no`" ]
+      if [ ! -z "`rexekutor git status -s --untracked-files=no`" ]
       then
          fail "git repository is not in a pristine state, can not commit"
       fi
@@ -542,8 +603,15 @@ main()
    local notes
    local markers
 
+   log_fluff "Version: ${VERSION}"
    markers="`compute_markers "${VERSION}"`"
-   notes="`emit_releasenotes "${VERSION}" "${markers}"`"
+
+   log_fluff "Markers: ${markers}"
+   notes="`emit_releasenotes "${VERSION}" \
+                             "${markers}" \
+                             "${OPTION_PREFIX}" \
+                             "${OPTION_MESSAGE}" \
+                             "${OPTION_DEFAULT_MESSAGE}" `"
 
    #
    # if no file is given, we don't merge
@@ -552,9 +620,9 @@ main()
    then
       if [ "${OPTION_OUTPUT}" = "-" ]
       then
-         echo "${notes}"
+         exekutor echo "${notes}"
       else
-         echo "${notes}" > "${OPTION_OUTPUT}" || exit 1
+         redirect_exekutor "${OPTION_OUTPUT}" echo "${notes}"  || exit 1
       fi
    else
       local result
@@ -563,9 +631,9 @@ main()
 
       if [ "${OPTION_OUTPUT}" = "-" ]
       then
-         echo "${result}"
+         exekutor echo "${result}"
       else
-         echo "${result}" > "${OPTION_OUTPUT}" || exit 1
+         redirect_exekutor "${OPTION_OUTPUT}" echo "${result}" || exit 1
       fi
    fi
 
@@ -574,15 +642,46 @@ main()
       changed="`git ls-files -m "${OPTION_OUTPUT}"`"
       if [ ! -z "${changed}" ]
       then
-         git commit ${OPTION_COMMITFLAGS} "${OPTION_OUTPUT}"
+         exekutor git commit ${OPTION_COMMITFLAGS} "${OPTION_OUTPUT}"
       fi
    fi
 }
 
 
-MULLE_EXECUTABLE="`basename -- $0`"
-MULLE_BUILDTOOLS_FAIL_PREFIX="${MULLE_EXECUTABLE}"
+########
+###
+### INIT
+###
+_init()
+{
+   if [ -z "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}" ]
+   then
+      MULLE_BASHFUNCTIONS_LIBEXEC_DIR="`mulle-bashfunctions-env libexec-dir 2> /dev/null`"
+      [ -z "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}" ] && \
+         echo "mulle-bashfunctions are not installed" >&2 && \
+      exit 1
+   fi
 
-mulle_project_releasenotes_init
+   # shellcheck source=../mulle-bashfunctions/src/mulle-bashfunctions.sh
+   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-bashfunctions.sh"
 
+   MULLE_PROJECT_LIBEXEC_DIR="`mulle-project-env libexec-dir`" || exit 1
+
+   . "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-git.sh" || exit 1
+   . "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-version.sh" || exit 1
+
+   #  set -e # more pain then gain in the end
+   #  set -u # doesn't work with my style
+
+   set -o pipefail
+}
+
+
+###
+### INIT
+###
+########
+
+
+_init "$@" # needs params
 main "$@"

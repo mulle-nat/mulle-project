@@ -32,25 +32,82 @@
 [ "${TRACE}" = "YES" ] && set -x && : "$0" "$@"
 
 
+show_function()
+{
+   declare -f "$1" | \
+      sed -e '1,2d' -e '$d' | \
+      sed -e 's/^    //' | \
+      sed -e 's/exekutor //g' | \
+      sed -e "s/&&/^  /g" | \
+      tr '^' '\n'
+}
+
 usage()
 {
    [ "$#" -ne 0 ] && log_error "$1"
 
    cat <<EOF >&2
 Usage:
-   mulle-homebrew-untag <tag>
+   ${MULLE_USAGE_NAME} <message>
 
-   Remove <tag> from local clone and all remotes.
+   A lazy and sloppy way to push out a patch. It does:
+
+   `show_function "sloppy_commit"`
+   `show_function "sloppy_push"`
 EOF
    exit 1
+}
+
+sloppy_commit()
+{
+   exekutor git add -u &&
+   exekutor git commit -m "* $*"
+}
+
+
+sloppy_push()
+{
+   exekutor mulle-project-version --increment-patch --write &&
+   [ ! -f "RELEASENOTES.md" ] || exekutor mulle-project-releasenotes RELEASENOTES.md &&
+   exekutor git add -u &&
+   exekutor git commit --amend --no-edit &&
+   exekutor mulle-project-distribute
+}
+
+
+sloppy_distribute()
+{
+   if [ $# -ne 0 ]
+   then
+      sloppy_commit "$@" || exit 1
+   fi
+
+   sloppy_push
+}
+
+
+git_is_clean()
+{
+   log_entry "git_is_clean" "$@"
+
+   local name
+
+   name="${1:-${PWD}}"
+
+   if [ ! -d .git ]
+   then
+      fail "\"${name}\" is not a git repository"
+   fi
+
+   local clean
+
+   clean=`git status -s --untracked-files=no`
+   [ -z "${clean}" ]
 }
 
 
 main()
 {
-   local ORIGIN="origin"
-   local OPTION_FORCE="NO"
-
    while [ $# -ne 0 ]
    do
       if options_technical_flags "$1"
@@ -64,16 +121,6 @@ main()
             usage
          ;;
 
-         -f)
-            OPTION_FORCE="YES"
-         ;;
-
-         --origin)
-            [ $# -eq 1 ] && usage "missing argument to \"$1\""
-            shift
-            ORIGIN="$1"
-         ;;
-
          -*)
             usage "unknown option \"$1\""
          ;;
@@ -82,78 +129,41 @@ main()
             break
          ;;
       esac
-      shift
    done
 
    options_setup_trace "${MULLE_TRACE}"
 
-   TAG="$1"
-
-   if [ -z "${TAG}" ]
+   untracked="`exekutor git ls-files --others --exclude-standard`"
+   if [ ! -z "${untracked}" ]
    then
-      usage
+      fail "There are still untracked files here, can't be that sloppy"
    fi
 
-   log_info "Trying to remove local tag"
-   git tag -d "$TAG" || [ "${OPTION_FORCE}" = "YES" ] || exit 1
+   if ! git_is_clean && [ $# -eq 0 ]
+   then
+      log_error "Need a commit message for the outstandig commits"
+      git status -s
+      exit 1
+   fi
 
-   # find .git folder (must exist, since git tag didn't fail)
-
-   while [ ! -d .git ]
-   do
-      cd ..
-      [ `pwd` = "/" ] && exit 1  # paranoia
-   done
-
-   local i
-   local remote
-
-   for i in .git/refs/remotes/*
-   do
-      remote="`fast_basename "${i}"`"
-      log_info "Trying to remove tag \"${TAG}\" on remote \"${remote}\""
-      exekutor git push "${remote}" ":${TAG}" # failure is OK
-   done
+   sloppy_distribute "$@"
 }
 
 
-########
-###
-### INIT
-###
 _init()
 {
    if [ -z "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}" ]
    then
-      MULLE_BASHFUNCTIONS_LIBEXEC_DIR="`mulle-bashfunctions-env libexec-dir 2> /dev/null`"
+      MULLE_BASHFUNCTIONS_LIBEXEC_DIR="`mulle-bashfunctions-env "libexec-dir" 2> /dev/null`"
       [ -z "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}" ] && \
-         echo "mulle-bashfunctions are not installed" >&2 && \
-      exit 1
+         echo "mulle-bashfunctions-env not installed" >&2 && \
+         exit 1
    fi
 
-   # shellcheck source=../mulle-bashfunctions/src/mulle-bashfunctions.sh
-   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-bashfunctions.sh"
-
-   if [ -z "`command -v mulle-project-env`" ]
-   then
-      cat <<EOF >&2
-mulle-project-env not found in PATH.
-Visit the homepage for installation instructions:
-      https://github.com/mulle-nat/mulle-project
-EOF
-      exit 1
-   fi
-
-   set -o pipefail
+   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-bashfunctions.sh" "minimal" || exit 1
 }
 
-
-###
-### INIT
-###
-########
-
-
-_init "$@" # needs params
+_init "$@"
 main "$@"
+
 

@@ -6,3 +6,8 @@ tmp.*
 dox/
 .DS_Store
 mulle-project/publisher-info.sh
+*.sublime-workspace
+mulle-project.graffle
+obsolete-mulle-project-init
+templates/
+tmp/

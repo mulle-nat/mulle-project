@@ -33,10 +33,12 @@
 
 
 
-MULLE_PROJECT_VERSION="1.1.0"
+MULLE_PROJECT_VERSION="1.2.0"
 
 usage()
 {
+   [ "$#" -ne 0 ] && log_error "$1"
+
    cat <<EOF >&2
 Usage: mulle-project-env [command]
 

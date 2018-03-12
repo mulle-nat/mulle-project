@@ -34,6 +34,8 @@
 
 usage()
 {
+   [ "$#" -ne 0 ] && log_error "$1"
+
    cat <<EOF >&2
 Usage: mulle-project-version [options] [projectname]
 
@@ -70,39 +72,11 @@ EOF
 }
 
 
-fail()
-{
-   echo "Error:" "$*" >&2
-   exit 1
-}
-
-
-mulle_project_version_init()
-{
-   #
-   # prefer local mulle-project if available
-   # Do not embed it anymore!
-   #
-   if [ -z "`command -v mulle-project-env`" ]
-   then
-      cat <<EOF >&2
-mulle-project-env not found in PATH.
-Visit the homepage for installation instructions:
-   https://github.com/mulle-nat/mulle-project
-EOF
-      exit 1
-   fi
-
-   INSTALLED_MULLE_PROJECT_VERSION="`mulle-project-env version`" || exit 1
-   LIBEXEC_DIR="`mulle-project-env libexec-dir`" || exit 1
-
-   . "${LIBEXEC_DIR}/mulle-version.sh" || exit 1
-   . "${LIBEXEC_DIR}/mulle-git.sh" || exit 1
-}
-
 
 get_xcodeproj_version()
 {
+   log_entry "get_xcodeproj_version" "$@"
+
    local filename="$1/project.pbxproj"
 
    if [ ! -f "${filename}" ]
@@ -118,6 +92,8 @@ get_xcodeproj_version()
 
 get_version()
 {
+   log_entry "get_version" "$@"
+
    if [ "${OPTION_READ_XCODE_VERSION}" = "YES" -o "${OPTION_WRITE_XCODE_VERSION}" = "YES" ]
    then
       ACTUAL_XCODEPROJ="${OPTION_XCODEPROJ}"
@@ -149,20 +125,21 @@ get_version()
    then
       if [ -z "${LANGUAGE}" ]
       then
-         LANGUAGE="`get_language_from_directoryname "${DIRECTORY_NAME}"`" || exit 1
+         LANGUAGE="`get_language_from_directoryname "${DIRECTORY_NAME}"`"
+         log_verbose "LANGUAGE is \"${LANGUAGE}\""
       fi
 
       if [ -z "${VERSIONFILE}" ]
       then
-         VERSIONFILE="`get_header_from_project "${PROJECT}" "${LANGUAGE}"`" || exit 1
+         VERSIONFILE="`get_header_from_project "${PROJECT}" "${LANGUAGE}"`"
       fi
 
       if [ -z "${VERSIONNAME}" ]
       then
-         VERSIONNAME="`get_versionname_from_project "${PROJECT}"`" || exit 1
+         VERSIONNAME="`get_versionname_from_project "${PROJECT}"`"
       fi
 
-      if [ -f VERSION ]
+      if [ ! -f "${VERSIONFILE}" -a -f "VERSION" ]
       then
          VERSION="`egrep -v '^#' "VERSION"`"
          if [ ! -z "${VERSION}" ]
@@ -170,10 +147,10 @@ get_version()
             VERSIONFILE="VERSION"
          fi
       else
-         VERSION="`get_project_version "${VERSIONFILE}" "${VERSIONNAME}"`" || exit 1
+         VERSION="`get_project_version "${VERSIONFILE}" "${VERSIONNAME}"`"
          if [ -z "${VERSION}" ]
          then
-            VERSION="`get_project_version "src/version.h" "${VERSIONNAME}"`" || exit 1
+            VERSION="`get_project_version "src/version.h" "${VERSIONNAME}"`"
             if [ ! -z "${VERSION}" ]
             then
                VERSIONFILE="src/version.h"
@@ -196,6 +173,8 @@ Hint: specify VERSIONNAME, VERSIONFILE in mulle-project/version-info.sh"
 
 edit_version_if_requested()
 {
+   log_entry "edit_version_if_requested" "$@"
+
    if [ -z "${OPTION_VERSION_SET}" ]
    then
       [ "${OPTION_ADD_MAJOR}" -ne 0 ] &&
@@ -250,6 +229,8 @@ edit_version_if_requested()
 
 write_version_if_requested()
 {
+   log_entry "write_version_if_requested" "$@"
+
    if ! [ "${OPTION_WRITE}" = "YES" -o "${OPTION_WRITE_XCODE_VERSION}" = "YES" ]
    then
       return 1
@@ -262,15 +243,35 @@ write_version_if_requested()
 
    if [ "${OPTION_WRITE_XCODE_VERSION}" = "YES" ]
    then
-      sed -i.bak -e 's|^\([[:space:]]*CURRENT_PROJECT_VERSION[[:space:]]*=[[:space:]]*["]*\)'${XCODE_VERSION}'\(.*\)|\1'${VERSION}'\2|' "${ACTUAL_XCODEPROJ}/project.pbxproj"
+      inplace_sed -e 's|^\([[:space:]]*CURRENT_PROJECT_VERSION[[:space:]]*=[[:space:]]*["]*\)'${XCODE_VERSION}'\(.*\)|\1'${VERSION}'\2|' "${ACTUAL_XCODEPROJ}/project.pbxproj"
    fi
 
    if [ "${OPTION_WRITE}" = "YES" ]
    then
-      set_project_version "${VERSION}" "${VERSIONFILE}" "${VERSIONNAME}"
+      #
+      # small hack for extensions to distribute versioning
+      # improve with namekeys later
+      #
+      local other
+
+      set -o noglob ; IFS="
+"
+      for other in ${VERSIONFILEMIRRORS}
+      do
+         IFS="${DEFAULT_IFS}" ; set +o noglob
+
+         if [ ! -z "${other}" ]
+         then
+            set_project_version "${VERSION}" "${other}"  || exit 1
+         fi
+      done
+      IFS="${DEFAULT_IFS}" ; set +o noglob
+
+      # set mirrors first before "real", which is nicer in case of fails
+      set_project_version "${VERSION}" "${VERSIONFILE}" "${VERSIONNAME}" || exit 1
    fi
 
-   VERIFY_VERSION="`"${MULLE_EXECUTABLE_PATH}" "$@" --reset`"
+   VERIFY_VERSION="`"$0" "$@" --reset`"
 
    if [ "${VERSION}" != "${VERIFY_VERSION}" ]
    then
@@ -285,8 +286,16 @@ write_version_if_requested()
 
 parse_arguments()
 {
+   log_entry "parse_arguments" "$@"
+
    while [ $# -ne 0 ]
    do
+      if options_technical_flags "$1"
+      then
+         shift
+         continue
+      fi
+
       case "$1" in
          --no-info)
             OPTION_READ_INFO="NO"
@@ -385,7 +394,7 @@ parse_arguments()
             OPTION_VERSIONFILE="$1"
          ;;
 
-         -h|--help)
+         -h*|--help|help)
             usage
          ;;
 
@@ -408,6 +417,8 @@ parse_arguments()
 
       shift
    done
+
+   options_setup_trace "${MULLE_TRACE}"
 
    DIRECTORY_NAME="`basename -- "$PWD"`"
 
@@ -481,10 +492,43 @@ main()
 }
 
 
-MULLE_EXECUTABLE_PATH="$0"
-MULLE_EXECUTABLE="`basename -- $0`"
-MULLE_BUILDTOOLS_FAIL_PREFIX="${MULLE_EXECUTABLE}"
+_init()
+{
+   if [ -z "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}" ]
+   then
+      MULLE_BASHFUNCTIONS_LIBEXEC_DIR="`mulle-bashfunctions-env "libexec-dir" 2> /dev/null`"
+      [ -z "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}" ] && \
+         echo "mulle-bashfunctions-env not installed" >&2 && \
+         exit 1
+   fi
 
-mulle_project_version_init
+   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-bashfunctions.sh" "minimal" || exit 1
 
+
+   #
+   # prefer local mulle-project if available
+   # Do not embed it anymore!
+   #
+   if [ -z "`command -v mulle-project-env`" ]
+   then
+      cat <<EOF >&2
+mulle-project-env not found in PATH.
+Visit the homepage for installation instructions:
+   https://github.com/mulle-nat/mulle-project
+EOF
+      exit 1
+   fi
+
+   INSTALLED_MULLE_PROJECT_VERSION="`mulle-project-env version`" || exit 1
+   MULLE_PROJECT_LIBEXEC_DIR="`mulle-project-env libexec-dir`" || exit 1
+
+   . "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-version.sh" || exit 1
+   . "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-git.sh" || exit 1
+}
+
+
+
+_init "$@"
 main "$@"
+
+

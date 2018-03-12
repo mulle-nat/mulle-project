@@ -67,11 +67,19 @@ make_file_string()
 
 get_project_version()
 {
+   log_entry "get_project_version" "$@"
+
    local filename="$1"
    local versionname="$2"
    local printtype="${3:-NO}"
 
    local version
+
+   if [ ! -f "${filename}" ]
+   then
+      log_verbose "\"${filename}\" does not exist"
+      return 1
+   fi
 
    match="`fgrep -s -w "${versionname}" "${filename}" | head -1`"
    case "${match}" in
@@ -86,6 +94,11 @@ get_project_version()
          sed 's|( *\([0-9]* *\) *\<\< *[0-9]* *)|\1|g' | \
          sed 's|^.*(\(.*\))|\1|' | \
          sed 's/ *| */./g'
+      ;;
+
+      "")
+         log_verbose "No \"${versionname}\" found in \"${filename}\""
+         return 1
       ;;
 
       *)
@@ -120,18 +133,24 @@ get_project_version()
 # legacy name
 get_header_version()
 {
+   log_entry "get_header_version" "$@"
+
    get_project_version "$@"
 }
 
 
 get_versionname_from_project()
 {
+   log_entry "get_versionname_from_project" "$@"
+
    echo "$1_VERSION" | split_camelcase_string | make_cpp_string
 }
 
 
 get_language_from_directoryname()
 {
+   log_entry "get_language_from_directoryname" "$@"
+
    local directory="$1"
 
    case "${directory}" in
@@ -148,6 +167,8 @@ get_language_from_directoryname()
 
 get_header_from_project()
 {
+   log_entry "get_header_from_project" "$@"
+
    local project="$1"
    local language="$2"
 
@@ -166,6 +187,8 @@ get_header_from_project()
 
 get_formula_name_from_project()
 {
+   log_entry "get_formula_name_from_project" "$@"
+
    local project="$1"
    local language="$2"
 
@@ -184,6 +207,8 @@ get_formula_name_from_project()
 
 project_version_add()
 {
+   log_entry "project_version_add" "$@"
+
    local version="$1"
    local add_major="$2"
    local add_minor="$3"
@@ -252,6 +277,8 @@ project_version_add()
 #
 get_major_minor_patch()
 {
+   log_entry "get_major_minor_patch" "$@"
+
    local version="$1"
 
    major="`cut -d'.' -f 1 <<< "${version}"`"
@@ -265,6 +292,8 @@ get_major_minor_patch()
 
 set_project_version()
 {
+   log_entry "set_project_version" "$@"
+
    local version="$1"
    local versionfile="$2"
    local versionname="$3"
@@ -286,21 +315,24 @@ set_project_version()
    # // or 0.4.9
 
    local value
+   local scheme
 
-   case `get_project_version "${versionfile}" "${versionname}" "YES"` in
+   scheme="`get_project_version "${versionfile}" "${versionname}" "YES"`"
+
+   case "${scheme}" in
       "<<")
          value="(($major << 20) \| ($minor << 8) \| $patch)"
 
-         sed -i.bak -e 's|^\(.*\)'"${versionname}"'\([^0-9()]*\)( *( *[0-9][0-9]* *\<\< *20 *) *\| *( *[0-9][0-9]* *\<\< *8 *) *\| *[0-9][0-9]* *)\(.*\)$|\1'"${versionname}"'\2'"${value}"'\3|' "${versionfile}" || fail "could not set version number"
+         inplace_sed -e 's|^\(.*\)'"${versionname}"'\([^0-9()]*\)( *( *[0-9][0-9]* *\<\< *20 *) *\| *( *[0-9][0-9]* *\<\< *8 *) *\| *[0-9][0-9]* *)\(.*\)$|\1'"${versionname}"'\2'"${value}"'\3|' "${versionfile}" || fail "could not set version number"
       ;;
 
       "1.2.3")
          value="$major.$minor.$patch"
-         sed -i.bak -e 's|^\(.*\)'"${versionname}"'\([^0-9]*\)[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\(.*\)$|\1'"${versionname}"'\2'"${value}"'\3|' "${versionfile}" || fail "could not set version number"
+         inplace_sed -e 's|^\(.*\)'"${versionname}"'\([^0-9]*\)[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\(.*\)$|\1'"${versionname}"'\2'"${value}"'\3|' "${versionfile}" || fail "could not set version number"
       ;;
 
       *)
-         fail "Incompatble versions scheme for set. Use either 1.2.3 or ((1 << 20) | (2 << 8) | 3)"
+         fail "Incompatible versions scheme in \"${versionfile}\". Use either 1.2.3 or ((1 << 20) | (2 << 8) | 3)"
       ;;
    esac
 }
