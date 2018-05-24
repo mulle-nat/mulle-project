@@ -162,11 +162,11 @@ _print_dependencies()
    local lines
    local line
 
-   IFS="
+   set -f ; IFS="
 "
    for dependency in ${dependencies}
    do
-      IFS="${DEFAULT_IFS}"
+      set +f ; IFS="${DEFAULT_IFS}"
       dependency="`eval echo "${dependency}"`"
 
       line="${INDENTATION}depends_on \"${dependency}\"${epilog}"
@@ -175,7 +175,8 @@ _print_dependencies()
       lines="${lines}
 ${line}"
    done
-   IFS="${DEFAULT_IFS}"
+
+   set +f; IFS="${DEFAULT_IFS}"
 
    if [ ! -z "${lines}" ]
    then
@@ -214,13 +215,13 @@ generate_brew_formula_xcodebuild()
 
    local aux_args
    local option
-   local seperator
+   local separator
 
 
    for option in "$@"
    do
       aux_args="\"${option}\", ${aux_args}"
-      seperator=", "
+      separator=", "
    done
 
    local lines
@@ -229,7 +230,7 @@ generate_brew_formula_xcodebuild()
 
 ${INDENTATION}def install
 ${INDENTATION}${INDENTATION}system "xcodebuild", "-configuration", "${configuration}", \
-"DSTROOT=#{prefix}", ${aux_args}${seperator}"install"
+"DSTROOT=#{prefix}", ${aux_args}${separator}"install"
 ${INDENTATION}end
 EOF
 `"
@@ -287,7 +288,7 @@ generate_brew_formula_mulle_test()
    lines="`cat <<EOF
 
 ${INDENTATION}test do
-${INDENTATION}${INDENTATION}if File.directory? 'tests'
+${INDENTATION}${INDENTATION}if File.directory? 'test'
 ${INDENTATION}${INDENTATION}${INDENTATION}system "mulle-test", "-vvv", "--fast-test"
 ${INDENTATION}${INDENTATION}end
 ${INDENTATION}end

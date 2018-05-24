@@ -91,9 +91,9 @@ get_project_version()
          fi
 
          echo "${match}" | \
-         sed 's|( *\([0-9]* *\) *\<\< *[0-9]* *)|\1|g' | \
-         sed 's|^.*(\(.*\))|\1|' | \
-         sed 's/ *| */./g'
+         sed -e 's|( *\([0-9]* *\) *<< *[0-9]* *)|\1|g' | \
+         sed -e 's|^.*(\(.*\))|\1|' | \
+         sed -e 's/ *| */./g'
       ;;
 
       "")
@@ -230,7 +230,7 @@ project_version_add()
    if [ "${add_major}" -ne 0 ]
    then
       major="$(expr $major + $add_major)" ||
-         fail "wrong increment parameter \"${add_major}\""
+         fail "wrong increment parameter \"${add_major}\" for major \"${major}\""
       minor="${first_minor}"
       patch="${first_patch}"
    else
@@ -300,7 +300,7 @@ set_project_version()
 
    if [ -z "${versionname}" ]
    then
-      echo "$version" > "${versionfile}"
+      redirect_exekutor "${versionfile}" echo "$version"
       return
    fi
 
@@ -323,7 +323,7 @@ set_project_version()
       "<<")
          value="(($major << 20) \| ($minor << 8) \| $patch)"
 
-         inplace_sed -e 's|^\(.*\)'"${versionname}"'\([^0-9()]*\)( *( *[0-9][0-9]* *\<\< *20 *) *\| *( *[0-9][0-9]* *\<\< *8 *) *\| *[0-9][0-9]* *)\(.*\)$|\1'"${versionname}"'\2'"${value}"'\3|' "${versionfile}" || fail "could not set version number"
+         inplace_sed -e 's|^\(.*\)'"${versionname}"'\([^0-9()]*\)( *( *[0-9][0-9]* *<< *20 *) *\| *( *[0-9][0-9]* *<< *8 *) *\| *[0-9][0-9]* *)\(.*\)$|\1'"${versionname}"'\2'"${value}"'\3|' "${versionfile}" || fail "could not set version number"
       ;;
 
       "1.2.3")

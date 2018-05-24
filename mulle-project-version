@@ -301,8 +301,21 @@ parse_arguments()
             OPTION_READ_INFO="NO"
          ;;
 
+         ++)
+            OPTION_ADD_PATCH="1"
+            OPTION_WRITE="YES"
+         ;;
+
          --no-tag-warning)
             OPTION_TAG_WARNING="NO"
+         ;;
+
+         --increment-major)
+            OPTION_ADD_MAJOR="1"
+         ;;
+
+         --increment-major)
+            OPTION_ADD_MAJOR="1"
          ;;
 
          --increment-minor)

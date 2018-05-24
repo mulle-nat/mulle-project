@@ -73,9 +73,9 @@ create_debian()
 
    mkdir -p "/tmp/${directory}/DEBIAN" || exit 1
 
-   log_verbose "Run mulle-install  --prefix \"/tmp/${directory}${OPTION_ROOT}\""
+   log_verbose "Run mulle-install --prefix \"/tmp/${directory}${OPTION_ROOT}\""
 
-   mulle-install --prefix "/tmp/${directory}${OPTION_ROOT}" >&2 || exit 1
+   mulle-make install --prefix "/tmp/${directory}${OPTION_ROOT}" >&2 || exit 1
 
    write_control > "/tmp/${directory}/DEBIAN/control"
 

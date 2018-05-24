@@ -1,3 +1,7 @@
+### 1.2.2
+
+* fix homebrew install ruby script
+
 ### 1.2.1
 
 * remove obsolete file mulle-project-init

@@ -402,7 +402,8 @@ main()
    local MULLE_FLAG_MAGNUM_FORCE="NO"
    local OPTION_COMMIT="NO"
    local OPTION_INPUT=""
-   local OPTION_KEEP_TMP="YES"
+   local OPTION_ADD_U="NO"
+   local OPTION_KEEP_TMP="NO"
    local OPTION_MESSAGE=""
    local OPTION_OUTPUT=""
    local OPTION_PREFIX="* "
@@ -442,6 +443,13 @@ main()
       case "$1" in
          -h|--help|help)
             usage
+         ;;
+
+         ++)
+            OPTION_COMMIT="YES"
+            OPTION_INPUT="RELEASENOTES.md"
+            OPTION_OUTPUT="RELEASENOTES.md"
+            OPTION_ADD_U="YES"
          ;;
 
          -a|--append)
@@ -594,9 +602,18 @@ main()
 
    if [ "${OPTION_COMMIT}" = "YES" ]
    then
-      if [ ! -z "`rexekutor git status -s --untracked-files=no`" ]
+      if [ "${OPTION_ADD_U}" = "YES" ]
       then
-         fail "git repository is not in a pristine state, can not commit"
+         exekutor git add -u
+         if ! git diff-files --quiet --ignore-submodules --
+         then
+            fail "git repository is not in a pristine enough state, can not commit"
+         fi
+      else
+         if [ ! -z "`rexekutor git status -s --untracked-files=no`" ]
+         then
+            fail "git repository is not in a pristine state, can not commit"
+         fi
       fi
    fi
 
@@ -642,7 +659,12 @@ main()
       changed="`git ls-files -m "${OPTION_OUTPUT}"`"
       if [ ! -z "${changed}" ]
       then
-         exekutor git commit ${OPTION_COMMITFLAGS} "${OPTION_OUTPUT}"
+         if [ "${OPTION_ADD_U}" = "YES" ]
+         then
+            exekutor git commit ${OPTION_COMMITFLAGS}
+         else
+            exekutor git commit ${OPTION_COMMITFLAGS} "${OPTION_OUTPUT}"
+         fi
       fi
    fi
 }

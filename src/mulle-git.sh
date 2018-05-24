@@ -36,7 +36,7 @@ git_tag_exists()
 
    local tag="$1"
 
-   git rev-parse "${tag}" > /dev/null 2>&1
+   rexekutor git rev-parse "${tag}" > /dev/null 2>&1
 }
 
 
@@ -55,7 +55,7 @@ git_ref_for_tag()
 {
    log_entry "git_ref_for_tag" "$@"
 
-   git show-ref --tags $1 | awk '{ print$1 }'
+   rexekutor git show-ref --tags $1 | awk '{ print$1 }'
 }
 
 
@@ -63,7 +63,7 @@ git_any_first_commit()
 {
    log_entry "git_any_first_commit" "$@"
 
-   git rev-list HEAD | tail -n 1
+   rexekutor git rev-list HEAD | tail -n 1
 }
 
 
@@ -71,7 +71,7 @@ git_last_tag()
 {
    log_entry "git_last_tag" "$@"
 
-   git describe --tags --abbrev=0 2> /dev/null
+   rexekutor git describe --tags --abbrev=0 2> /dev/null
 }
 
 
@@ -79,7 +79,7 @@ git_commits_from_start()
 {
    log_entry "git_commits_from_start" "$@"
 
-   git log --format=%B
+   rexekutor git log --format=%B
 }
 
 
@@ -87,7 +87,7 @@ git_commits_from_ref()
 {
    log_entry "git_commits_from_ref" "$@"
 
-   git log --format=%B "$1..HEAD"
+   rexekutor git log --format=%B "$1..HEAD"
 }
 
 
@@ -117,7 +117,7 @@ git_must_be_clean()
 
    local clean
 
-   clean=`git status -s --untracked-files=no`
+   clean=`rexekutor git status -s --untracked-files=no`
    if [ "${clean}" != "" ]
    then
       fail "repository \"${name}\" is tainted"
@@ -168,13 +168,13 @@ git_untag_all()
    local remote
 
    log_info "Trying to remove local tag \"${tag}\""
-   git tag -d "$tag"
+   exekutor git tag -d "$tag"
 
    for i in .git/refs/remotes/*
    do
       remote="`basename -- "${i}"`"
       log_info "Trying to remove tag \"${tag}\" on remote \"${remote}\""
-      git push "${remote}" ":${tag}" # failure is OK
+      exekutor git push "${remote}" ":${tag}" # failure is OK
    done
 }
 

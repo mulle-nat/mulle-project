@@ -42,15 +42,15 @@ source_publisher_defaults()
       exit 1
    fi
 
-   if [ ! -z "${DEPENDENCIES_DIR}" ]
+   if [ ! -z "${DEPENDENCY_DIR}" ]
    then
-      if [ -f "${DEPENDENCIES_DIR}/share/publisher-info.sh" ]
+      if [ -f "${DEPENDENCY_DIR}/share/publisher-info.sh" ]
       then
          if [ "${VERBOSE}" = "YES" ]
          then
-            echo "reading \"${DEPENDENCIES_DIR}/share/publisher-info.sh\"" >&2
+            echo "reading \"${DEPENDENCY_DIR}/share/publisher-info.sh\"" >&2
          fi
-         . "${DEPENDENCIES_DIR}/share/publisher-info.sh"
+         . "${DEPENDENCY_DIR}/share/publisher-info.sh"
          return 0
       fi
    fi
@@ -63,6 +63,6 @@ if ! source_publisher_overrides
 then
    if ! source_publisher_defaults
    then
-      echo "No publisher info found" >&2
+      echo "No publisher info found. Set PUBLISHER_INFO_SH, if desired" >&2
    fi
 fi
