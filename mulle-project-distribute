@@ -47,7 +47,7 @@ Usage: mulle-project-distribute [options]
    Distribute the project via github, homebrew, debian.
 
 Options:
-   ****
+   --verify-only  : check but do not acually commit anything
 EOF
    exit 1
 }
@@ -137,6 +137,57 @@ __environment_main()
       DEPENDENCIES="`egrep -v '^#' .DEPENDENCIES`"
    fi
 
+   MULLE_KYBERNETIK_TAP="${MULLE_KYBERNETIK_TAP:-mulle-kybernetik/software/}"
+   case "${MULLE_KYBERNETIK_TAP}" in
+      */)
+      ;;
+
+      *)
+         MULLE_KYBERNETIK_TAP="${MULLE_KYBERNETIK_TAP}/"
+      ;;
+   esac
+
+   MULLE_SDE_TAP="${MULLE_SDE_TAP:-mulle-kybernetik/software/}"
+   case "${MULLE_SDE_TAP}" in
+      */)
+      ;;
+
+      *)
+         MULLE_SDE_TAP="${MULLE_SDE_TAP}/"
+      ;;
+   esac
+
+
+   MULLE_NAT_TAP="${MULLE_NAT_TAP:-mulle-kybernetik/software/}"
+   case "${MULLE_NAT_TAP}" in
+      */)
+      ;;
+
+      *)
+         MULLE_NAT_TAP="${MULLE_NAT_TAP}/"
+      ;;
+   esac
+
+   MULLE_C_TAP="${MULLE_C_TAP:-mulle-kybernetik/software/}"
+   case "${MULLE_C_TAP}" in
+      */)
+      ;;
+
+      *)
+         MULLE_C_TAP="${MULLE_C_TAP}/"
+      ;;
+   esac
+
+   MULLE_OBJC_TAP="${MULLE_OBJC_TAP:-mulle-kybernetik/software/}"
+   case "${MULLE_OBJC_TAP}" in
+      */)
+      ;;
+
+      *)
+         MULLE_OBJC_TAP="${MULLE_OBJC_TAP}/"
+      ;;
+   esac
+
    BUILDTOOLS_TAP="${BUILDTOOLS_TAP:-mulle-kybernetik/software/}"
    case "${BUILDTOOLS_TAP}" in
       */)
@@ -221,6 +272,7 @@ main()
    DO_PUSH_FORMULA="YES"
    USE_CACHE="NO"
    OPTION_LATEST_TAG="latest"
+   VERIFY_ONLY="NO"
 
    while [ $# -ne 0 ]
    do
@@ -344,6 +396,10 @@ main()
             TAPS_LOCATION="$1"
          ;;
 
+         --verify-only)
+            VERIFY_ONLY="YES"
+         ;;
+
             # allow user to specify own parameters for his
             # generate_formula scripts w/o having to modify this file
          --*)
@@ -399,10 +455,15 @@ main()
 
    if [ "${DO_GIT_RELEASE}" = "YES" ]
    then
-      log_info "Git release..."
-
      # do the release
-      git_main "${BRANCH}" "${ORIGIN}" "${TAG}" "${GITHUB}" "${OPTION_LATEST_TAG}" || exit 1
+      git_verify_main "${BRANCH}" "${ORIGIN}" "${TAG}" "${GITHUB}" "${OPTION_LATEST_TAG}" || exit 1
+
+      if [ "${VERIFY_ONLY}" != "YES" ]
+      then
+         log_info "Git release..."
+
+         git_commit_main "${BRANCH}" "${ORIGIN}" "${TAG}" "${GITHUB}" "${OPTION_LATEST_TAG}" || exit 1
+      fi
    else
       log_fluff "No git release"
    fi
@@ -419,22 +480,25 @@ main()
          fail "You need to specify a publisher tap with --tap (hint: <mulle-kybernetik/software>)"
       fi
 
-      log_info "Homebrew formula..."
-
-      # generate the formula and push it
-      if ! homebrew_main "${PROJECT}" \
-                         "${NAME}" \
-                         "${VERSION}" \
-                         "${DEPENDENCIES}" \
-                         "${BUILD_DEPENDENCIES}" \
-                         "${HOMEPAGE_URL}" \
-                         "${DESC}" \
-                         "${ARCHIVE_URL}" \
-                         "${HOMEBREW_TAP}" \
-                         "${RBFILE}"
+      if [ "${VERIFY_ONLY}" != "YES" ]
       then
-         log_error "Homebrew generation failed!"
-         return 1
+         log_info "Homebrew formula..."
+
+         # generate the formula and push it
+         if ! homebrew_main "${PROJECT}" \
+                            "${NAME}" \
+                            "${VERSION}" \
+                            "${DEPENDENCIES}" \
+                            "${BUILD_DEPENDENCIES}" \
+                            "${HOMEPAGE_URL}" \
+                            "${DESC}" \
+                            "${ARCHIVE_URL}" \
+                            "${HOMEBREW_TAP}" \
+                            "${RBFILE}"
+         then
+            log_error "Homebrew generation failed!"
+            return 1
+         fi
       fi
    else
       log_fluff "No homebrew formula"
@@ -444,20 +508,23 @@ main()
    # check if someone installed a post_release function
    # if yes call it (maybe calls mulle-project-debian)
    #
-   if [ "`type -t post_release`" = "function" ]
+   if [ "${VERIFY_ONLY}" != "YES" ]
    then
-      log_info "Post release..."
-      post_release "${PROJECT}" \
-                   "${NAME}" \
-                   "${VERSION}" \
-                   "${DEPENDENCIES}" \
-                   "${BUILD_DEPENDENCIES}" \
-                   "${HOMEPAGE_URL}" \
-                   "${DESC}" \
-                   "${ARCHIVE_URL}" \
-                   "${DEBIAN_DEPENDENCIES}"
-   else
-      log_fluff "No post release"
+      if [ "`type -t post_release`" = "function" ]
+      then
+         log_info "Post release..."
+         post_release "${PROJECT}" \
+                      "${NAME}" \
+                      "${VERSION}" \
+                      "${DEPENDENCIES}" \
+                      "${BUILD_DEPENDENCIES}" \
+                      "${HOMEPAGE_URL}" \
+                      "${DESC}" \
+                      "${ARCHIVE_URL}" \
+                      "${DEBIAN_DEPENDENCIES}"
+      else
+         log_fluff "No post release"
+      fi
    fi
 }
 

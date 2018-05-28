@@ -83,7 +83,10 @@ create_debian()
    (
       cd "/tmp" ;
 
-      dpkg-deb -b "${directory}" >&2 || exit 1
+      # we use gzip, because on trusty xz is not always available
+      # and trusty is used on travis-ci
+
+      dpkg-deb -Zgzip -b "${directory}" >&2 || exit 1
 
       if [ "${OPTION_REMOVE_TMP}" = "YES" ]
       then

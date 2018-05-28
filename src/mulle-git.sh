@@ -136,7 +136,7 @@ git_repo_can_push()
    local result
 
    exekutor git fetch -q "${remote}" "${branch}"
-   result="`exekutor git rev-list --left-right "HEAD...${remote}/${branch}" --ignore-submodules --count 2> /dev/null`"
+   result="`rexekutor git rev-list --left-right "HEAD...${remote}/${branch}" --ignore-submodules --count 2> /dev/null`"
    if [ $? -ne 0 ]
    then
       log_verbose "Remote \"${remote}\" does not have branch \"${branch}\" yet"
@@ -154,7 +154,7 @@ _git_check_remote()
    local name="$1"
 
    log_info "Check if remote \"${name}\" is present"
-   exekutor git ls-remote -q --exit-code "${name}" > /dev/null 2> /dev/null
+   rexekutor git ls-remote -q --exit-code "${name}" > /dev/null 2> /dev/null
 }
 
 
@@ -179,23 +179,8 @@ git_untag_all()
 }
 
 
-# Parameters!
-#
-# BRANCH
-# ORIGIN
-# TAG
-#
-_git_main()
+_git_parse_params()
 {
-   log_entry "_git_main" "$@"
-
-   local branch
-   local dstbranch
-   local origin
-   local tag
-   local github
-   local latesttag
-
    branch="${1:-master}"
    [ $# -ne 0 ] && shift
 
@@ -231,25 +216,44 @@ _git_main()
          fail "Invalid github \"${github}\""
       ;;
    esac
+}
 
-   log_verbose "Check clean state of project"
-   exekutor git_must_be_clean               || return 1
 
-   log_verbose "Check that the tag \"${tag}\" does not exist yet"
-   exekutor git_tag_must_not_exist "${tag}" || return 1
+_git_verify_main()
+{
+   log_entry "_git_verify_main" "$@"
 
-   if ! _git_check_remote "${origin}"
-   then
-      fail "\"${origin}\" not accessible (If present, maybe needs an initial push ?)"
-   fi
+   local branch
+   local dstbranch
+   local origin
+   local tag
+   local github
+   local latesttag
+
+   _git_parse_params "$@"
 
    local have_github
+
+   log_verbose "Verify repository \"`pwd -P`\""
 
    if _git_check_remote "${github}"
    then
       have_github="YES"
    else
       log_info "There is no remote named \"${github}\""
+   fi
+
+   log_verbose "Check clean state of project"
+   rexekutor git_must_be_clean               || return 1
+
+   if git_tag_exists "${tag}"
+   then
+      log_warning "Tag \"${tag}\" already exists"
+   fi
+
+   if ! _git_check_remote "${origin}"
+   then
+      fail "\"${origin}\" not accessible (If present, maybe needs an initial push ?)"
    fi
 
    #
@@ -273,6 +277,37 @@ _git_main()
          fail "You need to merge \"${github}/${dstbranch}\" first"
       fi
    fi
+}
+
+
+# Parameters!
+#
+# BRANCH
+# ORIGIN
+# TAG
+#
+_git_commit_main()
+{
+   log_entry "_git_commit_main" "$@"
+
+   local branch
+   local dstbranch
+   local origin
+   local tag
+   local github
+   local latesttag
+
+   _git_parse_params "$@"
+
+   local have_github
+
+   if _git_check_remote "${github}"
+   then
+      have_github="YES"
+   fi
+
+   log_verbose "Check that the tag \"${tag}\" does not exist yet"
+   rexekutor git_tag_must_not_exist "${tag}" || return 1
 
    #
    # make it a release
@@ -308,15 +343,27 @@ _git_main()
    fi
 }
 
-
-git_main()
+git_verify_main()
 {
-   log_entry "git_main" "$@"
+   log_entry "git_verify_main" "$@"
+
+   local branch
+
+   branch="`rexekutor git rev-parse --abbrev-ref HEAD`"
+   branch="${branch:-master}" # for dry run
+
+   _git_verify_main "${branch}" "$@"
+
+   return $?
+}
+
+
+git_commit_main()
+{
+   log_entry "git_commit_main" "$@"
 
    local branch
    local rval
-
-   log_verbose "Verify repository \"`pwd -P`\""
 
    branch="`exekutor git rev-parse --abbrev-ref HEAD`"
    branch="${branch:-master}" # for dry run
@@ -325,7 +372,7 @@ git_main()
       fail "Don't call it from release branch"
    fi
 
-   _git_main "${branch}" "$@"
+   _git_commit_main "${branch}" "$@"
    rval=$?
 
    log_verbose "Checkout \"${branch}\" again"

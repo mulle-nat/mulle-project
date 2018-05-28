@@ -48,5 +48,5 @@ DESTINATION "share/mulle-project")
 ######
 #
 # must be after CPACK_PACKAGE_VERSION
-include( CMakePackage.txt)
+include( CMakePackage.cmake)
 include( CPack)

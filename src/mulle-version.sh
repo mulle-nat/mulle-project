@@ -59,9 +59,15 @@ make_directory_string()
 }
 
 
-make_file_string()
+make_file_string_no_hyphen()
 {
    tr '[A-Z]' '[a-z]' | tr ' ' '_' | tr '-' '_'
+}
+
+
+make_file_string()
+{
+   tr '[A-Z]' '[a-z]' | tr ' ' '_'
 }
 
 
@@ -172,10 +178,18 @@ get_header_from_project()
    local project="$1"
    local language="$2"
 
+   local filename
+
    case "${language}" in
       c)
          project="`echo "${project}" | split_camelcase_string`"
-         echo "src/${project}.h" | make_file_string
+         filename="`make_file_string_no_hyphen <<< "src/${project}.h"`"
+         if [ -f "${filename}" ]
+         then
+            echo "${filename}"
+            return
+         fi
+         make_file_string <<< "src/${project}.h"
       ;;
 
       *|"")

@@ -82,6 +82,8 @@ sloppy_distribute()
       sloppy_commit "$@" || exit 1
    fi
 
+   exekutor mulle-project-distribute --verify-only || exit 1
+
    sloppy_push
 }
 
