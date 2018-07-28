@@ -1,10 +1,11 @@
+.DS_Store
+._.DS_Store
 build/
 *.old
 tmp.*
 
 # keep it local
 dox/
-.DS_Store
 mulle-project/publisher-info.sh
 *.sublime-workspace
 mulle-project.graffle

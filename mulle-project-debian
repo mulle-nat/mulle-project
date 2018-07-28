@@ -26,6 +26,8 @@ EOF
 
 control_echo()
 {
+   log_entry "control_echo" "$@"
+
    local key="$1"
    local value="$2"
    local envkey="$3"
@@ -35,12 +37,14 @@ control_echo()
       fail "\"${envkey:-${key}}\" is not defined"
    fi
 
-   echo "${key}: ${value}"
+   rexekutor echo "${key}: ${value}"
 }
 
 
 write_control()
 {
+   log_entry "write_control" "$@"
+
    control_echo "Package" "${PROJECT}" PROJECT
    control_echo "Architecture" "all"
    control_echo "Priority" "optional"
@@ -62,22 +66,20 @@ write_control()
 
 create_debian()
 {
+   log_entry "create_debian" "$@"
+
    local directory
 
    directory="${PROJECT}_${VERSION}"
 
-   if [ -d "/tmp/${directory}" ]
-   then
-      rm -rf "/tmp/${directory}"
-   fi
-
-   mkdir -p "/tmp/${directory}/DEBIAN" || exit 1
+   rmdir_safer -rf "/tmp/${directory}"
+   mkdir_if_missing "/tmp/${directory}/DEBIAN"
 
    log_verbose "Run mulle-install --prefix \"/tmp/${directory}${OPTION_ROOT}\""
 
-   mulle-make install --prefix "/tmp/${directory}${OPTION_ROOT}" >&2 || exit 1
+   exekutor mulle-make install -k --prefix "/tmp/${directory}${OPTION_ROOT}" >&2 || exit 1
 
-   write_control > "/tmp/${directory}/DEBIAN/control"
+   redirect_exekutor "/tmp/${directory}/DEBIAN/control" write_control
 
    # brew install dpkg
    (
@@ -85,6 +87,10 @@ create_debian()
 
       # we use gzip, because on trusty xz is not always available
       # and trusty is used on travis-ci
+
+      # building packages on OSX can be shit, if something plunks down
+      # .DS_Store files
+      find "${directory}" \( -name ._.DS_Store -o -name .DS_Store \) -exec rm -f {} \;
 
       dpkg-deb -Zgzip -b "${directory}" >&2 || exit 1
 
@@ -129,23 +135,6 @@ main()
       case "$1" in
          -h|--help|help)
             usage
-         ;;
-
-         -v)
-            MULLE_FLAG_LOG_VERBOSE="YES"
-         ;;
-         -vv)
-            MULLE_FLAG_LOG_VERBOSE="YES"
-            MULLE_FLAG_LOG_FLUFF="YES"
-         ;;
-         -vvv)
-            MULLE_FLAG_LOG_VERBOSE="YES"
-            MULLE_FLAG_LOG_FLUFF="YES"
-            MULLE_FLAG_LOG_TRACE="YES"
-         ;;
-
-         -t)
-            set -x
          ;;
 
          --no-update)

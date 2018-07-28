@@ -1,3 +1,7 @@
+### 1.2.3
+
+* fix various fails and uglinesses
+
 ### 1.2.2
 
 * fix homebrew install ruby script

@@ -419,7 +419,7 @@ main()
          ;;
 
          -*)
-            log_error "unknown option \"$1\""
+            log_error "Unknown option \"$1\""
             exit 1
          ;;
       esac

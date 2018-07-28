@@ -51,21 +51,21 @@ Usage: mulle-project-version [options] [projectname]
       #define VERSION   "1.2.3"
 
 Options:
+   ++                    : shorthand for --increment-patch --write
    --add-patch <value>   : add value to patch version part
-   --first-patch-zero    : set patch to 0 for minor/major increments
    --first-patch-one     : set patch to 1 for minor/major increments
+   --first-patch-zero    : set patch to 0 for minor/major increments
    --increment-major     : add 1 to major versionpart
    --increment-minor     : add 1 to minor version part
    --increment-patch     : add 1 to patch version part
-   --read-xcode-version  : read version from Xcode project
-   --write-xcode-version : write version to Xcode project
-
    --language <name>     : project language, (c, obj, cpp, bash etc)
    --no-info             : do not read -info.sh files
    --no-tag-warning      : do not warn if git tag exists
-   --versionfile <file>  : file containing version
+   --read-xcode-version  : read version from Xcode project
+   --set-version <value> : set version
    --versionname <name>  : version variable name
    --write               : update versionfile with new version
+   --write-xcode-version : write version to Xcode project
    --xcodeproj <dir>     : specify path of .xcodeproj directory
 EOF
    exit 1
@@ -167,6 +167,8 @@ get_version()
 LANGUAGE=\"${LANGUAGE}\", VERSIONNAME=\"${VERSIONNAME}\", \
 VERSIONFILE=\"${VERSIONFILE}\".
 Hint: specify VERSIONNAME, VERSIONFILE in mulle-project/version-info.sh"
+   else
+      log_fluff "Versionfile: ${VERSIONFILE}"
    fi
 }
 

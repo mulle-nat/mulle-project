@@ -33,7 +33,7 @@
 
 
 
-MULLE_PROJECT_VERSION="1.2.2"
+MULLE_PROJECT_VERSION="1.2.3"
 
 usage()
 {
@@ -170,7 +170,7 @@ main()
          ;;
 
          -*)
-            fail "unknown option \"$1\""
+            fail "Unknown option \"$1\""
          ;;
 
          *)

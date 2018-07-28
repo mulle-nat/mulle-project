@@ -69,13 +69,13 @@ main()
          ;;
 
          --origin)
-            [ $# -eq 1 ] && usage "missing argument to \"$1\""
+            [ $# -eq 1 ] && usage "Missing argument to \"$1\""
             shift
             ORIGIN="$1"
          ;;
 
          -*)
-            usage "unknown option \"$1\""
+            usage "Unknown option \"$1\""
          ;;
 
          *)

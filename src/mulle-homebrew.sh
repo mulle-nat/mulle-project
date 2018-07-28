@@ -416,7 +416,7 @@ homebrew_main()
 
    [ ! -d "${homebrewtap}" ] && fail "Failed to locate tap directory \"${homebrewtap}\" from \"$PWD\""
 
-   log_info "Generate brew fomula \"${homebrewtap}/${rbfile}\""
+   log_info "Generate brew formula \"${homebrewtap}/${rbfile}\""
 
    log_fluff "project           = ${C_RESET}${project}"
    log_fluff "name              = ${C_RESET}${name}"

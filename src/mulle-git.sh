@@ -170,12 +170,17 @@ git_untag_all()
    log_info "Trying to remove local tag \"${tag}\""
    exekutor git tag -d "$tag"
 
-   for i in .git/refs/remotes/*
-   do
-      remote="`basename -- "${i}"`"
-      log_info "Trying to remove tag \"${tag}\" on remote \"${remote}\""
-      exekutor git push "${remote}" ":${tag}" # failure is OK
-   done
+   # remotes are only present after a fetch, otherwise just in config
+   (
+      shopt -s nullglob
+
+      for i in ".git/refs/remotes"/*
+      do
+         remote="`basename -- "${i}"`"
+         log_info "Trying to remove tag \"${tag}\" on remote \"${remote}\""
+         exekutor git push "${remote}" ":${tag}" # failure is OK
+      done
+   )
 }
 
 
@@ -244,7 +249,7 @@ _git_verify_main()
    fi
 
    log_verbose "Check clean state of project"
-   rexekutor git_must_be_clean               || return 1
+   rexekutor git_must_be_clean
 
    if git_tag_exists "${tag}"
    then
