@@ -6,3 +6,6 @@
 #
 VERSIONFILE="mulle-project-env"
 VERSIONNAME="MULLE_PROJECT_VERSION"
+
+VERSIONFILEMIRRORS="\
+src/mulle-sde/mulle-project/etc/project/version"

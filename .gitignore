@@ -6,7 +6,7 @@ tmp.*
 
 # keep it local
 dox/
-mulle-project/publisher-info.sh
+.mulle/etc/project/publisher-info.sh
 *.sublime-workspace
 mulle-project.graffle
 obsolete-mulle-project-init

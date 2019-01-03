@@ -243,7 +243,7 @@ _git_verify_main()
 
    if _git_check_remote "${github}"
    then
-      have_github="YES"
+      have_github='YES'
    else
       log_info "There is no remote named \"${github}\""
    fi
@@ -275,7 +275,7 @@ _git_verify_main()
       fail "You need to merge \"${origin}/${dstbranch}\" first"
    fi
 
-   if [ "${have_github}" = "YES" ]
+   if [ "${have_github}" = 'YES' ]
    then
       if ! git_repo_can_push "${github}" "${dstbranch}"
       then
@@ -308,7 +308,7 @@ _git_commit_main()
 
    if _git_check_remote "${github}"
    then
-      have_github="YES"
+      have_github='YES'
    fi
 
    log_verbose "Check that the tag \"${tag}\" does not exist yet"
@@ -341,7 +341,7 @@ _git_commit_main()
    log_info "Push \"${dstbranch}\" with tags to \"${origin}\""
    exekutor git push "${origin}" "${dstbranch}" --tags || return 1
 
-   if [ "${have_github}" = "YES" ]
+   if [ "${have_github}" = 'YES' ]
    then
       log_info "Push \"${dstbranch}\" with tags to \"${github}\""
       exekutor git push "${github}" "${dstbranch}" --tags || return 1

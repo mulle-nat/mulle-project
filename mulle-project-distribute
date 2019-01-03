@@ -31,12 +31,12 @@
 #
 #
 # For documentation and help see:
-#    https://github.com/mulle-nat/mulle-project
+#    https://github.com/mulle-sde/mulle-project
 #
 # Run this somewhat like this (for real: remove -n):
 #    mulle-project-release -v -n --publisher mulle-nat --publisher-tap mulle-kybernetik/software/
 #
-[ "${TRACE}" = "YES" ] && set -x && : "$0" "$@"
+[ "${TRACE}" = 'YES' ] && set -x && : "$0" "$@"
 
 
 usage()
@@ -269,10 +269,13 @@ __environment_main()
 
 main()
 {
-   DO_PUSH_FORMULA="YES"
-   USE_CACHE="NO"
+   DO_PUSH_FORMULA='YES'
+   USE_CACHE='NO'
    OPTION_LATEST_TAG="latest"
-   VERIFY_ONLY="NO"
+   VERIFY_ONLY='NO'
+
+   local DO_GIT_RELEASE="DEFAULT"
+   local DO_GENERATE_FORMULA="DEFAULT"
 
    while [ $# -ne 0 ]
    do
@@ -289,23 +292,23 @@ main()
 
          # single arg long (kinda lame)
          --cache)
-            USE_CACHE="YES"
+            USE_CACHE='YES'
          ;;
 
          --no-cache)
-            USE_CACHE="NO"
+            USE_CACHE='NO'
          ;;
 
          --echo)
-            OPTION_ECHO="YES"
+            OPTION_ECHO='YES'
          ;;
 
          --no-git)
-            DO_GIT_RELEASE="NO"
+            DO_GIT_RELEASE='NO'
          ;;
 
          --no-formula)
-            DO_GENERATE_FORMULA="NO"
+            DO_GENERATE_FORMULA='NO'
          ;;
 
          --no-latest-tag)
@@ -313,7 +316,7 @@ main()
          ;;
 
          --no-push)
-            DO_PUSH_FORMULA="NO"
+            DO_PUSH_FORMULA='NO'
          ;;
 
          # arg long
@@ -397,7 +400,7 @@ main()
          ;;
 
          --verify-only)
-            VERIFY_ONLY="YES"
+            VERIFY_ONLY='YES'
          ;;
 
             # allow user to specify own parameters for his
@@ -427,9 +430,9 @@ main()
       shift
    done
 
-   if [ ! -d "mulle-project" ]
+   if [ ! -d ".mulle/etc/project" ]
    then
-      fail "No mulle-project folder found."
+      log_warning "No .mulle/etc/project folder found."
    fi
 
    #
@@ -448,17 +451,23 @@ main()
    #
    # dial past options now as they have been parsed
    #
-   if [ "${DO_GIT_RELEASE}" != "YES" -a "${DO_GENERATE_FORMULA}" != "YES" ]
+   if [ "${DO_GIT_RELEASE}" = "DEFAULT" -a -f VERSION -a ! -d mulle-project ]
    then
-      fail "Nothing to do! mulle-project/version-info.sh and mulle-project/formula-info.sh are missing"
+      # make most simplistic stuff work (nice for farmhash e.g.)
+      DO_GIT_RELEASE='YES'
    fi
 
-   if [ "${DO_GIT_RELEASE}" = "YES" ]
+   if [ "${DO_GIT_RELEASE}" != 'YES' -a "${DO_GENERATE_FORMULA}" != 'YES' ]
+   then
+      fail "Nothing to do! .mulle/etc/project/version-info.sh and .mulle/etc/project/formula-info.sh are missing"
+   fi
+
+   if [ "${DO_GIT_RELEASE}" = 'YES' ]
    then
      # do the release
       git_verify_main "${BRANCH}" "${ORIGIN}" "${TAG}" "${GITHUB}" "${OPTION_LATEST_TAG}" || exit 1
 
-      if [ "${VERIFY_ONLY}" != "YES" ]
+      if [ "${VERIFY_ONLY}" != 'YES' ]
       then
          log_info "Git release..."
 
@@ -468,7 +477,7 @@ main()
       log_fluff "No git release"
    fi
 
-   if [ "${DO_GENERATE_FORMULA}" = "YES" ]
+   if [ "${DO_GENERATE_FORMULA}" = 'YES' ]
    then
       if [ -z "${PUBLISHER}" ]
       then
@@ -480,7 +489,7 @@ main()
          fail "You need to specify a publisher tap with --tap (hint: <mulle-kybernetik/software>)"
       fi
 
-      if [ "${VERIFY_ONLY}" != "YES" ]
+      if [ "${VERIFY_ONLY}" != 'YES' ]
       then
          log_info "Homebrew formula..."
 
@@ -508,7 +517,7 @@ main()
    # check if someone installed a post_release function
    # if yes call it (maybe calls mulle-project-debian)
    #
-   if [ "${VERIFY_ONLY}" != "YES" ]
+   if [ "${VERIFY_ONLY}" != 'YES' ]
    then
       if [ "`type -t post_release`" = "function" ]
       then

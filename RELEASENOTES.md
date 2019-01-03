@@ -1,3 +1,16 @@
+### 2.0.1
+
+* too many changes to list
+* added a mulle-sde extension for convenient initalization
+* use .mulle folder instead of mulle-project (mulle-env will convert this)
+
+# 2.0.0
+
+* too many changes to list
+* added a mulle-sde extension for convenient initalization
+* use .mulle folder instead of mulle-project (mulle-env will convert this)
+
+
 ### 1.2.3
 
 * fix various fails and uglinesses
@@ -41,7 +54,7 @@
 
 ## 5.2.0
 
-* mulle-homebrew-debian installs into /usr instead of / by default
+* mulle-project-debian installs into /usr instead of / by default
 * `--first-increment-zero` renamed to `--first-patch-zero`
 * zero is now the new default for patch
 * will now read a file called post-release.sh and execute a function called post_release on a successful install
@@ -62,7 +75,7 @@
 
 # 5.0.0
 
-* move the install part of mulle-homebrew-env into mulle-homebrew-init
+* move the install part of mulle-project-env into mulle-project-init
 * improved VERSION checking for mulle-homebrew
 * release-info.sh is now called version-info.sh
 
@@ -75,7 +88,7 @@
 
 * do missing publisher check in the template, this allows the absence of
 `formula-info.sh`.
-* improve **mulle-homebrew-get-version** to work with existing -info.sh files
+* improve **mulle-project-get-version** to work with existing -info.sh files
 
 
 # 4.0.0
@@ -94,11 +107,11 @@ dependencies (`.buildtools/repositories` instead of
 #### Other changes
 
 * simplified release.sh
-* use two (three) .sh files release-info.sh and formula-info.sh for customization. This allows (in many cases) to upgrade the release script with mulle-homebrew-env install w/o having to re-edit the release.sh file
-* new exposed version functionality via mulle-homebrew-get-version
+* use two (three) .sh files release-info.sh and formula-info.sh for customization. This allows (in many cases) to upgrade the release script with mulle-project-env install w/o having to re-edit the release.sh file
+* new exposed version functionality via mulle-project-get-version
 * you can choose to not generate a formula if so desired, simply remove formula-info.sh
 * now checks if remotes require merging before tagging
-* add mulle-homebrew-untag because I notoriusly forget to update the dox
+* add mulle-project-untag because I notoriusly forget to update the dox
 
 ### 3.4.4
 

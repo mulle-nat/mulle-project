@@ -88,9 +88,14 @@ get_project_version()
    fi
 
    match="`fgrep -s -w "${versionname}" "${filename}" | head -1`"
+   if [ -z "${match}" ]
+   then
+      match="`egrep -v '^#' "${filename}" | head -1`"
+   fi
+
    case "${match}" in
       *"<<"*)
-         if [ "${printtype}" = "YES" ]
+         if [ "${printtype}" = 'YES' ]
          then
             echo "<<"
             return 0
@@ -113,7 +118,7 @@ get_project_version()
          version="`sed -n 's/^[^0-9]*\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*$/\1/p' <<< "${match}"`"
          if [ -z "${version}" ]
          then
-            if [ "${printtype}" = "YES" ]
+            if [ "${printtype}" = 'YES' ]
             then
                return 1
             fi
@@ -125,7 +130,7 @@ get_project_version()
             fi
          fi
 
-         if [ "${printtype}" = "YES" ]
+         if [ "${printtype}" = 'YES' ]
          then
             echo "1.2.3"
             return 0
@@ -332,7 +337,7 @@ set_project_version()
    local value
    local scheme
 
-   scheme="`get_project_version "${versionfile}" "${versionname}" "YES"`"
+   scheme="`get_project_version "${versionfile}" "${versionname}" 'YES'`"
 
    case "${scheme}" in
       "<<")
@@ -343,11 +348,16 @@ set_project_version()
 
       "1.2.3")
          value="$major.$minor.$patch"
-         inplace_sed -e 's|^\(.*\)'"${versionname}"'\([^0-9]*\)[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\(.*\)$|\1'"${versionname}"'\2'"${value}"'\3|' "${versionfile}" || fail "could not set version number"
+         if [ ! -z "${versionname}" ]
+         then
+            inplace_sed -e 's|^\(.*\)'"${versionname}"'\([^0-9]*\)[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\(.*\)$|\1'"${versionname}"'\2'"${value}"'\3|' "${versionfile}" || fail "could not set version number"
+         else
+            inplace_sed -e 's|^\([^0-9]*\)[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*|${value}|' "${versionfile}" || fail "could not set version number"
+         fi
       ;;
 
       *)
-         fail "Incompatible versions scheme in \"${versionfile}\". Use either 1.2.3 or ((1 << 20) | (2 << 8) | 3)"
+         fail "Incompatible versioning scheme in \"${versionfile}\". Use either 1.2.3 or ((1 << 20) | (2 << 8) | 3)"
       ;;
    esac
 }

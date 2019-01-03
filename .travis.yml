@@ -10,6 +10,6 @@ before_install:
   - sudo apt-get -y install mulle-bashfunctions
 
 script:
-  - ./install.sh /tmp
+  - ./bin/installer /tmp
   - mulle-project-init /tmp
 

@@ -2,7 +2,7 @@
 
 ![mulle-project logo](mulle-project-128x128.png)
 
-**mulle-project** facilitates project management tasks, such as 
+**mulle-project** facilitates project management tasks, such as
 
 * versioning
 * releasenotes
@@ -39,7 +39,7 @@ Command                      | Description
 15. Optional: Runs a post-release step
 
 In essence making a tagged release, publishing the release branch,
-updating your homebrew formula and distributing an apt package, reduces to the 
+updating your homebrew formula and distributing an apt package, reduces to the
 one-liner:
 
 ```
@@ -63,8 +63,8 @@ This will create the following files
 
 File                            | Description
 --------------------------------|----------------------------
-`mulle-project/version-info.sh` | Versioning information
-`mulle-project/formula-info.sh` | Information for package creation
+`.mulle/etc/project/version-info.sh` | Versioning information
+`.mulle/etc/project/formula-info.sh` | Information for package creation
 
 In the `...-info.sh` files you define various configuration  variables.
 
@@ -211,7 +211,7 @@ EOF
 ## Optional: Create publisher-info.sh to set publishing information
 
 Instead of passing in parameters, you can place the required information
-into `mulle-project/publisher-info.sh`.  It is recommended to place this
+into `.mulle/etc/project/publisher-info.sh`.  It is recommended to place this
 file into `.gitignore`
 
 Variable               | Description

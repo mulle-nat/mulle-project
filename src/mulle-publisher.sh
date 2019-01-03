@@ -7,13 +7,11 @@ source_publisher_overrides()
 {
    local filename
 
-   [ ! -d "mulle-project" ] && echo "mulle-project not found" >&2 && exit 1
-
    # old name
-   filename="mulle-project/publisher-info.sh"
+   filename=".mulle/etc/project/publisher-info.sh"
    if [ -f "${filename}" ]
    then
-      if [ "${VERBOSE}" = "YES" ]
+      if [ "${VERBOSE}" = 'YES' ]
       then
          echo "reading \"${filename}\"" >&2
       fi
@@ -30,7 +28,7 @@ source_publisher_defaults()
    then
       if [ -f "${PUBLISHER_INFO_SH}" ]
       then
-         if [ "${VERBOSE}" = "YES" ]
+         if [ "${VERBOSE}" = 'YES' ]
          then
             echo "reading \"${PUBLISHER_INFO_SH}\" as defined by PUBLISHER_INFO_SH" >&2
          fi
@@ -46,7 +44,7 @@ source_publisher_defaults()
    then
       if [ -f "${DEPENDENCY_DIR}/share/publisher-info.sh" ]
       then
-         if [ "${VERBOSE}" = "YES" ]
+         if [ "${VERBOSE}" = 'YES' ]
          then
             echo "reading \"${DEPENDENCY_DIR}/share/publisher-info.sh\"" >&2
          fi

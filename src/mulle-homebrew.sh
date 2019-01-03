@@ -81,7 +81,7 @@ generate_brew_formula_header()
 
    tmparchive="/tmp/${project}-${version}-archive"
 
-   if [ "${USE_CACHE}" = "NO" -a -f "${tmparchive}" ]
+   if [ "${USE_CACHE}" = 'NO' -a -f "${tmparchive}" ]
    then
       exekutor rm "${tmparchive}" || fail "could not delete old \"${tmparchive}\""
    fi
@@ -119,7 +119,8 @@ generate_brew_formula_header()
 
    local hash
 
-   hash="`exekutor shasum -p -a 256 "${tmparchive}" | exekutor awk '{ print $1 }'`"
+   set -o pipefail
+   hash="`exekutor shasum -a 256 "${tmparchive}" | exekutor awk '{ print $1 }'`" || exit 1
    log_verbose "Calculated shasum256 \"${hash}\" for \"${tmparchive}\"."
 
    local formula
@@ -141,7 +142,7 @@ EOF
 `"
 
    line="version \"${version}\""
-   if fgrep -s "${version}" <<< "${archiveurl}" > /dev/null
+   if fgrep -q -s -e "${version}" <<< "${archiveurl}"
    then
       line="# ${line}"
    fi
@@ -452,7 +453,7 @@ homebrew_main()
 
    redirect_exekutor "${homebrewtap}/${rbfile}" echo "${formula}"
 
-   if [ "${DO_PUSH_FORMULA}" = "YES" ]
+   if [ "${DO_PUSH_FORMULA}" = 'YES' ]
    then
       formula_push "${rbfile}" "${version}" "${name}" "${homebrewtap}"
    fi

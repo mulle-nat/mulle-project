@@ -34,11 +34,11 @@
 # Load in some user file, that define permanent info
 #######
 
-INFO_DIR="${INFO_DIR:-mulle-project}"
+INFO_DIR="${INFO_DIR:-.mulle/etc/project}"
 
 source_file()
 {
-   if [ "${VERBOSE}" = "YES" ]
+   if [ "${VERBOSE}" = 'YES' ]
    then
       echo "Read \"$1\"" >&2
    fi
@@ -49,14 +49,14 @@ source_file()
 # if there is a version-info.sh file read it
 if [ -f "${INFO_DIR}/version-info.sh" ]
 then
-   DO_GIT_RELEASE="YES"
+   DO_GIT_RELEASE='YES'
    source_file "${INFO_DIR}/version-info.sh"
 fi
 
 # if there is a formula-info.sh file read it
 if [ -f "${INFO_DIR}/formula-info.sh" ]
 then
-   DO_GENERATE_FORMULA="YES"
+   DO_GENERATE_FORMULA='YES'
    source_file "${INFO_DIR}/formula-info.sh"
 fi
 
@@ -65,7 +65,6 @@ fi
 # if there is a generate-formula.sh file read it
 if [ -f "${INFO_DIR}/generate-formula.sh" ]
 then
-   DO_GENERATE_FORMULA="YES"
    source_file "${INFO_DIR}/generate-formula.sh"
 fi
 

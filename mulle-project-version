@@ -29,7 +29,7 @@
 #   ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 #   POSSIBILITY OF SUCH DAMAGE.
 #
-[ "${TRACE}" = "YES" ] && set -x && : "$0" "$@"
+[ "${TRACE}" = 'YES' ] && set -x && : "$0" "$@"
 
 
 usage()
@@ -94,7 +94,7 @@ get_version()
 {
    log_entry "get_version" "$@"
 
-   if [ "${OPTION_READ_XCODE_VERSION}" = "YES" -o "${OPTION_WRITE_XCODE_VERSION}" = "YES" ]
+   if [ "${OPTION_READ_XCODE_VERSION}" = 'YES' -o "${OPTION_WRITE_XCODE_VERSION}" = 'YES' ]
    then
       ACTUAL_XCODEPROJ="${OPTION_XCODEPROJ}"
       if [ -z "${ACTUAL_XCODEPROJ}" ]
@@ -112,7 +112,7 @@ get_version()
          fail "could not read CURRENT_PROJECT_VERSION from \"${ACTUAL_XCODEPROJ}\""
       fi
 
-      if [ "${OPTION_READ_XCODE_VERSION}" = "YES" ]
+      if [ "${OPTION_READ_XCODE_VERSION}" = 'YES' ]
       then
          VERSION="${XCODE_VERSION}"
       fi
@@ -145,6 +145,7 @@ get_version()
          if [ ! -z "${VERSION}" ]
          then
             VERSIONFILE="VERSION"
+            VERSIONNAME=""
          fi
       else
          VERSION="`get_project_version "${VERSIONFILE}" "${VERSIONNAME}"`"
@@ -166,89 +167,85 @@ get_version()
       fail "Could not figure out the version for PROJECT=\"${PROJECT}\", \
 LANGUAGE=\"${LANGUAGE}\", VERSIONNAME=\"${VERSIONNAME}\", \
 VERSIONFILE=\"${VERSIONFILE}\".
-Hint: specify VERSIONNAME, VERSIONFILE in mulle-project/version-info.sh"
+Hint: specify VERSIONNAME, VERSIONFILE in .mulle/etc/project/version-info.sh"
    else
       log_fluff "Versionfile: ${VERSIONFILE}"
    fi
 }
 
 
-edit_version_if_requested()
+warn_version()
 {
-   log_entry "edit_version_if_requested" "$@"
+   log_entry "warn_version" "$@"
 
-   if [ -z "${OPTION_VERSION_SET}" ]
-   then
-      [ "${OPTION_ADD_MAJOR}" -ne 0 ] &&
-         [ "${OPTION_ADD_MINOR}" -ne 0 -o "${OPTION_ADD_PATCH}" -ne 0 ] &&
-            fail "only specify major to increment"
-
-      [ "${OPTION_ADD_MINOR}" -ne 0 ] &&
-         [ "${OPTION_ADD_PATCH}" -ne 0 ] &&
-            fail "only specify minor to increment"
-
-      OLDVERSION="${VERSION}"
-
-      if [ "${OPTION_ADD_MAJOR}" -ne 0 -o \
-           "${OPTION_ADD_MINOR}" -ne 0 -o \
-           "${OPTION_ADD_PATCH}" -ne 0 ]
-      then
-         if [ -z "${VERSIONFILE}" ]
-         then
-            fail "Don't know how to increment version"
-         fi
-
-         VERSION="`project_version_add "${VERSION}" \
-                                       "${OPTION_ADD_MAJOR}" \
-                                       "${OPTION_ADD_MINOR}" \
-                                       "${OPTION_ADD_PATCH}" \
-                                       "0" \
-                                       "${OPTION_FIRST_PATCH}"`" || exit 1
-      fi
-   else
-      VERSION="${OPTION_VERSION_SET}"
-   fi
-
-   if [ "${OPTION_TAG_WARNING}" = "YES" ]
+   if [ "${OPTION_TAG_WARNING}" = 'YES' ]
    then
       if git_tag_exists "${VERSION}"
       then
-         echo "warning: ${VERSION} already exists as a git tag" >&2
+         log_warning "${VERSION} already exists as a git tag"
       else
          local last
 
          last="`git_last_tag`"
          if [ ! -z "${last}" ]
          then
-            echo "info: Version is ${VERSION}. Last git tag is \"${last}\"." >&2
+            log_info "Version is ${VERSION}. Last git tag is \"${last}\"."
          else
-            echo "info: No git tag \"${VERSION}\" exists. (git fetch --tags maybe ?)" >&2
+            log_info  "No git tag \"${VERSION}\" exists. (git fetch --tags maybe ?)"
          fi
       fi
    fi
 }
 
 
-write_version_if_requested()
+edit_version()
 {
-   log_entry "write_version_if_requested" "$@"
+   log_entry "edit_version" "$@"
 
-   if ! [ "${OPTION_WRITE}" = "YES" -o "${OPTION_WRITE_XCODE_VERSION}" = "YES" ]
+   [ "${OPTION_ADD_MAJOR}" -ne 0 ] &&
+      [ "${OPTION_ADD_MINOR}" -ne 0 -o "${OPTION_ADD_PATCH}" -ne 0 ] &&
+         fail "only specify major to increment"
+
+   [ "${OPTION_ADD_MINOR}" -ne 0 ] &&
+      [ "${OPTION_ADD_PATCH}" -ne 0 ] &&
+         fail "only specify minor to increment"
+
+   OLDVERSION="${VERSION}"
+
+   if [ "${OPTION_ADD_MAJOR}" -ne 0 -o \
+        "${OPTION_ADD_MINOR}" -ne 0 -o \
+        "${OPTION_ADD_PATCH}" -ne 0 ]
    then
-      return 1
-   fi
+      if [ -z "${VERSIONFILE}" ]
+      then
+         fail "Don't know how to increment version"
+      fi
 
-   if [ "${VERSIONIMMUTABLE}" = "YES" ]
+      VERSION="`project_version_add "${VERSION}" \
+                                    "${OPTION_ADD_MAJOR}" \
+                                    "${OPTION_ADD_MINOR}" \
+                                    "${OPTION_ADD_PATCH}" \
+                                    "0" \
+                                    "${OPTION_FIRST_PATCH}"`" || exit 1
+   fi
+}
+
+
+write_version()
+{
+   log_entry "write_version" "$@"
+
+   if [ "${VERSIONIMMUTABLE}" = 'YES' ]
    then
       fail "Version is immutable (VERSIONIMMUTABLE=${VERSIONIMMUTABLE})"
    fi
 
-   if [ "${OPTION_WRITE_XCODE_VERSION}" = "YES" ]
+   if [ "${OPTION_WRITE_XCODE_VERSION}" = 'YES' ]
    then
       inplace_sed -e 's|^\([[:space:]]*CURRENT_PROJECT_VERSION[[:space:]]*=[[:space:]]*["]*\)'${XCODE_VERSION}'\(.*\)|\1'${VERSION}'\2|' "${ACTUAL_XCODEPROJ}/project.pbxproj"
    fi
 
-   if [ "${OPTION_WRITE}" = "YES" ]
+   if [ "${OPTION_WRITE}" = 'YES' ]
    then
       #
       # small hack for extensions to distribute versioning
@@ -264,7 +261,7 @@ write_version_if_requested()
 
          if [ ! -z "${other}" ]
          then
-            set_project_version "${VERSION}" "${other}"  || exit 1
+            set_project_version "${VERSION}" "${other}" "${VERSIONMIRRORNAME}" || exit 1
          fi
       done
       IFS="${DEFAULT_IFS}" ; set +o noglob
@@ -279,7 +276,7 @@ write_version_if_requested()
    then
       fail "Version could not be set"
    else
-      echo "Version successfully set to ${VERSION}" >&2
+      log_info "Version successfully set to ${VERSION}"
    fi
 
    return 0
@@ -299,17 +296,21 @@ parse_arguments()
       fi
 
       case "$1" in
+         -h*|--help|help)
+            usage
+         ;;
+
          --no-info)
-            OPTION_READ_INFO="NO"
+            OPTION_READ_INFO='NO'
          ;;
 
          ++)
             OPTION_ADD_PATCH="1"
-            OPTION_WRITE="YES"
+            OPTION_WRITE='YES'
          ;;
 
          --no-tag-warning)
-            OPTION_TAG_WARNING="NO"
+            OPTION_TAG_WARNING='NO'
          ;;
 
          --increment-major)
@@ -336,9 +337,9 @@ parse_arguments()
             OPTION_ADD_PATCH="0"
             OPTION_ADD_MINOR="0"
             OPTION_ADD_MAJOR="0"
-            OPTION_WRITE_XCODE_VERSION="NO"
-            OPTION_WRITE="NO"
-            OPTION_TAG_WARNING="NO"
+            OPTION_WRITE_XCODE_VERSION='NO'
+            OPTION_WRITE='NO'
+            OPTION_TAG_WARNING='NO'
          ;;
 
          --first-patch-zero)
@@ -365,11 +366,11 @@ parse_arguments()
          ;;
 
          --write)
-            OPTION_WRITE="YES"
+            OPTION_WRITE='YES'
          ;;
 
          --no-write)
-            OPTION_WRITE="NO"
+            OPTION_WRITE='NO'
          ;;
 
          --xcodeproj)
@@ -380,15 +381,15 @@ parse_arguments()
          ;;
 
          --read-xcode-version)
-            OPTION_READ_XCODE_VERSION="YES"
+            OPTION_READ_XCODE_VERSION='YES'
          ;;
 
          --write-xcode-version)
-            OPTION_WRITE_XCODE_VERSION="YES"
+            OPTION_WRITE_XCODE_VERSION='YES'
          ;;
 
          --no-write-xcode-version)
-            OPTION_WRITE_XCODE_VERSION="NO"
+            OPTION_WRITE_XCODE_VERSION='NO'
          ;;
 
          --language)
@@ -409,17 +410,10 @@ parse_arguments()
             OPTION_VERSIONFILE="$1"
          ;;
 
-         -h*|--help|help)
-            usage
-         ;;
-
          -t)
             set -x
          ;;
 
-         -v|-vv|-vvv)
-            OPTION_VERBOSE="YES"
-         ;;
 
          -*)
             usage
@@ -453,36 +447,36 @@ main()
    local OPTION_ADD_MINOR="0"
    local OPTION_ADD_PATCH="0"
    local OPTION_FIRST_PATCH="0"
-   local OPTION_READ_INFO="YES"
-   local OPTION_READ_XCODE_VERSION="NO"
-   local OPTION_WRITE="NO"
-   local OPTION_WRITE_XCODE_VERSION="NO"
+   local OPTION_READ_INFO='YES'
+   local OPTION_READ_XCODE_VERSION='NO'
+   local OPTION_WRITE='NO'
+   local OPTION_WRITE_XCODE_VERSION='NO'
    local OPTION_XCODEPROJ=""
-   local OPTION_TAG_WARNING="YES"
+   local OPTION_TAG_WARNING='YES'
 
    local OPTION_VERSIONNAME
    local OPTION_VERSIONFILE
 
-   if [ -f ".first_patch" ]
+   if [ -f ".mulle/etc/project/.first_patch" ]
    then
-      OPTION_FIRST_PATCH="`cat ".first_patch"`"
+      OPTION_FIRST_PATCH="`cat ".mulle/etc/project/.first_patch"`"
    fi
 
    parse_arguments "$@"
 
-   if [ "${OPTION_READ_INFO}" = "YES" ]
+   if [ "${OPTION_READ_INFO}" = 'YES' ]
    then
-      if [ -f "./mulle-project/version-info.sh" ]
+      if [ -f "./.mulle/etc/project/version-info.sh" ]
       then
-         . ./mulle-project/version-info.sh
+         . ./.mulle/etc/project/version-info.sh
       fi
-      if [ -f "./mulle-project/release-info.sh" ]
+      if [ -f "./.mulle/etc/project/release-info.sh" ]
       then
-         . ./mulle-project/release-info.sh
+         . ./.mulle/etc/project/release-info.sh
       fi
-      if [ -f "./mulle-project/formula-info.sh" ]
+      if [ -f "./.mulle/etc/project/formula-info.sh" ]
       then
-         . ./mulle-project/formula-info.sh
+         . ./.mulle/etc/project/formula-info.sh
       fi
    fi
 
@@ -491,19 +485,29 @@ main()
 
    get_version
 
-   edit_version_if_requested
-
-   if [ "${OPTION_VERBOSE}" = "YES" ]
+   if [ ! -z "${OPTION_VERSION_SET}" ]
    then
-      echo "VERSION=${VERSION}" >&2
-      echo "VERSIONNAME=${VERSIONNAME}" >&2
-      echo "VERSIONFILE=${VERSIONFILE}" >&2
+      VERSION="${OPTION_VERSION_SET}"
+   else
+      edit_version
    fi
 
-   if ! write_version_if_requested "$@"
+   if [ "${OPTION_TAG_WARNING}" = 'YES' ]
+   then
+      warn_version
+   fi
+
+   log_verbose "VERSION=${VERSION}"
+   log_verbose "VERSIONNAME=${VERSIONNAME}"
+   log_verbose "VERSIONFILE=${VERSIONFILE}"
+
+   if ! [ "${OPTION_WRITE}" = 'YES' -o "${OPTION_WRITE_XCODE_VERSION}" = 'YES' ]
    then
       echo "${VERSION}"
+      return 0
    fi
+
+   write_version "$@"
 }
 
 
@@ -518,6 +522,10 @@ _init()
    fi
 
    . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-bashfunctions.sh" "minimal" || exit 1
+   # shellcheck source=../mulle-bashfunctions/src/mulle-path.sh
+   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-path.sh"             || exit 1
+   # shellcheck source=../mulle-bashfunctions/src/mulle-file.sh
+   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-file.sh"             || exit 1
 
 
    #

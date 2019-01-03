@@ -2,7 +2,7 @@
 #
 # Create debian package on OS X
 #
-[ "${TRACE}" = "YES" ] && set -x && : "$0" "$@"
+[ "${TRACE}" = 'YES' ] && set -x && : "$0" "$@"
 
 
 usage()
@@ -94,7 +94,7 @@ create_debian()
 
       dpkg-deb -Zgzip -b "${directory}" >&2 || exit 1
 
-      if [ "${OPTION_REMOVE_TMP}" = "YES" ]
+      if [ "${OPTION_REMOVE_TMP}" = 'YES' ]
       then
          rm -rf "${directory}"
       fi
@@ -110,15 +110,15 @@ main()
 
    local OPTION_PREFIX
    local OPTION_ROOT="/usr"
-   local OPTION_UPDATE="YES"
-   local OPTION_PUBLISH="YES"
-   local OPTION_REMOVE_TMP="YES"
+   local OPTION_UPDATE='YES'
+   local OPTION_PUBLISH='YES'
+   local OPTION_REMOVE_TMP='YES'
 
    VERSION="`mulle-project-version --no-tag-warning`"
 
-   if [ -f "./mulle-project/formula-info.sh" ]
+   if [ -f ".mulle/etc/project/formula-info.sh" ]
    then
-      . ./mulle-project/formula-info.sh
+      . .mulle/etc/project/formula-info.sh
    fi
 
    EXE_DIR="`dirname -- "$0"`"
@@ -138,15 +138,15 @@ main()
          ;;
 
          --no-update)
-            OPTION_UPDATE="NO"
+            OPTION_UPDATE='NO'
          ;;
 
          --no-publish)
-            OPTION_PUBLISH="NO"
+            OPTION_PUBLISH='NO'
          ;;
 
          --no-remove-tmp)
-            OPTION_REMOVE_TMP="NO"
+            OPTION_REMOVE_TMP='NO'
          ;;
 
          --root)
@@ -220,7 +220,7 @@ main()
 
    debianfile="`create_debian`" || exit 1
 
-   if [ "${OPTION_PUBLISH}" = "YES" ]
+   if [ "${OPTION_PUBLISH}" = 'YES' ]
    then
       DEBIAN_DISTS="${DEBIAN_DISTS:-${DISTS_LOCATION:-..}/debian-${PUBLISHER_DEBIAN_DISTNAME:-software}}"
 
@@ -231,7 +231,7 @@ main()
          log_info "Publishing \"${debianfile}\"..."
          mv "${debianfile}" "${DEBIAN_DISTS}/all/"
 
-         if [ "${OPTION_UPDATE}" = "YES" ] && [ -x "${DEBIAN_DISTS}/did-update.sh" ]
+         if [ "${OPTION_UPDATE}" = 'YES' ] && [ -x "${DEBIAN_DISTS}/did-update.sh" ]
          then
             (
               log_info "Executing ./did-update.sh in ..."
@@ -272,7 +272,7 @@ _init()
       cat <<EOF >&2
 mulle-project-env not found in PATH.
 Visit the homepage for installation instructions:
-      https://github.com/mulle-nat/mulle-project
+      https://github.com/mulle-sde/mulle-project
 EOF
       exit 1
    fi

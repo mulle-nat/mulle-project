@@ -1,4 +1,5 @@
 #! /usr/bin/env bash
+#! /usr/bin/env bash
 #
 #   Copyright (c) 2017 Nat! - Mulle kybernetiK
 #   All rights reserved.
@@ -29,7 +30,7 @@
 #   ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 #   POSSIBILITY OF SUCH DAMAGE.
 #
-[ "${TRACE}" = "YES" ] && set -x && : "$0" "$@"
+[ "${TRACE}" = 'YES' ] && set -x && : "$0" "$@"
 
 
 usage()
@@ -37,7 +38,7 @@ usage()
    [ "$#" -ne 0 ] && log_error "$1"
 
    cat <<EOF >&2
-Usage: mulle-project-releasenotes [options] [releasenotes]
+Usage: mulle-project-releasenotes [flags] [releasenotes]
 
    Emit markup releasenotes for the current version. If no version is given,
    mulle-project-version is used to determine the current version.
@@ -45,7 +46,7 @@ Usage: mulle-project-releasenotes [options] [releasenotes]
    All comments from the last tag till HEAD will be collected.
    All comment lines starting with a '*' are included in the release notes.
 
-Options:
+Flags:
    -a                       : prepend notes to first releasenote
    -f                       : overwrite existing releasenotes for version
    --all                    : dump all releasenotes from the beginning
@@ -104,7 +105,7 @@ get_releasenote_commits()
 {
    log_entry "get_releasenote_commits" "$@"
 
-   if [ "${OPTION_ALL}" = "YES" ]
+   if [ "${OPTION_ALL}" = 'YES' ]
    then
       git_commits_from_start
       return
@@ -114,7 +115,7 @@ get_releasenote_commits()
 
    start="${OPTION_TAG}"
 
-   if [ "${OPTION_MISSING}" = "YES" ]
+   if [ "${OPTION_MISSING}" = 'YES' ]
    then
       if [ "${OPTION_INPUT}" = "-" ]
       then
@@ -173,8 +174,9 @@ determine_message()
    if [ ! -z "${prefix}" ]
    then
       local pattern
+         r_escaped_sed_pattern "${prefix}"
+      pattern="${RVAL}"
 
-      pattern="`escaped_sed_pattern "${prefix}"`"
       message="`sed "s/^/${pattern}/" <<< "${message}"`"
    fi
 
@@ -210,7 +212,7 @@ emit_releasenotes()
       message="`determine_message "${prefix}" "${defaultmessage}"`" || exit 1
    fi
 
-   if [ "${OPTION_MD_ESCAPE}" = "YES" ]
+   if [ "${OPTION_MD_ESCAPE}" = 'YES' ]
    then
       message="`markdown_escape_message <<< "${message}"`"
    fi
@@ -283,7 +285,7 @@ emit_prepended_notes_to_file()
 ${notes}
 EOF
 
-   if [ "${edited_header}" = "NO" -o "${OPTION_APPEND}" = "NO" ]
+   if [ "${edited_header}" = 'NO' -o "${OPTION_APPEND}" = 'NO' ]
    then
       echo
 
@@ -342,10 +344,14 @@ merged_releasenotes()
    else
       if [ ! -f "${OPTION_INPUT}" ]
       then
-         fail "Input file \"${OPTION_INPUT}\" not found"
+         if [ "${MULLE_FLAG_MAGNUM_FORCE}" != 'YES' ]
+         then
+            fail "Input file \"${OPTION_INPUT}\" not found"
+         fi
+         OPTION_APPEND='NO'
+      else
+         old_header="`head -1 "${OPTION_INPUT}" | sed 's/^#*[[:space:]]*//'`"
       fi
-
-      old_header="`head -1 "${OPTION_INPUT}" | sed 's/^#*[[:space:]]*//'`"
    fi
 
    new_header="`head -1 <<< "${notes}" | sed 's/^#*[[:space:]]*//'`"
@@ -353,7 +359,7 @@ merged_releasenotes()
    tmpfile="`mktemp "tmp.XXXXXXXX"`"
    if [ "${old_header}" = "${new_header}" ]
    then
-      if [ "${OPTION_APPEND}" = "YES" ]
+      if [ "${OPTION_APPEND}" = 'YES' ]
       then
          if [ "${OPTION_INPUT}" = "-" ]
          then
@@ -362,7 +368,7 @@ merged_releasenotes()
             copy_without_first_line "${old_header}" < "${OPTION_INPUT}" > "${tmpfile}" || exit 1
          fi
       else
-         if [ "${MULLE_FLAG_MAGNUM_FORCE}" = "NO" ]
+         if [ "${MULLE_FLAG_MAGNUM_FORCE}" = 'NO' ]
          then
             rm "${tmpfile}"
             fail "Releasenotes already contain a leading entry for \"${version}\""
@@ -375,15 +381,15 @@ merged_releasenotes()
             copy_without_first_entry "${old_header}" < "${OPTION_INPUT}" > "${tmpfile}" || exit 1
          fi
       fi
-      edited_header="YES"
+      edited_header='YES'
    else
       exekutor cp "${OPTION_INPUT}" "${tmpfile}" || exit 1
-      edited_header="YES"
+      edited_header='YES'
    fi
 
    emit_prepended_notes_to_file "${markers}" "${notes}" "${tmpfile}" "${edited_header}"
 
-   if [ "${OPTION_KEEP_TMP}" = "NO" ]
+   if [ "${OPTION_KEEP_TMP}" = 'NO' ]
    then
       exekutor rm "${tmpfile}"
    fi
@@ -396,23 +402,23 @@ main()
 
    local directory
 
-   local OPTION_APPEND="NO"
+   local OPTION_APPEND='NO'
    local OPTION_DEFAULT_MESSAGE="Various small improvements"
    local OPTION_FIRST_PATCH="0"
-   local MULLE_FLAG_MAGNUM_FORCE="NO"
-   local OPTION_COMMIT="NO"
+   local MULLE_FLAG_MAGNUM_FORCE='NO'
+   local OPTION_COMMIT='NO'
    local OPTION_INPUT=""
-   local OPTION_ADD_U="NO"
-   local OPTION_KEEP_TMP="NO"
+   local OPTION_ADD_U='NO'
+   local OPTION_KEEP_TMP='NO'
    local OPTION_MESSAGE=""
    local OPTION_OUTPUT=""
    local OPTION_PREFIX="* "
    local OPTION_TAG=""
    local OPTION_COMMITFLAGS="--amend --no-edit"
    local OPTION_ALL
-   local OPTION_MD_ESCAPE="YES"
+   local OPTION_MD_ESCAPE='YES'
 
-   local custom_output="NO"
+   local custom_output='NO'
 
    if [ -z "${RELEASENOTE_FILTER}" ]
    then
@@ -446,22 +452,26 @@ main()
          ;;
 
          ++)
-            OPTION_COMMIT="YES"
+            OPTION_COMMIT='YES'
             OPTION_INPUT="RELEASENOTES.md"
             OPTION_OUTPUT="RELEASENOTES.md"
-            OPTION_ADD_U="YES"
+            OPTION_ADD_U='YES'
          ;;
 
          -a|--append)
-            OPTION_APPEND="YES"
-         ;;
-
-         -c|--commit)
-            OPTION_COMMIT="YES"
+            OPTION_APPEND='YES'
          ;;
 
          --all)
-            OPTION_ALL="YES"
+            OPTION_ALL='YES'
+         ;;
+
+         -c|--commit)
+            OPTION_COMMIT='YES'
+         ;;
+
+         -f)
+            MULLE_FLAG_MAGNUM_FORCE="YES"
          ;;
 
          --filter)
@@ -493,7 +503,7 @@ main()
          ;;
 
          --keep-tmp)
-            OPTION_KEEP_TMP="YES"
+            OPTION_KEEP_TMP='YES'
          ;;
 
          -i|--input)
@@ -515,11 +525,11 @@ main()
          ;;
 
          --missing)
-            OPTION_MISSING="YES"
+            OPTION_MISSING='YES'
          ;;
 
          --no-md-escape)
-            OPTION_MD_ESCAPE="NO"
+            OPTION_MD_ESCAPE='NO'
          ;;
 
          --prefix)
@@ -600,9 +610,9 @@ main()
       VERSION="`rexekutor mulle-project-version --no-tag-warning`" || fail "Could not figure out current version"
    fi
 
-   if [ "${OPTION_COMMIT}" = "YES" ]
+   if [ "${OPTION_COMMIT}" = 'YES' ]
    then
-      if [ "${OPTION_ADD_U}" = "YES" ]
+      if [ "${OPTION_ADD_U}" = 'YES' ]
       then
          exekutor git add -u
          if ! git diff-files --quiet --ignore-submodules --
@@ -630,6 +640,18 @@ main()
                              "${OPTION_MESSAGE}" \
                              "${OPTION_DEFAULT_MESSAGE}" `"
 
+   case "${OPTION_INPUT}" in
+      ''|'-')
+      ;;
+
+      *)
+         if [ "${MULLE_FLAG_MAGNUM_FORCE}" = "YES" -a  ! -f "${OPTION_INPUT}" ]
+         then
+            OPTION_INPUT=''
+         fi
+      ;;
+   esac
+
    #
    # if no file is given, we don't merge
    #
@@ -654,12 +676,12 @@ main()
       fi
    fi
 
-   if [ "${OPTION_COMMIT}" = "YES" ]
+   if [ "${OPTION_COMMIT}" = 'YES' ]
    then
       changed="`git ls-files -m "${OPTION_OUTPUT}"`"
       if [ ! -z "${changed}" ]
       then
-         if [ "${OPTION_ADD_U}" = "YES" ]
+         if [ "${OPTION_ADD_U}" = 'YES' ]
          then
             exekutor git commit ${OPTION_COMMITFLAGS}
          else
