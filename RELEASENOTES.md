@@ -1,3 +1,7 @@
+### 2.0.2
+
+* fix cmake packaging
+
 ### 2.0.1
 
 * too many changes to list

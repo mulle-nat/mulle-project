@@ -154,8 +154,8 @@ mulle-project-distribute -v -n -lx --taps-location ~/taps --publisher  --tap ''
 >
 > Here is an example if the taps are located elsewhere. If your taps path is
 > `/home/nat/mulle-kybernetik/taps/project-software`
-> the `--taps-location` is the parent directory `/home/nat/mulle-kybernetik/taps`.
-> and `--tap` is ``
+> then `--taps-location` is the parent directory `/home/nat/mulle-kybernetik/taps`.
+> and `--tap` is `mulle-kybernetik`
 
 
 If the output looks good, then do the release:
