@@ -1,3 +1,7 @@
+### 2.0.3
+
+* better commandline override of some file settings
+
 ### 2.0.2
 
 * fix cmake packaging

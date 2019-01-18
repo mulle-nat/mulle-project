@@ -274,7 +274,7 @@ write_version()
 
    if [ "${VERSION}" != "${VERIFY_VERSION}" ]
    then
-      fail "Version could not be set"
+      fail "Version could not be set to ${VERSION} (is ${VERIFY_VERSION})"
    else
       log_info "Version successfully set to ${VERSION}"
    fi

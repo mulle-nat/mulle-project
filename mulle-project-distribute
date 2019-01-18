@@ -47,7 +47,13 @@ Usage: mulle-project-distribute [options]
    Distribute the project via github, homebrew, debian.
 
 Options:
-   --verify-only  : check but do not acually commit anything
+   --no-git          : suppress git operations (implies --no-post-release)
+   --no-formula      : suppress formula operations (implies --no-post-release)
+   --no-formula-push : do not publish the formula to github
+   --verify-only     : check but do not acually commit anything
+   --post-release    : reenable post-release after --no-git or -no-formula
+   --no-post-release : suppress post-release processing
+
 EOF
    exit 1
 }
@@ -269,13 +275,14 @@ __environment_main()
 
 main()
 {
-   DO_PUSH_FORMULA='YES'
    USE_CACHE='NO'
    OPTION_LATEST_TAG="latest"
    VERIFY_ONLY='NO'
 
-   local DO_GIT_RELEASE="DEFAULT"
-   local DO_GENERATE_FORMULA="DEFAULT"
+   local OPTION_DO_PUSH_FORMULA=""
+   local OPTION_DO_GIT_RELEASE=""
+   local OPTION_DO_GENERATE_FORMULA=""
+   local OPTION_DO_POST_RELEASE=""
 
    while [ $# -ne 0 ]
    do
@@ -304,19 +311,29 @@ main()
          ;;
 
          --no-git)
-            DO_GIT_RELEASE='NO'
+            OPTION_DO_GIT_RELEASE='NO'
+            OPTION_DO_POST_RELEASE='NO'
          ;;
 
          --no-formula)
-            DO_GENERATE_FORMULA='NO'
+            OPTION_DO_GENERATE_FORMULA='NO'
+            OPTION_DO_POST_RELEASE='NO'
          ;;
 
          --no-latest-tag)
             OPTION_LATEST_TAG=""
          ;;
 
-         --no-push)
-            DO_PUSH_FORMULA='NO'
+         --no-formula-push)
+            OPTION_DO_PUSH_FORMULA='NO'
+         ;;
+
+         --post-release)
+            OPTION_DO_POST_RELEASE='YES'
+         ;;
+
+         --no-post-release)
+            OPTION_DO_POST_RELEASE='NO'
          ;;
 
          # arg long
@@ -430,6 +447,8 @@ main()
       shift
    done
 
+   options_setup_trace "${MULLE_TRACE}"
+
    if [ ! -d ".mulle/etc/project" ]
    then
       log_warning "No .mulle/etc/project folder found."
@@ -447,6 +466,14 @@ main()
 
    source_file "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-homebrew.sh" "$@"       || exit 1
    source_file "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-git.sh" "$@"            || exit 1
+
+   #
+   # override values read from user files
+   # with flags an options
+   #
+   DO_GIT_RELEASE="${OPTION_DO_GIT_RELEASE:-${DO_GIT_RELEASE}}"
+   DO_GENERATE_FORMULA="${OPTION_DO_GENERATE_FORMULA:-${DO_GENERATE_FORMULA}}"
+   DO_POST_RELEASE="${OPTION_DO_POST_RELEASE:-${DO_POST_RELEASE}}"
 
    #
    # dial past options now as they have been parsed
@@ -517,22 +544,25 @@ main()
    # check if someone installed a post_release function
    # if yes call it (maybe calls mulle-project-debian)
    #
-   if [ "${VERIFY_ONLY}" != 'YES' ]
+   if [ "${DO_POST_RELEASE}" = 'YES' ]
    then
-      if [ "`type -t post_release`" = "function" ]
+      if [ "${VERIFY_ONLY}" != 'YES' ]
       then
-         log_info "Post release..."
-         post_release "${PROJECT}" \
-                      "${NAME}" \
-                      "${VERSION}" \
-                      "${DEPENDENCIES}" \
-                      "${BUILD_DEPENDENCIES}" \
-                      "${HOMEPAGE_URL}" \
-                      "${DESC}" \
-                      "${ARCHIVE_URL}" \
-                      "${DEBIAN_DEPENDENCIES}"
-      else
-         log_fluff "No post release"
+         if [ "`type -t post_release`" = "function" ]
+         then
+            log_info "Post release..."
+            post_release "${PROJECT}" \
+                         "${NAME}" \
+                         "${VERSION}" \
+                         "${DEPENDENCIES}" \
+                         "${BUILD_DEPENDENCIES}" \
+                         "${HOMEPAGE_URL}" \
+                         "${DESC}" \
+                         "${ARCHIVE_URL}" \
+                         "${DEBIAN_DEPENDENCIES}"
+         else
+            log_fluff "No post release"
+         fi
       fi
    fi
 }

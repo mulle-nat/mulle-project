@@ -341,12 +341,14 @@ set_project_version()
 
    case "${scheme}" in
       "<<")
+         log_debug "Using << scheme"
          value="(($major << 20) \| ($minor << 8) \| $patch)"
 
          inplace_sed -e 's|^\(.*\)'"${versionname}"'\([^0-9()]*\)( *( *[0-9][0-9]* *<< *20 *) *\| *( *[0-9][0-9]* *<< *8 *) *\| *[0-9][0-9]* *)\(.*\)$|\1'"${versionname}"'\2'"${value}"'\3|' "${versionfile}" || fail "could not set version number"
       ;;
 
       "1.2.3")
+         log_debug "Using 1.2.3 scheme"
          value="$major.$minor.$patch"
          if [ ! -z "${versionname}" ]
          then
