@@ -1,3 +1,7 @@
+### 2.0.4
+
+* fix post-release, add mulle-project-redistribute
+
 ### 2.0.3
 
 * better commandline override of some file settings

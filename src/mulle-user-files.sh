@@ -58,19 +58,18 @@ if [ -f "${INFO_DIR}/formula-info.sh" ]
 then
    DO_GENERATE_FORMULA='YES'
    source_file "${INFO_DIR}/formula-info.sh"
-fi
-
-
 
 # if there is a generate-formula.sh file read it
-if [ -f "${INFO_DIR}/generate-formula.sh" ]
-then
-   source_file "${INFO_DIR}/generate-formula.sh"
+   if [ -f "${INFO_DIR}/generate-formula.sh" ]
+   then
+      source_file "${INFO_DIR}/generate-formula.sh"
+   fi
 fi
 
 # if there is a post-release.sh file read it
 if [ -f "${INFO_DIR}/post-release.sh" ]
 then
+   DO_POST_RELEASE='YES'
    source_file "${INFO_DIR}/post-release.sh"
 fi
 
