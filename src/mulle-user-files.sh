@@ -57,6 +57,7 @@ fi
 if [ -f "${INFO_DIR}/formula-info.sh" ]
 then
    DO_GENERATE_FORMULA='YES'
+   DO_PUSH_FORMULA='YES'
    source_file "${INFO_DIR}/formula-info.sh"
 
 # if there is a generate-formula.sh file read it

@@ -312,16 +312,23 @@ main()
 
          --no-git)
             OPTION_DO_GIT_RELEASE='NO'
-            OPTION_DO_POST_RELEASE='NO'
          ;;
 
          --no-formula)
             OPTION_DO_GENERATE_FORMULA='NO'
-            OPTION_DO_POST_RELEASE='NO'
+            OPTION_DO_PUSH_FORMULA='NO'
+         ;;
+
+         --no-generate-formula)
+            OPTION_DO_GENERATE_FORMULA='NO'
          ;;
 
          --no-latest-tag)
             OPTION_LATEST_TAG=""
+         ;;
+
+         --formula-push)
+            OPTION_DO_PUSH_FORMULA='YES'
          ;;
 
          --no-formula-push)
@@ -471,9 +478,27 @@ main()
    # override values read from user files
    # with flags an options
    #
+
+   if [ "${MULLE_FLAG_LOG_SETTINGS}" = 'YES' ]
+   then
+      log_trace2 "OPTION_DO_GIT_RELEASE      = ${OPTION_DO_GIT_RELEASE}"
+      log_trace2 "OPTION_DO_GENERATE_FORMULA = ${OPTION_DO_GENERATE_FORMULA}"
+      log_trace2 "OPTION_DO_POST_RELEASE     = ${OPTION_DO_POST_RELEASE}"
+      log_trace2 "OPTION_DO_PUSH_FORMULA     = ${OPTION_DO_PUSH_FORMULA}"
+   fi
+
    DO_GIT_RELEASE="${OPTION_DO_GIT_RELEASE:-${DO_GIT_RELEASE}}"
    DO_GENERATE_FORMULA="${OPTION_DO_GENERATE_FORMULA:-${DO_GENERATE_FORMULA}}"
    DO_POST_RELEASE="${OPTION_DO_POST_RELEASE:-${DO_POST_RELEASE}}"
+   DO_PUSH_FORMULA="${OPTION_DO_PUSH_FORMULA:-${DO_PUSH_FORMULA}}"
+
+   if [ "${MULLE_FLAG_LOG_SETTINGS}" = 'YES' ]
+   then
+      log_trace2 "DO_GIT_RELEASE      = ${DO_GIT_RELEASE}"
+      log_trace2 "DO_GENERATE_FORMULA = ${DO_GENERATE_FORMULA}"
+      log_trace2 "DO_POST_RELEASE     = ${DO_POST_RELEASE}"
+      log_trace2 "DO_PUSH_FORMULA     = ${DO_PUSH_FORMULA}"
+   fi
 
    #
    # dial past options now as they have been parsed
@@ -484,10 +509,14 @@ main()
       DO_GIT_RELEASE='YES'
    fi
 
-   if [ "${DO_GIT_RELEASE}" != 'YES' -a "${DO_GENERATE_FORMULA}" != 'YES' ]
+   if [ "${DO_GIT_RELEASE}" != 'YES' -a  \
+        "${DO_GENERATE_FORMULA}" != 'YES' -a  \
+        "${DO_PUSH_FORMULA}" != 'YES' -a \
+        "${DO_POST_RELEASE}" != 'YES' ]
    then
       fail "Nothing to do! .mulle/etc/project/version-info.sh and .mulle/etc/project/formula-info.sh are missing"
    fi
+
 
    if [ "${DO_GIT_RELEASE}" = 'YES' ]
    then
@@ -503,6 +532,7 @@ main()
    else
       log_fluff "No git release"
    fi
+
 
    if [ "${DO_GENERATE_FORMULA}" = 'YES' ]
    then
@@ -521,16 +551,16 @@ main()
          log_info "Homebrew formula..."
 
          # generate the formula and push it
-         if ! homebrew_main "${PROJECT}" \
-                            "${NAME}" \
-                            "${VERSION}" \
-                            "${DEPENDENCIES}" \
-                            "${BUILD_DEPENDENCIES}" \
-                            "${HOMEPAGE_URL}" \
-                            "${DESC}" \
-                            "${ARCHIVE_URL}" \
-                            "${HOMEBREW_TAP}" \
-                            "${RBFILE}"
+         if ! homebrew_generate "${PROJECT}" \
+                                "${NAME}" \
+                                "${VERSION}" \
+                                "${DEPENDENCIES}" \
+                                "${BUILD_DEPENDENCIES}" \
+                                "${HOMEPAGE_URL}" \
+                                "${DESC}" \
+                                "${ARCHIVE_URL}" \
+                                "${HOMEBREW_TAP}" \
+                                "${RBFILE}"
          then
             log_error "Homebrew generation failed!"
             return 1
@@ -538,6 +568,19 @@ main()
       fi
    else
       log_fluff "No homebrew formula"
+   fi
+
+
+   if [ "${DO_PUSH_FORMULA}" = 'YES' ]
+   then
+      if ! homebrew_push "${NAME}" \
+                         "${VERSION}" \
+                         "${HOMEBREW_TAP}" \
+                         "${RBFILE}"
+      then
+         log_error "Homebrew formula push failed!"
+         return 1
+      fi
    fi
 
    #

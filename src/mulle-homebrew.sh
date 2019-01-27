@@ -387,9 +387,33 @@ formula_push()
 }
 
 
-homebrew_main()
+homebrew_push()
 {
-   log_entry "homebrew_main" "$@"
+   log_entry "homebrew_push" "$@"
+
+   local name="$1"; shift
+   local version="$1"; shift
+   local homebrewtap="$1"; shift
+   local rbfile="$1"; shift
+
+   local formula
+
+   [ -z "${name}" ]        && internal_fail "missing name"
+   [ -z "${version}" ]     && internal_fail "missing version"
+   [ -z "${homebrewtap}" ] && internal_fail "missing homebrewtap"
+   [ -z "${rbfile}" ]      && internal_fail "missing rbfile"
+
+   [ ! -d "${homebrewtap}" ] && fail "Failed to locate tap directory \"${homebrewtap}\" from \"$PWD\""
+
+   log_info "Push brew formula \"${homebrewtap}/${rbfile}\""
+
+   formula_push "${rbfile}" "${version}" "${name}" "${homebrewtap}"
+}
+
+
+homebrew_generate()
+{
+   log_entry "homebrew_generate" "$@"
 
    local project="$1" ; shift
    local name="$1"; shift
@@ -452,9 +476,4 @@ homebrew_main()
    fi
 
    redirect_exekutor "${homebrewtap}/${rbfile}" echo "${formula}"
-
-   if [ "${DO_PUSH_FORMULA}" = 'YES' ]
-   then
-      formula_push "${rbfile}" "${version}" "${name}" "${homebrewtap}"
-   fi
 }

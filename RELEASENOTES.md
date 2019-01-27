@@ -1,3 +1,7 @@
+### 2.0.5
+
+* more fine-grained control over distribute functionality
+
 ### 2.0.4
 
 * fix post-release, add mulle-project-redistribute

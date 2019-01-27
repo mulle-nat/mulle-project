@@ -105,14 +105,7 @@ main()
 
    options_setup_trace "${MULLE_TRACE}"
 
-   version="`mulle-project-version`" || exit 1
-   mulle-project-untag ${MULLE_TECHNICAL_FLAGS} "${version}" || exit 1
-
-   # das macht eigentlich schon mulle-project-distribute
-   if git_tag_exists "latest"
-   then
-      mulle-project-untag ${MULLE_TECHNICAL_FLAGS} "latest" || exit 1
-   fi
+   local dogit='NO'
 
    if ! git_is_clean
    then
@@ -122,7 +115,14 @@ main()
          git status -s
          exit 1
       fi
+      dogit='YES'
+   fi
 
+   version="`mulle-project-version`" || exit 1
+   mulle-project-untag ${MULLE_TECHNICAL_FLAGS} "${version}" || exit 1
+
+   if [ "${dogit}" = 'YES' ]
+   then
       (
          log_info "Add modified files and commit changes"
          exekutor git add -u &&
@@ -130,7 +130,6 @@ main()
       ) || exit 1
    fi
 
-   mulle-project-distribute ${MULLE_TECHNICAL_FLAGS} --verify-only || exit 1
    mulle-project-distribute ${MULLE_TECHNICAL_FLAGS}
 }
 
