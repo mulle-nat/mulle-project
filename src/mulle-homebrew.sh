@@ -163,8 +163,7 @@ _print_dependencies()
    local lines
    local line
 
-   set -f ; IFS="
-"
+   set -f ; IFS=$'\n'
    for dependency in ${dependencies}
    do
       set +f ; IFS="${DEFAULT_IFS}"

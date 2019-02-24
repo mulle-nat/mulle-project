@@ -253,8 +253,7 @@ write_version()
       #
       local other
 
-      set -o noglob ; IFS="
-"
+      set -o noglob ; IFS=$'\n'
       for other in ${VERSIONFILEMIRRORS}
       do
          IFS="${DEFAULT_IFS}" ; set +o noglob
