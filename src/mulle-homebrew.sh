@@ -167,7 +167,7 @@ _print_dependencies()
    for dependency in ${dependencies}
    do
       set +f ; IFS="${DEFAULT_IFS}"
-      dependency="`eval echo "${dependency}"`"
+      dependency="`eval "echo \"${dependency}\"" `"
 
       line="${INDENTATION}depends_on \"${dependency}\"${epilog}"
 

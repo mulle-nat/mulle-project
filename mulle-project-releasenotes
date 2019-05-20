@@ -239,7 +239,7 @@ copy_without_first_entry()
    markers="`sed 's/^\(#+\).*/\1/' <<< "${header}"`"
 
    state="start"
-   while read line
+   while IFS=$'\n' read -r line
    do
       case "${state}" in
          start)
@@ -615,7 +615,7 @@ main()
       if [ "${OPTION_ADD_U}" = 'YES' ]
       then
          exekutor git add -u
-         if ! git diff-files --quiet --ignore-submodules --
+         if ! git diff-files --ignore-submodules -- > /dev/null
          then
             fail "git repository is not in a pristine enough state, can not commit"
          fi
