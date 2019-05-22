@@ -1,3 +1,9 @@
+### 2.0.6
+
+* add usage info
+* potential shell script bugs removed
+* small beauty fixes in code
+
 ### 2.0.5
 
 * more fine-grained control over distribute functionality

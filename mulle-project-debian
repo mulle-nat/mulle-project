@@ -14,6 +14,7 @@ Usage:
    mulle-project-debian [options]
 
    Produce debian packages for bash projects.
+   There is no signing involved.
 
    Options:
       --root <path> : default is /usr
