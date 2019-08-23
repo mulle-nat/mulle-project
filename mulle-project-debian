@@ -38,7 +38,7 @@ control_echo()
       fail "\"${envkey:-${key}}\" is not defined"
    fi
 
-   rexekutor echo "${key}: ${value}"
+   rexekutor printf "%s\n" "${key}: ${value}"
 }
 
 

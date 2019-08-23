@@ -58,7 +58,7 @@ get_class_from_name()
             result="${result}${tmp}"
          fi
       done
-      echo "${result}"
+      printf "%s\n" "${result}"
    )
 }
 
@@ -149,7 +149,7 @@ EOF
 
    lines="${lines}
 ${INDENTATION}${line}"
-   exekutor echo "${lines}"
+   exekutor printf "%s\n" "${lines}"
 }
 
 
@@ -180,7 +180,7 @@ ${line}"
 
    if [ ! -z "${lines}" ]
    then
-      exekutor echo "${lines}"
+      exekutor printf "%s\n" "${lines}"
    fi
 }
 
@@ -234,7 +234,7 @@ ${INDENTATION}${INDENTATION}system "xcodebuild", "-configuration", "${configurat
 ${INDENTATION}end
 EOF
 `"
-   exekutor echo "${lines}"
+   exekutor printf "%s\n" "${lines}"
 }
 
 
@@ -263,7 +263,7 @@ ${INDENTATION}${INDENTATION}system "mulle-install", "-vvv", "--prefix", prefix, 
 ${INDENTATION}end
 EOF
 `"
-   exekutor echo "${lines}"
+   exekutor printf "%s\n" "${lines}"
 }
 
 
@@ -294,7 +294,7 @@ ${INDENTATION}${INDENTATION}end
 ${INDENTATION}end
 EOF
 `"
-   exekutor echo "${lines}"
+   exekutor printf "%s\n" "${lines}"
 }
 
 
@@ -311,7 +311,7 @@ end
 # FORMULA ${name}.rb
 EOF
 `"
-   exekutor echo "${lines}"
+   exekutor printf "%s\n" "${lines}"
 }
 
 
@@ -470,9 +470,9 @@ homebrew_generate()
 
    if [ "${OPTION_ECHO}" ]
    then
-      echo "${formula}"
+      printf "%s\n" "${formula}"
       return
    fi
 
-   redirect_exekutor "${homebrewtap}/${rbfile}" echo "${formula}"
+   redirect_exekutor "${homebrewtap}/${rbfile}" printf "%s\n" "${formula}"
 }

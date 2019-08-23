@@ -33,7 +33,7 @@
 
 
 
-MULLE_PROJECT_VERSION="2.0.6"
+MULLE_PROJECT_VERSION="2.0.7"
 
 usage()
 {
@@ -89,10 +89,10 @@ _prepend_path_if_relative()
 {
    case "$2" in
       /*)
-         echo "$2"
+         printf "%s\n" "$2"
          ;;
       *)
-         echo "$1/$2"
+         printf "%s/%s\n" "$1" "$2"
          ;;
    esac
 }
@@ -108,7 +108,7 @@ resolve_symlinks()
       dir_context=`dirname -- "$1"`
       resolve_symlinks "`_prepend_path_if_relative "${dir_context}" "${linkpath}"`"
    else
-      echo "$1"
+      printf "%s\n" "$1"
    fi
 }
 
@@ -166,7 +166,7 @@ main()
          ;;
 
          "--version")
-            echo "${MULLE_PROJECT_VERSION}"
+            printf "%s\n" "${MULLE_PROJECT_VERSION}"
          ;;
 
          -*)
@@ -191,11 +191,11 @@ main()
       ;;
 
       "version")
-         echo "${MULLE_PROJECT_VERSION}"
+         printf "%s\n" "${MULLE_PROJECT_VERSION}"
       ;;
 
       path)
-         echo "${executable}"
+         printf "%s\n" "${executable}"
       ;;
 
       *)

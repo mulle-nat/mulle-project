@@ -101,7 +101,7 @@ get_project_version()
             return 0
          fi
 
-         echo "${match}" | \
+         printf "%s\n" "${match}" | \
          sed -e 's|( *\([0-9]* *\) *<< *[0-9]* *)|\1|g' | \
          sed -e 's|^.*(\(.*\))|\1|' | \
          sed -e 's/ *| */./g' |
@@ -136,7 +136,7 @@ get_project_version()
             return 0
          fi
 
-         echo "$version"
+         printf "%s\n" "$version"
       ;;
    esac
 }
@@ -155,7 +155,7 @@ get_versionname_from_project()
 {
    log_entry "get_versionname_from_project" "$@"
 
-   echo "$1_VERSION" | split_camelcase_string | make_cpp_string
+   printf "%s\n" "$1_VERSION" | split_camelcase_string | make_cpp_string
 }
 
 
@@ -188,11 +188,11 @@ get_header_from_project()
 
    case "${language}" in
       c)
-         project="`echo "${project}" | split_camelcase_string`"
+         project="`printf "%s\n" "${project}" | split_camelcase_string`"
          filename="`make_file_string_no_hyphen <<< "src/${project}.h"`"
          if [ -f "${filename}" ]
          then
-            echo "${filename}"
+            printf "%s\n" "${filename}"
             return
          fi
          make_file_string <<< "src/${project}.h"
@@ -215,11 +215,11 @@ get_formula_name_from_project()
    language="`tr '[A-Z]' '[a-z]' <<< "${language}"`"
    case "${language}" in
       c|sh|bash)
-         echo "${project}" | split_camelcase_string | make_directory_string
+         printf "%s\n" "${project}" | split_camelcase_string | make_directory_string
       ;;
 
       *|"")
-         echo "${project}" # lowercase ?
+         printf "%s\n" "${project}" # lowercase ?
       ;;
    esac
 }
@@ -285,7 +285,7 @@ project_version_add()
       fail "patch field is exhausted. Update the minor"
    fi
 
-   echo "${major}.${minor}.${patch}"
+   printf "%s\n" "${major}.${minor}.${patch}"
 }
 
 
@@ -320,7 +320,7 @@ set_project_version()
 
    if [ -z "${versionname}" ]
    then
-      redirect_exekutor "${versionfile}" echo "$version"
+      redirect_exekutor "${versionfile}" printf "%s\n" "$version"
       return
    fi
 
@@ -339,28 +339,70 @@ set_project_version()
 
    scheme="`get_project_version "${versionfile}" "${versionname}" 'YES'`"
 
+   local escaped_versionname_pattern
+   local escaped_versionname_value
+   local escaped_value
+
+   r_escaped_sed_pattern "${versionname}"
+   escaped_versionname_pattern="${RVAL}"
+
+   r_escaped_sed_replacement "${versionname}"
+   escaped_versionname_value="${RVAL}"
+
+   local sed_script
+
    case "${scheme}" in
       "<<")
          log_debug "Using << scheme"
-         value="(($major << 20) \| ($minor << 8) \| $patch)"
+         value="(($major << 20) | ($minor << 8) | $patch)"
 
-         inplace_sed -e 's|^\(.*\)'"${versionname}"'\([^0-9()]*\)( *( *[0-9][0-9]* *<< *20 *) *\| *( *[0-9][0-9]* *<< *8 *) *\| *[0-9][0-9]* *)\(.*\)$|\1'"${versionname}"'\2'"${value}"'\3|' "${versionfile}" || fail "could not set version number"
+         r_escaped_sed_replacement "${value}"
+         escaped_value="${RVAL}"
+
+         RVAL='s/^\(.*\)'
+         r_append "${RVAL}" "${escaped_versionname_pattern}"
+         r_append "${RVAL}" '\([^0-9()]*\)( *( *[0-9][0-9]* *<< *20 *) *| *( *[0-9][0-9]* *<< *8 *) *| *[0-9][0-9]* *)\(.*\)$/'
+         r_append "${RVAL}" '\1'
+         r_append "${RVAL}" "${escaped_versionname_value}"
+         r_append "${RVAL}" '\2'
+         r_append "${RVAL}" "${escaped_value}"
+         r_append "${RVAL}" '\3/'
+         sed_script="${RVAL}"
+
+         inplace_sed -e "${sed_script}" "${versionfile}" || fail "could not set version number"
       ;;
 
       "1.2.3")
          log_debug "Using 1.2.3 scheme"
+
          value="$major.$minor.$patch"
+         r_escaped_sed_replacement "${value}"
+         escaped_value="${RVAL}"
+
          if [ ! -z "${versionname}" ]
          then
-            inplace_sed -e 's|^\(.*\)'"${versionname}"'\([^0-9]*\)[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\(.*\)$|\1'"${versionname}"'\2'"${value}"'\3|' "${versionfile}" || fail "could not set version number"
+            RVAL='s/^\(.*\)'
+            r_append "${RVAL}" "${escaped_versionname_pattern}"
+            r_append "${RVAL}" '\([^0-9]*\)[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\(.*\)$/'
+            r_append "${RVAL}" '\1'
+            r_append "${RVAL}" "${escaped_versionname_value}"
+            r_append "${RVAL}" '\2'
+            r_append "${RVAL}" "${escaped_value}"
+            r_append "${RVAL}" '\3/'
          else
-            inplace_sed -e 's|^\([^0-9]*\)[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*|${value}|' "${versionfile}" || fail "could not set version number"
+            RVAL='s/^\([^0-9]*\)[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*/'
+            r_append "${RVAL}" "${escaped_value}"
+            r_append "${RVAL}" '/'
          fi
+         sed_script="${RVAL}"
       ;;
 
       *)
-         fail "Incompatible versioning scheme in \"${versionfile}\". Use either 1.2.3 or ((1 << 20) | (2 << 8) | 3)"
+         fail "Incompatible versioning scheme in \"${versionfile}\".
+${C_INFO}Use either 1.2.3 or ((1 << 20) | (2 << 8) | 3)"
       ;;
    esac
+
+   inplace_sed -e "${sed_script}" "${versionfile}"
 }
 

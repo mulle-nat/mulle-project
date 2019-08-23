@@ -142,7 +142,7 @@ git_repo_can_push()
       log_verbose "Remote \"${remote}\" does not have branch \"${branch}\" yet"
       return 0
    fi
-   result="`echo "${result}" | awk '{ print $2 }'`"
+   result="`printf "%s\n" "${result}" | awk '{ print $2 }'`"
    [ -z "${result}" ] || [ "${result}" -eq 0 ]  # -z test for exekutor
 }
 

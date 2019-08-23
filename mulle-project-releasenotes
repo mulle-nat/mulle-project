@@ -59,6 +59,7 @@ Flags:
    --message <text>         : message to use instead of git comments
    --missing                : emit all missing comments, not just from last tag
    --output <file>          : where to output the releasenotes (- for stdout)
+   --print-latest-version   : prints latest version in releasenotes then exits
    --tag <tag>              : git tag where to collect comments from
    --unfiltered             : don't filter git commit comments
    --version <version>      : specify version for releasenotes
@@ -180,7 +181,7 @@ determine_message()
       message="`sed "s/^/${pattern}/" <<< "${message}"`"
    fi
 
-   echo "${message}"
+   printf "%s\n" "${message}"
 }
 
 
@@ -250,12 +251,12 @@ copy_without_first_entry()
             if egrep -s "^${markers} *" <<< "${line}"
             then
                state="copy"
-               exekutor echo "${line}"
+               exekutor printf "%s\n" "${line}"
             fi
          ;;
 
          copy)
-            exekutor echo "${line}"
+            exekutor printf "%s\n" "${line}"
          ;;
       esac
    done
@@ -307,7 +308,7 @@ get_latest_releasenote_version()
 {
    log_entry "get_latest_releasenote_version" "$@"
 
-   local filename
+   local filename="$1"
 
    if [ ! -f "${filename}" ]
    then
@@ -316,7 +317,7 @@ get_latest_releasenote_version()
 
    egrep -v '^[[:space:]]*$' "${filename}" | \
       head -1 | \
-      sed -n 's/^#*[[:space:]]*\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/'
+      sed -n 's/^#*[[:space:]]*\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p'
 }
 
 
@@ -417,6 +418,7 @@ main()
    local OPTION_COMMITFLAGS="--amend --no-edit"
    local OPTION_ALL
    local OPTION_MD_ESCAPE='YES'
+   local OPTION_PRINT_LATEST_VERSION='NO'
 
    local custom_output='NO'
 
@@ -561,6 +563,13 @@ main()
             OPTION_FIRST_PATCH="1"
          ;;
 
+         --print-latest-version)
+            shift
+            OPTION_INPUT="$1"
+            get_latest_releasenote_version "$1"
+            return $?
+         ;;
+
          -*)
             usage "Unknown option \"$1\""
          ;;
@@ -659,9 +668,9 @@ main()
    then
       if [ "${OPTION_OUTPUT}" = "-" ]
       then
-         exekutor echo "${notes}"
+         exekutor printf "%s\n" "${notes}"
       else
-         redirect_exekutor "${OPTION_OUTPUT}" echo "${notes}"  || exit 1
+         redirect_exekutor "${OPTION_OUTPUT}" printf "%s\n" "${notes}"  || exit 1
       fi
    else
       local result
@@ -670,9 +679,9 @@ main()
 
       if [ "${OPTION_OUTPUT}" = "-" ]
       then
-         exekutor echo "${result}"
+         exekutor printf "%s\n" "${result}"
       else
-         redirect_exekutor "${OPTION_OUTPUT}" echo "${result}" || exit 1
+         redirect_exekutor "${OPTION_OUTPUT}" printf "%s\n" "${result}" || exit 1
       fi
    fi
 

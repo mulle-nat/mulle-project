@@ -76,10 +76,10 @@ project_is_compatible_version()
    local i_major
    local i_minor
 
-   s_major="`echo "${script}"    | head -1 | cut -d. -f1`"
-   s_minor="`echo "${script}"    | head -1 | cut -d. -f2`"
-   i_major="`echo "${installed}" | head -1 | cut -d. -f1`"
-   i_minor="`echo "${installed}" | head -1 | cut -d. -f2`"
+   s_major="`printf "%s\n" "${script}"    | head -1 | cut -d. -f1`"
+   s_minor="`printf "%s\n" "${script}"    | head -1 | cut -d. -f2`"
+   i_major="`printf "%s\n" "${installed}" | head -1 | cut -d. -f1`"
+   i_minor="`printf "%s\n" "${installed}" | head -1 | cut -d. -f2`"
 
    if [ "${i_major}" = "" -o "${i_minor}" = "" -o \
         "${s_major}" = "" -o "${s_minor}" = "" ]

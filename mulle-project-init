@@ -58,7 +58,7 @@ log_verbose()
 {
    if [ "${OPTION_VERBOSE}" = 'YES' ]
    then
-      echo "$*" >&2
+      printf "%s\n" "$*" >&2
    fi
 }
 
@@ -165,11 +165,11 @@ write_formula_info_template()
 
    result="`sed "s/^# PROJECT=\\\"MyProject\\\"/PROJECT=\\\"${project}\\\"/" "${template}"`" || exit 1
    [ -z "${result}" ] && fail "formula-info.sh generation failed"
-   result="`echo "${result}" | sed "s/^# DESC=\\\".*\\\"/DESC=\\\"${project} is ...\\\"/"`" || exit 1
+   result="`printf "%s\n" "${result}" | sed "s/^# DESC=\\\".*\\\"/DESC=\\\"${project} is ...\\\"/"`" || exit 1
 
    if [ -f "${projectdir}/CMakeLists.txt" ]
    then
-      result="`echo "${result}" |  sed "s/^' *# cmake may be useful to add *$/cmake'/"`" || exit 1
+      result="`printf "%s\n" "${result}" |  sed "s/^' *# cmake may be useful to add *$/cmake'/"`" || exit 1
    fi
 
    if [ ! -d "${directory}" ]
@@ -189,7 +189,7 @@ write_formula_info_template()
       (
          log_verbose "Write \"${filename}\""
 
-         echo "${result}" > "${filename}" &&
+         printf "%s\n" "${result}" > "${filename}" &&
          chmod 755 "${filename}"
       ) || exit 1
    fi
@@ -312,7 +312,7 @@ _init()
    #
    case "$1" in
       "libexec-dir"|"library-path")
-         echo "${MULLE_PROJECT_LIBEXEC_DIR}"
+         printf "%s\n" "${MULLE_PROJECT_LIBEXEC_DIR}"
          exit 0
       ;;
    esac

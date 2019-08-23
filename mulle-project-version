@@ -61,6 +61,7 @@ Options:
    --language <name>     : project language, (c, obj, cpp, bash etc)
    --no-info             : do not read -info.sh files
    --no-tag-warning      : do not warn if git tag exists
+   --print-latest-tag    : print latest release tag
    --read-xcode-version  : read version from Xcode project
    --set-version <value> : set version
    --versionname <name>  : version variable name
@@ -332,6 +333,11 @@ parse_arguments()
             OPTION_ADD_PATCH="1"
          ;;
 
+         --print-latest-tag)
+            git_last_tag
+            exit $?
+         ;;
+
          --reset) # stupid option for verify must be last
             OPTION_ADD_PATCH="0"
             OPTION_ADD_MINOR="0"
@@ -502,7 +508,7 @@ main()
 
    if ! [ "${OPTION_WRITE}" = 'YES' -o "${OPTION_WRITE_XCODE_VERSION}" = 'YES' ]
    then
-      echo "${VERSION}"
+      printf "%s\n" "${VERSION}"
       return 0
    fi
 
