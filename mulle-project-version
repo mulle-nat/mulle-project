@@ -52,18 +52,18 @@ Usage: mulle-project-version [options] [projectname]
 
 Options:
    ++                    : shorthand for --increment-patch --write
-   --add-patch <value>   : add value to patch version part
+   --add-patch <value>   : add value to patch version part, needs --write
    --first-patch-one     : set patch to 1 for minor/major increments
    --first-patch-zero    : set patch to 0 for minor/major increments
-   --increment-major     : add 1 to major versionpart
-   --increment-minor     : add 1 to minor version part
-   --increment-patch     : add 1 to patch version part
+   --increment-major     : add 1 to major versionpart, needs --write
+   --increment-minor     : add 1 to minor version part, needs --write
+   --increment-patch     : add 1 to patch version part, needs --write
    --language <name>     : project language, (c, obj, cpp, bash etc)
    --no-info             : do not read -info.sh files
    --no-tag-warning      : do not warn if git tag exists
    --print-latest-tag    : print latest release tag
    --read-xcode-version  : read version from Xcode project
-   --set-version <value> : set version
+   --set <value>         : set version, needs --write to persist change
    --versionname <name>  : version variable name
    --write               : update versionfile with new version
    --write-xcode-version : write version to Xcode project
@@ -351,7 +351,7 @@ parse_arguments()
             OPTION_FIRST_PATCH="0"
          ;;
 
-         --set-version)
+         -set|--set-version)
             [ $# -eq 1 ] && fail "missing argument to $1"
             shift
 
