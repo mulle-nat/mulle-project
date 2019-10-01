@@ -1,0 +1,362 @@
+#! /usr/bin/env bash
+#
+#   Copyright (c) 2019 nat - Mulle kybernetiK
+#   All rights reserved.
+#
+#   Redistribution and use in source and binary forms, with or without
+#   modification, are permitted provided that the following conditions are met:
+#
+#   Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+#   Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+#   Neither the name of Mulle kybernetiK nor the names of its contributors
+#   may be used to endorse or promote products derived from this software
+#   without specific prior written permission.
+#
+#   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+#   AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+#   IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+#   ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+#   LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+#   CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+#   SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+#   INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+#   CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+#   ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+#   POSSIBILITY OF SUCH DAMAGE.
+#
+[ "${TRACE}" = 'YES' ] && set -x && : "$0" "$@"
+
+
+MULLE_EXECUTABLE_VERSION="0.0.1s"
+
+
+print_flags()
+{
+   echo "   -f          : force operation"
+
+   options_technical_flags_usage "       : "
+}
+
+
+usage()
+{
+   [ $# -ne 0 ] && log_error "$*"
+
+   cat <<EOF >&2
+Usage:
+   ${MULLE_USAGE_NAME} [flags]
+
+   This is a convenient to run before mulle-project-distribute. It minimizes
+   the chance of it failing. It will checks that:
+
+   * the version numbers of git, project and RELEASENOTES match up
+     for release
+   * there are no uncommitted files
+   * there are no changes in the github/release branch to be merged
+   * that git tags are properly set
+
+Flags:
+EOF
+   print_flags | LC_ALL=C sort >&2
+
+   exit 1
+}
+
+
+git_is_clean()
+{
+   log_entry "git_is_clean" "$@"
+
+   local name
+
+   name="${1:-${PWD}}"
+
+   if [ ! -d .git ]
+   then
+      fail "\"${name}\" is not a git repository"
+   fi
+
+   local clean
+
+   clean=`rexekutor git status -s --untracked-files=no`
+   [ "${clean}" = "" ]
+}
+
+
+git_ref_for_tag()
+{
+   log_entry "git_ref_for_tag" "$@"
+
+   rexekutor git show-ref --tags $1 | awk '{ print$1 }'
+}
+
+
+git_commits_from_tag()
+{
+   log_entry "git_commits_from_tag" "$@"
+
+   local ref
+
+   ref="`git_ref_for_tag "$1"`"
+   rexekutor git log --format=%B "$1..HEAD"
+}
+
+
+git_can_push()
+{
+   log_entry "git_can_push" "$@"
+
+   local version="$1"
+
+   [ ! -z "`git_commits_from_tag "${version}"`" ]
+}
+
+
+git_need_merge()
+{
+   log_entry "git_need_merge" "$@"
+
+   if [ "${OPTION_REMOTE_UPDATE}" = 'YES' ]
+   then
+      git remote update > /dev/null 2>&1
+   fi
+   [ ! -z "`git log HEAD..github/release --oneline 2> /dev/null`" ]
+}
+
+
+main()
+{
+   local MULLE_FLAG_MAGNUM_FORCE='NO'
+
+   # technical flags
+   local MULLE_TRACE
+   local MULLE_FLAG_EXEKUTOR_DRY_RUN='NO'
+   local MULLE_FLAG_LOG_LOCAL='NO'
+   local MULLE_FLAG_LOG_DEBUG='NO'
+   local MULLE_FLAG_LOG_EXEKUTOR='NO'
+   local MULLE_FLAG_LOG_FLUFF='NO'
+   local MULLE_FLAG_LOG_SCRIPTS='NO'
+   local MULLE_FLAG_LOG_SETTINGS='NO'
+   local MULLE_FLAG_LOG_VERBOSE='NO'
+   local MULLE_FLAG_LOG_MERGE='NO'
+   local MULLE_TRACE_POSTPONE='NO'
+
+   #
+   # simple option handling
+   #
+   while [ $# -ne 0 ]
+   do
+      if options_technical_flags "$1"
+      then
+         shift
+         continue
+      fi
+
+      case "$1" in
+         -f|--force)
+            MULLE_FLAG_MAGNUM_FORCE='YES'
+         ;;
+
+         -h*|--help|help)
+            usage
+         ;;
+
+         --version)
+            printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
+            exit 0
+         ;;
+
+         -*)
+            usage "Unknown option \"$1\""
+         ;;
+
+         *)
+            break
+         ;;
+      esac
+
+      shift
+   done
+
+   options_setup_trace "${MULLE_TRACE}"
+
+   local project_version
+   local releasenotes_version
+   local git_version
+   local project_git_distance
+   local project_releasenotes_distance
+   local git_releasenotes_distance
+
+   project_version="`mulle-project-version --no-tag-warning`"
+   git_version="`mulle-project-version --print-latest-tag`"
+
+   log_info "Project      : ${project_version}"
+   log_info "Git          : ${git_version}"
+
+   r_version_distance "${project_version}" "${git_version}"
+   project_git_distance="${RVAL}"
+
+   if [ -f RELEASENOTES.md ]
+   then
+      releasenotes_version="`mulle-project-releasenotes --print-latest-version RELEASENOTES.md `"
+      r_version_distance "${project_version}" "${releasenotes_version}"
+      project_releasenotes_distance="${RVAL}"
+
+      r_version_distance "${git_version}" "${releasenotes_version}"
+      git_releasenotes_distance="${RVAL}"
+
+      log_info "RELEASENOTES : ${releasenotes_version}"
+   else
+      fail "Missing RELEASENOTES.md"
+   fi
+
+   local is_clean='NO'
+   local is_pushable='NO'
+
+   if git_need_merge
+   then
+      log_error "You need to merge release from github first"
+      return 1
+   fi
+
+   if git_is_clean
+   then
+      is_clean='YES'
+   fi
+
+   if git_can_push "${git_version}"
+   then
+      is_pushable='YES'
+   fi
+
+   case "${is_pushable}-${is_clean}" in
+      'NO-YES')
+         log_verbose "Repository has nothing to release"
+      ;;
+
+      'YES-YES')
+         log_verbose "Repository has unreleased commits"
+      ;;
+
+      *)
+         log_error "Repository needs changes to be committed first"
+      ;;
+   esac
+
+   if [ "${is_clean}" = 'NO' ]
+   then
+      if [ "${project_releasenotes_distance}" -eq 0 ]
+      then
+         log_warning "This project is a candidate for a ${C_RESET_BOLD}mulle-project-sloppy-distribute"
+         git diff
+         return 0
+      fi
+      log_warning "Commit changes first"
+      return 1
+   fi
+
+   if [ "${is_pushable}" = 'NO' ]
+   then
+      log_info "Project is unchanged since ${git_version}"
+      return 1
+   fi
+
+   if [ "${project_git_distance}" -eq 0 ]
+   then
+      if [ "${git_releasenotes_distance}" -eq 0 ]
+      then
+         log_warning "This project is a candidate for release with: ${C_RESET_BOLD}
+mulle-project-version ++
+mulle-project-releasenotes RELEASENOTES.md
+git add -u
+git commit --amend --no-edit
+mulle-project-distribute"
+         return 0
+      fi
+
+      log_warning "Need to update the project version ${C_RESET_BOLD}mulle-project-version ++${C_WARNING} first"
+      return 0
+   fi
+
+   if [ "${git_releasenotes_distance}" -eq 0 ]
+   then
+      log_warning "Need to update the project version ${C_RESET_BOLD}mulle-project-releasenotes RELEASENOTES.md${C_WARNING} first"
+      return 0
+   fi
+
+   if [ "${project_releasenotes_distance}" -lt 0 ]
+   then
+      log_warning "Update releasenotes with ${C_RESET_BOLD}mulle-project-releasenotes --commit RELEASENOTES.md${C_WARNING} first"
+      return 0
+   fi
+
+   if [ "${project_releasenotes_distance}" -eq 0 ]
+   then
+      log_warning "This project is a candidate for a ${C_RESET_BOLD}mulle-project-distribute"
+      return 0
+   fi
+
+   fail "Unknown configuration"
+}
+
+
+########
+###
+### INIT
+###
+trap_fail()
+{
+   exit 1
+}
+
+
+_init()
+{
+   #
+   # minimal setup exit
+   #
+   if [ "$1" = "version" ]
+   then
+      printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
+      exit 0
+   fi
+
+   if [ -z "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}" ]
+   then
+      MULLE_BASHFUNCTIONS_LIBEXEC_DIR="`mulle-bashfunctions-env libexec-dir 2> /dev/null`"
+      if [ -z "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}" ]
+      then
+         if [ -z "`command -v "${executablepath}"`" ]
+         then
+            echo "Fatal Error: Could not find mulle-bashfunctions-env in PATH ($PATH) - mulle-bashfunctions not installed ?" >&2
+         else
+            echo "Fatal Error: Could not find libexec of mulle-bashfunctions-env ($PWD)" >&2
+         fi
+         exit 1
+      fi
+   fi
+
+      # shellcheck source=../mulle-bashfunctions/src/mulle-string.sh
+   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-bashfunctions.sh" ||
+      fail "failed to load bashfunctions from ${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}"
+
+   #  set -e # more pain then gain in the end
+   #  set -u # doesn't work with my style
+
+   trap trap_fail INT
+   set -o pipefail
+}
+
+###
+### INIT
+###
+########
+
+
+_init "$@" # needs params
+main "$@"
