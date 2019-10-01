@@ -269,6 +269,17 @@ write_version()
       # set mirrors first before "real", which is nicer in case of fails
       set_project_version "${VERSION}" "${VERSIONFILE}" "${VERSIONNAME}" || exit 1
    fi
+}
+
+
+verify_version()
+{
+   # lame ass bug check
+   case "$*" in
+      *--reset*)
+         internal_fail "verify called too oftena"
+      ;;
+   esac
 
    VERIFY_VERSION="`"$0" "$@" --reset`"
 
@@ -351,7 +362,7 @@ parse_arguments()
             OPTION_FIRST_PATCH="0"
          ;;
 
-         -set|--set-version)
+         --set|--set-version)
             [ $# -eq 1 ] && fail "missing argument to $1"
             shift
 
@@ -421,7 +432,7 @@ parse_arguments()
 
 
          -*)
-            usage
+            usage "Unknown option $1"
          ;;
 
          *)
@@ -454,8 +465,8 @@ main()
    local OPTION_FIRST_PATCH="0"
    local OPTION_READ_INFO='YES'
    local OPTION_READ_XCODE_VERSION='NO'
-   local OPTION_WRITE='NO'
-   local OPTION_WRITE_XCODE_VERSION='NO'
+   local OPTION_WRITE='DEFAULT'
+   local OPTION_WRITE_XCODE_VERSION='DEFAULT'
    local OPTION_XCODEPROJ=""
    local OPTION_TAG_WARNING='YES'
 
@@ -488,6 +499,21 @@ main()
    VERSIONNAME="${OPTION_VERSIONNAME:-${VERSIONNAME}}"
    VERSIONFILE="${OPTION_VERSIONFILE:-${VERSIONFILE}}"
 
+   if [ "${OPTION_WRITE}" = "${DEFAULT}" ]
+   then
+      OPTION_WRITE="NO"
+   fi
+
+   if [ "${OPTION_WRITE_XCODE_VERSION}" = 'DEFAULT' ]
+   then
+      if [ "${OPTION_WRITE}" = "YES" ]
+      then
+         OPTION_WRITE_XCODE_VERSION="${WRITE_XCODE_VERSION:-NO}"
+      else
+         OPTION_WRITE_XCODE_VERSION="NO"
+      fi
+   fi
+
    get_version
 
    if [ ! -z "${OPTION_VERSION_SET}" ]
@@ -513,6 +539,7 @@ main()
    fi
 
    write_version "$@"
+   verify_version "$@"
 }
 
 
