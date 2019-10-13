@@ -1,3 +1,10 @@
+## 2.1.0
+
+* moved to mulle-bashfunctions v2
+* new script mulle-project-distcheck
+* rename --set-version to --set
+
+
 ### 2.0.6
 
 * add usage info
