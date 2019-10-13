@@ -301,11 +301,8 @@ _init()
    #  set -e # more pain then gain in the end
    #  set -u # doesn't work with my style
 
-   local _libexec_dir
-
-   _get_libexec_dir "$0" "mulle-project" "mulle-publisher.sh"
-
-   MULLE_PROJECT_LIBEXEC_DIR="${_libexec_dir}"
+   r_get_libexec_dir "$0" "mulle-project" "mulle-publisher.sh"
+   MULLE_PROJECT_LIBEXEC_DIR="${RVAL}"
 
    #
    # minimal setup exit

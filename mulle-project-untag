@@ -110,7 +110,7 @@ main()
 
    for i in .git/refs/remotes/*
    do
-      r_fast_basename "${i}"
+      r_basename "${i}"
       remote="${RVAL}"
       log_info "Trying to remove tag \"${TAG}\" on remote \"${remote}\""
       exekutor git push "${remote}" ":${TAG}" # failure is OK
