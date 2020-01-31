@@ -84,7 +84,7 @@ project_is_compatible_version()
    if [ "${i_major}" = "" -o "${i_minor}" = "" -o \
         "${s_major}" = "" -o "${s_minor}" = "" ]
    then
-      return 2
+      return 4
    fi
 
    if [ "${i_major}" != "${s_major}" ]

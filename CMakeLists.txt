@@ -22,6 +22,7 @@ mulle-project-debian
 mulle-project-distribute
 mulle-project-env
 mulle-project-releasenotes
+mulle-project-tag
 mulle-project-untag
 mulle-project-version
 )

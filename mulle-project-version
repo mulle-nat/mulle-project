@@ -68,6 +68,12 @@ Options:
    --write               : update versionfile with new version
    --write-xcode-version : write version to Xcode project
    --xcodeproj <dir>     : specify path of .xcodeproj directory
+
+Environment:
+   VERSIONFILE           : File to look for master version number
+   VERSIONNAME           : Variable name of the version number
+   VERSIONFILEMIRRORS    : Other files containing the version number
+
 EOF
    exit 1
 }
