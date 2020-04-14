@@ -6,19 +6,31 @@
 
 * versioning
 * releasenotes
-* commit and distribution
+* git tagging
 * debian distribution
+* homebrew distribution
+* local travis-ci like continous integration
+*
+
+The process is quite involved and has organically grown over time. For starters
+it is recommended to get familiar with `mulle-project-version` and
+`mulle-project-releasenotes` only.
 
 
 Command                      | Description
 -----------------------------|-----------------------
 `mulle-project-debian`       | Create and upload debian packages (own server)
+`mulle-project-distcheck`    | Predicts if a `mulle-project-distribute` would fail
 `mulle-project-distribute`   | Create and publish releases (github)
 `mulle-project-init`         | Initial setup and update
 `mulle-project-releasenotes` | Create releasenotes from git logs
 `mulle-project-untag`        | Remove tags from multiple repositories
+`mulle-project-distribute`   | Combines `mulle-project-untag` and `mulle-project-distribute`
 `mulle-project-version`      | Examine and change project versions
-
+`mulle-project-local-travis` | Test in a local travis-ci like docker
+`mulle-project-sloppy-distribute` v           | Commit current changes, up the version count and distribute with releasenotes given on commandline
+`mulle-project-travis-ci-prerelease`          | Create an environment-host-travis-ci-prerelease.sh file for prerelease tests
+`mulle-project-add-missing-branch-identifier` | Massages sourcetree configs for use with `mulle-project-travis-ci-prerelease`
 
 #### What `mulle-project-distribute` does
 
@@ -31,7 +43,7 @@ Command                      | Description
 7. Tags your repository with the current version and with "latest"
 8. Pushes the tagged **release** to **origin**
 9. Optionally pushes the tagged **release** to **github**
-10. Checks out the the current development branch (usually **master**) again (see 3.)
+10. Checks out the current development branch (usually **master**) again (see 3.)
 11. Optional: Downloads the source archive for the created tag
 12. Optional: Calculates the sha256 for the archive
 13. Optional: Creates the homebrew formula for your project and places it into your tap
@@ -61,8 +73,8 @@ mulle-project-init
 
 This will create the following files
 
-File                            | Description
---------------------------------|----------------------------
+File                                 | Description
+-------------------------------------|----------------------------
 `.mulle/etc/project/version-info.sh` | Versioning information
 `.mulle/etc/project/formula-info.sh` | Information for package creation
 
@@ -112,7 +124,8 @@ Variable             | Description
 `VERSION`            | As a last resort you can specify the VERSION here
 `VERSIONFILE`        | The filename containing the version variable
 `VERSIONNAME`        | The name of the version variable
-
+`VERSIONMIRRORNAME`  | The name of the version variable in mirrors
+`VERSIONFILEMIRRORS` | You can mirror the VERSION into multiple files here. Files must be separated by linefeed
 
 
 ### 4. Edit formula-info.sh
@@ -246,12 +259,13 @@ Variable         | Option             | Description
 `BUILDTOOLS_TAP` | `--buildtools-tap` | Tap to use for depends_on => build in formulas
 `BRANCH`         | `--branch`         | Branch to use as release branch
 `DEPENDENCY_TAP` | `--dependency-tap` | Tap to use for depends_on in formulas
-`GITHUB`         | `--github`         | Git remote github
+`GITHUB`         | `--github`         | Git remote github (like origin)
 `HOMEPAGE_URL`   | `--homepage-url`   | URL of the homepage to use for the formula.
 `LANGUAGE`       |     none           | Main language of your project: `c`,`cpp`, `objc` or anything else
 `NAME`           |     none           | Formula name without .rb extension. Derived from PROJECT if not specified.
 `ORIGIN`         | `--origin`         | Git remote origin
 `TAG_PREFIX`     | `--tag-prefix`     | Prefix to use with version to create the tag
+`TAG_SUFFIX`     | `--tag-suffix`     | Suffix to use with version to create the tag
 `TAG`            | `--tag`            | Tag to use, instead of version
 `TAPS_LOCATION`  | `--taps-location`  | Where your taps are stored on your filesystem.
 `VERSION`        |    none            | Version

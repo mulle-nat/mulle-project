@@ -1,0 +1,342 @@
+#! /usr/bin/env bash
+
+[ "${TRACE}" = 'YES' -o "${MULLE_PROJECT_TRAVIS_CI_PRERELEASE_TRACE}" = 'YES' ] && set -x && : "$0" "$@"
+
+
+MULLE_EXECUTABLE_VERSION="0.0.0"
+
+
+print_flags()
+{
+   echo "   -f          : force operation"
+
+   ##
+   ## ADD YOUR FLAGS HERE
+   ##
+
+   options_technical_flags_usage "       : "
+}
+
+
+usage()
+{
+   [ $# -ne 0 ] && log_error "$*"
+
+
+   cat <<EOF >&2
+Usage:
+   mulle_project_travis_ci_prerelease [flags]
+
+   Generate environment variable settings to map the sourcetree dependecies to
+   a different branch, nodetype, url. This is useful for testing prereleases
+   on travis, where you want to clone from a different branch rather than
+   downloading a tagged archive from release.
+
+   On Travis Ci, with the default flag values, set MULLE_HOSTNAME to
+   "travis-ci-prerelease" in the settings. This will be picked up and the
+   environment variables will be used in the next build.
+
+   Example:
+      mulle-project-travis-ci-prerelease --user 'mulle-*'
+
+Flags:
+   --user <pattern> : specify github users to match, multiple uses are
+                      possible, wildcards are possible
+   --repo <pattern> : specify repository names to match, multiple uses are
+                      possible, wildcards are possible
+   --branch <name>  : specify github branch to pull from (prerelease)
+   --scope <name>   : specify environment scope (host-travis-ci-<branch>)
+
+EOF
+   print_flags | LC_ALL=C sort >&2
+
+   exit 1
+}
+
+
+produce_environment()
+{
+   log_entry produce_environment "$@"
+
+   local mapped_branch="$1"
+   local mapped_scope="$2"
+   local matching_users="$3"
+   local matching_repos="$4"
+
+   [ -z "${mapped_branch}" ] && internal_fail "mapped_branch is empty"
+   [ -z "${mapped_scope}" ]  && internal_fail "mapped_scope is empty"
+
+   exekutor mulle-env \
+               ${MULLE_TECHNICAL_FLAGS} \
+               ${MULLE_ENV_FLAGS} \
+            scope  \
+               remove --if-exists "${mapped_scope}"  || fail "Could not remove old scope"
+
+   local lines
+
+   #
+   # uses mulle-sourcetree-parser.h library
+   #
+   lines="`get_dependency_address_nodetype_branch_tag_url -r`"
+
+   set -o noglob; IFS=$'\n'
+   for line in ${lines}
+   do
+      set +o noglob; IFS="${DEFAULT_IFS}"
+
+      [ -z "${line}" ] && continue
+
+      local _address
+      local _nodetype
+      local _branch
+      local _url
+      local _host
+      local _user
+      local _repo
+      local _nodetype_identifier
+      local _nodetype_fallback
+      local _branch_identifier
+      local _branch_fallback
+      local _url_identifier
+      local _url_fallback
+      local _tag_identifier
+      local _tag_fallback
+
+      if ! parse_sourcetree_nodetype_branch_tag_url "${line}"
+      then
+         continue
+      fi
+
+      [ -z "${_address}" ] && fail "Can't figure out address: ${line}"
+      [ -z "${_host}" ]    && fail "Can't figure out host from URL ${_url}: ${line}"
+      [ -z "${_user}" ]    && fail "Can't figure out user from URL ${_url}: ${line}"
+      [ -z "${_repo}" ]    && fail "Can't figure out repo from URL ${_url}: ${line}"
+      [ -z "${_nodetype_identifier}" ] && fail "Can't figure out node identifier: ${line}"
+      [ -z "${_url_identifier}" ] && fail "Can't figure out URL from URL ${_url}: ${line}"
+
+      if [ ! -z "${_user}" ] && ! is_matching_wildcards "${matching_users}" "${_user}"
+      then
+         log_fluff "\"${_user}\" does not match \"${matching_users}\""
+         continue
+      fi
+      if [ ! -z "${_repo}" ] && ! is_matching_wildcards "${matching_repos}" "${_repo}"
+      then
+         log_fluff "\"${_repo}\" does not match \"${matching_repos}\""
+         continue
+      fi
+
+      local mapped_url
+
+      mapped_url="https://${_host}/${_user}/${_repo%.git}.git"
+
+      log_verbose "Map ${mapped_url}"
+
+      exekutor mulle-env \
+                  ${MULLE_TECHNICAL_FLAGS} \
+                  ${MULLE_ENV_FLAGS} \
+               environment  \
+                  --scope "${mapped_scope}" \
+                  set "${_nodetype_identifier}" "git" "${_address} nodetype: ${_nodetype}" &&
+      exekutor mulle-env \
+                  ${MULLE_TECHNICAL_FLAGS} \
+                  ${MULLE_ENV_FLAGS} \
+               environment  \
+                  --scope "${mapped_scope}" \
+                  set "${_url_identifier}" "${mapped_url}" "${_address} url: ${_url}" &&
+      exekutor mulle-env \
+                  ${MULLE_TECHNICAL_FLAGS} \
+                  ${MULLE_ENV_FLAGS} \
+               environment  \
+                  --scope "${mapped_scope}" \
+                  set "${_branch_identifier}" "${mapped_branch}" "${_address} branch: ${_branch}"
+   done
+
+   set +o noglob; IFS="${DEFAULT_IFS}"
+}
+
+
+main()
+{
+   local MULLE_FLAG_MAGNUM_FORCE='NO'
+
+   # technical flags
+   local MULLE_TRACE
+   local MULLE_FLAG_EXEKUTOR_DRY_RUN='NO'
+   local MULLE_FLAG_LOG_LOCAL='NO'
+   local MULLE_FLAG_LOG_DEBUG='NO'
+   local MULLE_FLAG_LOG_EXEKUTOR='NO'
+   local MULLE_FLAG_LOG_FLUFF='NO'
+   local MULLE_FLAG_LOG_SCRIPTS='NO'
+   local MULLE_FLAG_LOG_SETTINGS='NO'
+   local MULLE_FLAG_LOG_VERBOSE='NO'
+   local MULLE_FLAG_LOG_MERGE='NO'
+   local MULLE_TRACE_POSTPONE='NO'
+
+   local OPTION_SCOPE
+   local OPTION_BRANCH
+   local OPTION_USERS
+   local OPTION_REPOS
+
+   #
+   # simple flag handling
+   #
+   while [ $# -ne 0 ]
+   do
+      if options_technical_flags "$1"
+      then
+         shift
+         continue
+      fi
+
+      case "$1" in
+         -f|--force)
+            MULLE_FLAG_MAGNUM_FORCE='YES'
+         ;;
+
+         -h*|--help|help)
+            usage
+         ;;
+
+         --version)
+            printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
+            exit 0
+         ;;
+
+         --mulle)
+            r_colon_concat "${OPTION_USERS}" 'Mulle*'
+            OPTION_USERS="${RVAL}"
+            r_colon_concat "${OPTION_USERS}" 'mulle-*'
+            OPTION_USERS="${RVAL}"
+
+            r_colon_concat "${OPTION_REPOS}" '!mintomic*'
+            OPTION_REPOS="${RVAL}"
+            r_colon_concat "${OPTION_REPOS}" '!farmhash*'
+            OPTION_REPOS="${RVAL}"
+            r_colon_concat "${OPTION_REPOS}" '*'
+            OPTION_REPOS="${RVAL}"
+         ;;
+
+         --branch)
+            [ $# -eq 1 ] && usage "Missing argument to \"$1\""
+            shift
+
+            OPTION_BRANCH="$1"
+         ;;
+
+         --repo)
+            [ $# -eq 1 ] && usage "Missing argument to \"$1\""
+            shift
+
+            r_colon_concat "${OPTION_REPOS}" "$1"
+            OPTION_REPOS="${RVAL}"
+         ;;
+
+         --scope)
+            [ $# -eq 1 ] && usage "Missing argument to \"$1\""
+            shift
+
+            OPTION_SCOPE="$1"
+         ;;
+
+         --user)
+            [ $# -eq 1 ] && usage "Missing argument to \"$1\""
+            shift
+
+            r_colon_concat "${OPTION_USERS}" "$1"
+            OPTION_USERS="${RVAL}"
+         ;;
+
+         -*)
+            usage "Unknown flag \"$1\""
+         ;;
+
+         *)
+            break
+         ;;
+      esac
+
+      shift
+   done
+
+   options_setup_trace "${MULLE_TRACE}"
+
+   produce_environment "${OPTION_BRANCH:-prerelease}" \
+                       "${OPTION_SCOPE:-host-travis-ci-${OPTION_BRANCH:-prerelease}}" \
+                       "${OPTION_USERS}" \
+                       "${OPTION_REPOS}"
+}
+
+
+########
+###
+### INIT - You usually won't edit code below
+###
+
+trap_fail()
+{
+   exit 1
+}
+
+
+_init()
+{
+   #
+   # minimal setup exit
+   #
+   if [ "$1" = "version" ]
+   then
+      printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
+      exit 0
+   fi
+
+   #
+   # leading backslash ? looks like we're getting called from
+   # mingw via a .BAT or so
+   #
+   case "$PATH" in
+      '\\'*)
+         PATH="${PATH//\\/\/}"
+      ;;
+   esac
+
+   if [ -z "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}" ]
+   then
+      MULLE_BASHFUNCTIONS_LIBEXEC_DIR="`mulle-bashfunctions-env libexec-dir 2> /dev/null`"
+      if [ -z "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}" ]
+      then
+         if [ -z "`command -v "${executablepath}"`" ]
+         then
+            echo "Fatal Error: Could not find mulle-bashfunctions-env in PATH ($PATH) - mulle-bashfunctions not installed ?" >&2
+         else
+            echo "Fatal Error: Could not find libexec of mulle-bashfunctions-env ($PWD)" >&2
+         fi
+         exit 1
+      fi
+   fi
+
+   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-bashfunctions.sh" "minimal" &&
+   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-path.sh" &&
+   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-file.sh" ||
+      fail "failed to load bashfunctions from ${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}"
+
+   #  set -e # more pain then gain in the end
+   #  set -u # doesn't work with my style
+
+   trap trap_fail INT
+   set -o pipefail
+
+   INSTALLED_MULLE_PROJECT_VERSION="`mulle-project-env version`" || exit 1
+   MULLE_PROJECT_LIBEXEC_DIR="`mulle-project-env libexec-dir`" || exit 1
+
+   . "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-sourcetree-parser.sh" || exit 1
+
+   call_main "${MULLE_PROJECT_TRAVIS_CI_PRERELEASE_FLAGS}" "$@"
+}
+
+
+_init "$@" # will call main indirectly via call_main
+
+###
+### INIT
+###
+########

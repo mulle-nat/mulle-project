@@ -186,13 +186,13 @@ main()
    for i in src/mulle*.sh
    do
       mkdir -p "${libexec}" 2> /dev/null
-      install -v -m "644" "${i}" "${libexec}" || exit 1
+      install ${VERBOSE} -m "644" "${i}" "${libexec}" || exit 1
    done
 
    for i in *.template mulle-*.png
    do
       mkdir -p "${share}" 2> /dev/null
-      install -v -m "644" "${i}" "${share}" || exit 1
+      install ${VERBOSE} -m "644" "${i}" "${share}" || exit 1
    done
 }
 

@@ -151,14 +151,6 @@ get_header_version()
 }
 
 
-get_versionname_from_project()
-{
-   log_entry "get_versionname_from_project" "$@"
-
-   printf "%s\n" "$1_VERSION" | split_camelcase_string | make_cpp_string
-}
-
-
 get_language_from_directoryname()
 {
    log_entry "get_language_from_directoryname" "$@"

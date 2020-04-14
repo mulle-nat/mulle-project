@@ -73,13 +73,14 @@ generate_brew_formula_header()
    local homepage="$4"
    local desc="$5"
    local archiveurl="$6"
+   local tag="$7"
 
    [ -z "${version}" ]    && internal_fail "empty version"
    [ -z "${archiveurl}" ] && internal_fail "empty archiveurl"
-
+   [ -z "${tag}" ]        && internal_fail "empty tag"
    local tmparchive
 
-   tmparchive="/tmp/${project}-${version}-archive"
+   tmparchive="/tmp/${project}-${tag}-archive"
 
    if [ "${USE_CACHE}" = 'NO' -a -f "${tmparchive}" ]
    then
@@ -163,10 +164,10 @@ _print_dependencies()
    local lines
    local line
 
-   set -f ; IFS=$'\n'
+   set -o noglob; IFS=$'\n'
    for dependency in ${dependencies}
    do
-      set +f ; IFS="${DEFAULT_IFS}"
+      set +o noglob; IFS="${DEFAULT_IFS}"
       dependency="`eval "echo \"${dependency}\"" `"
 
       line="${INDENTATION}depends_on \"${dependency}\"${epilog}"
@@ -176,7 +177,7 @@ _print_dependencies()
 ${line}"
    done
 
-   set +f; IFS="${DEFAULT_IFS}"
+   set +o noglob; IFS="${DEFAULT_IFS}"
 
    if [ ! -z "${lines}" ]
    then
@@ -340,6 +341,7 @@ _generate_brew_formula()
    local homepage="$6"
    local desc="$7"
    local archiveurl="$8"
+   local tag="$9"
 
    local generator
 
@@ -351,7 +353,7 @@ _generate_brew_formula()
 
 
    generate_brew_formula_header "${project}" "${name}" "${version}" \
-                                "${homepage}" "${desc}" "${archiveurl}"  &&
+                                "${homepage}" "${desc}" "${archiveurl}" "${tag}" &&
    generate_brew_formula_dependencies "${dependencies}" "${builddependencies}" &&
    ${generator} "${project}" "${name}" "${version}" "${dependencies}" &&
    generate_brew_formula_footer "${name}"
@@ -366,6 +368,7 @@ formula_push()
    local version="$1" ; shift
    local name="$1" ; shift
    local homebrewtap="$1" ; shift
+   local tag="$1"; shift
 
    HOMEBREW_TAP_BRANCH="${HOMEBREW_TAP_BRANCH:-master}"
    HOMEBREW_TAP_REMOTE="${HOMEBREW_TAP_REMOTE:-origin}"
@@ -374,12 +377,17 @@ formula_push()
    # this may fail if the formula didn't change (during untag/tag)
    # cycle
    #
+   local verb
+
+   verb="${tag##*-}"
+   verb="${verb:-release}"
+   tag="${tag%-*}"
 
    log_info "Push brew formula \"${rbfile}\" to \"${HOMEBREW_TAP_REMOTE}\""
    (
       exekutor cd "${homebrewtap}" &&
       exekutor git add "${rbfile}" &&
-      exekutor git commit -m "${version} release of ${name}" "${rbfile}"
+      exekutor git commit -m "${tag} ${verb} of ${name}" "${rbfile}"
       exekutor git push "${HOMEBREW_TAP_REMOTE}" "${HOMEBREW_TAP_BRANCH}"
    )
    :
@@ -394,6 +402,7 @@ homebrew_push()
    local version="$1"; shift
    local homebrewtap="$1"; shift
    local rbfile="$1"; shift
+   local tag="$1"; shift
 
    local formula
 
@@ -401,12 +410,13 @@ homebrew_push()
    [ -z "${version}" ]     && internal_fail "missing version"
    [ -z "${homebrewtap}" ] && internal_fail "missing homebrewtap"
    [ -z "${rbfile}" ]      && internal_fail "missing rbfile"
+   [ -z "${tag}" ]         && internal_fail "missing tag"
 
    [ ! -d "${homebrewtap}" ] && fail "Failed to locate tap directory \"${homebrewtap}\" from \"$PWD\""
 
    log_info "Push brew formula \"${homebrewtap}/${rbfile}\""
 
-   formula_push "${rbfile}" "${version}" "${name}" "${homebrewtap}"
+   formula_push "${rbfile}" "${version}" "${name}" "${homebrewtap}" "${tag}"
 }
 
 
@@ -424,6 +434,7 @@ homebrew_generate()
    local archiveurl="$1"; shift
    local homebrewtap="$1"; shift
    local rbfile="$1"; shift
+   local tag="$1"; shift
 
    local formula
 # DESC must not be empty
@@ -436,6 +447,7 @@ homebrew_generate()
    [ -z "${archiveurl}" ]  && internal_fail "missing archiveurl"
    [ -z "${homebrewtap}" ] && internal_fail "missing homebrewtap"
    [ -z "${rbfile}" ]      && internal_fail "missing rbfile"
+   [ -z "${tag}" ]         && internal_fail "missing tag"
 
 
    [ ! -d "${homebrewtap}" ] && fail "Failed to locate tap directory \"${homebrewtap}\" from \"$PWD\""
@@ -450,6 +462,7 @@ homebrew_generate()
    log_fluff "archiveurl        = ${C_RESET}${archiveurl}"
    log_fluff "dependencies      = ${C_RESET}${dependencies}"
    log_fluff "builddependencies = ${C_RESET}${builddependencies}"
+   log_fluff "tag               = ${C_RESET}${tag}"
 
    local generator
 
@@ -466,7 +479,8 @@ homebrew_generate()
                           "${builddependencies}" \
                           "${homepage}" \
                           "${desc}" \
-                          "${archiveurl}"`" || exit 1
+                          "${archiveurl}" \
+                          "${tag}"`" || exit 1
 
    if [ "${OPTION_ECHO}" ]
    then

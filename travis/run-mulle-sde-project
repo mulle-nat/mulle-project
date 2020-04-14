@@ -1,0 +1,407 @@
+#! /usr/bin/env bash
+
+[ "${TRACE}" = 'YES' -o "${FOOXX_TRACE}" = 'YES' ] && set -x && : "$0" "$@"
+
+
+MULLE_EXECUTABLE_VERSION="0.0.0"
+
+MOUNT_POINT="/mnt/project"
+
+
+print_flags()
+{
+   cat <<EOF
+   --branch <name> : git branch to clone, affects TRAVIS_BRANCH
+   --copy          : copy project (default)
+   --env           : enter the mulle-sde environment
+   --clone         : git clone project
+   --symlink       : symlink project, dangerous!
+   --travis        : execute all script files found in .travis.d
+   --travis-fast   : execute only the script phase file found in .travis.d
+   -f              : force operation"
+EOF
+   ##
+   ## ADD YOUR FLAGS HERE
+   ##
+
+   options_technical_flags_usage "       : "
+}
+
+
+usage()
+{
+   [ $# -ne 0 ] && log_error "$*"
+
+
+   cat <<EOF >&2
+Usage:
+   run-mulle-sde-project [flags] ...
+
+   Run commands in a mulle-sde project that has been mounted into the
+   container at "${MOUNT_POINT}"
+
+
+Flags:
+
+EOF
+   print_flags | LC_ALL=C sort >&2
+
+   exit 1
+}
+
+
+r_copy_project()
+{
+   log_entry "r_copy_project" "$@"
+
+   local branch="$1"; shift
+
+   local dst
+
+   dst="travis-build/${PROJECT_NAME}"
+
+   mkdir_if_missing  "${dst}" &&
+   exekutor rsync --exclude 'addiction/' \
+         --exclude 'dependency/' \
+         --exclude 'kitchen/' \
+         --exclude 'stash/' \
+         --exclude '.mulle/var/' \
+         --exclude '*/.mulle/var' \
+         -a "$@" "${MOUNT_POINT}/" "${dst}" || return 1
+
+   # we haz the project
+
+   RVAL="${dst}"
+}
+
+
+r_clone_project()
+{
+   log_entry "r_clone_project" "$@"
+
+   local branch="$1"; shift
+
+   local dst
+
+   dst="travis-build/${PROJECT_NAME}"
+   case "${branch}" in
+      "")
+         exekutor git clone "$@" "${MOUNT_POINT}" "${dst}" || return 1
+      ;;
+
+      *)
+         exekutor git clone -b "${branch}" "$@" "${MOUNT_POINT}" "${dst}" || return 1
+      ;;
+   esac
+   # we haz the project
+
+   RVAL="${dst}"
+}
+
+
+r_symlink_project()
+{
+   log_entry "r_symlink_project" "$@"
+
+   local branch="$1"; shift
+
+   local dst
+
+   dst="travis-build/${PROJECT_NAME}"
+   mkdir_if_missing travis-build
+   exekutor ln -s "${MOUNT_POINT}" "${dst}" || exit 1
+
+   RVAL="${dst}"
+}
+
+
+run_travis_fast()
+{
+   log_entry "run_travis_fast" "$@"
+
+   [ ! -d .travis.d ] && fail "There is no .travis.d directory in this project."
+
+   [ ! -f ".travis.d/script" ] || source ".travis.d/script"
+}
+
+
+run_travis()
+{
+   log_entry "run_travis" "$@"
+
+   [ ! -d .travis.d ] && fail "There is no .travis.d directory in this project."
+
+   [ ! -f ".travis.d/before_install.${MULLE_UNAME}" ]      || source ".travis.d/before_install.${MULLE_UNAME}"
+   [ ! -f ".travis.d/before_install-aux.${MULLE_UNAME}" ]  || source ".travis.d/before_install-aux.${MULLE_UNAME}"
+   [ ! -f ".travis.d/before_install-user.${MULLE_UNAME}" ] || source ".travis.d/before_install-user.${MULLE_UNAME}"
+
+   run_travis_fast "$@"
+}
+
+
+upgrade_sde()
+{
+   log_entry "upgrade_sde" "$@"
+
+   local prefix
+
+   prefix="`command -v mulle-sde`"
+   r_dirname "${prefix}"   # remove mulle-sde
+   r_dirname "${RVAL}"     # remove bin
+   prefix="${RVAL}"
+
+   IFS=$'\n'; set -f
+   for i in `egrep -v '^#' /mnt/sde/REPOS`
+   do
+      (
+         cd "/mnt/sde/$i" && sudo ./bin/installer "${prefix}"
+      ) || exit 1
+   done
+   IFS="${DEFAULT_IFS}"; set +f
+}
+
+
+main()
+{
+   local MULLE_FLAG_MAGNUM_FORCE='NO'
+
+   # technical flags
+   local MULLE_TRACE
+   local MULLE_FLAG_EXEKUTOR_DRY_RUN='NO'
+   local MULLE_FLAG_LOG_LOCAL='NO'
+   local MULLE_FLAG_LOG_DEBUG='NO'
+   local MULLE_FLAG_LOG_EXEKUTOR='NO'
+   local MULLE_FLAG_LOG_FLUFF='NO'
+   local MULLE_FLAG_LOG_SCRIPTS='NO'
+   local MULLE_FLAG_LOG_SETTINGS='NO'
+   local MULLE_FLAG_LOG_VERBOSE='NO'
+   local MULLE_FLAG_LOG_MERGE='NO'
+   local MULLE_TRACE_POSTPONE='NO'
+   local OPTION_MODE='copy'
+   local OPTION_CD='DEFAULT'
+   local OPTION_RUN='DEFAULT'
+   local OPTION_UPGRADE_SDE='DEFAULT'
+
+   TRAVIS_BRANCH="${TRAVIS_BRANCH}"
+   export TRAVIS_BRANCH
+   #
+   # simple flag handling
+   #
+   while [ $# -ne 0 ]
+   do
+      if options_technical_flags "$1"
+      then
+         shift
+         continue
+      fi
+
+      case "$1" in
+         -f|--force)
+            MULLE_FLAG_MAGNUM_FORCE='YES'
+         ;;
+
+         -h*|--help|help)
+            usage
+         ;;
+
+         --version)
+            printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
+            exit 0
+         ;;
+
+         ##
+         ## ADD YOUR FLAGS HERE
+         ##
+         --upgrade-sde)
+            OPTION_UPGRADE_SDE='YES'
+         ;;
+
+         --cd|--env)
+            OPTION_DE="${1:2}"
+         ;;
+
+         --copy|--clone|--symlink)
+            OPTION_MODE="${1:2}"
+         ;;
+
+         -c)
+            OPTION_RUN="eval"
+         ;;
+
+         --travis-fast)
+            OPTION_RUN="fast"
+         ;;
+
+         --eval|--travis|--fast)
+            OPTION_RUN="${1:2}"
+         ;;
+
+         --branch)
+            [ $# -eq 0 ] && usage "Missing $1 argument"
+            shift
+
+            TRAVIS_BRANCH="$1"
+         ;;
+
+         -*)
+            usage "Unknown flag \"$1\""
+         ;;
+
+         *)
+            break
+         ;;
+      esac
+
+      shift
+   done
+
+   options_setup_trace "${MULLE_TRACE}"
+
+   local envfile
+   local relpath
+
+   relpath=".mulle/etc/env/environment-project.sh"
+   envfile="${MOUNT_POINT}/${relpath}"
+   if [ ! -f "${envfile}" ]
+   then
+      fail "Mount a mulle-sde project unto this container with
+${C_RESET_BOLD}--volume \"\${PWD}:/mnt/project\""
+   fi
+
+   case "${OPTION_UPGRADE_SDE}"  in
+      DEFAULT)
+         if [ -d /mnt/sde ]
+         then
+            upgrade_sde
+         fi
+      ;;
+
+      'YES')
+         [ ! -d /mnt/sde ] &&  fail "No /mnt/sde present"
+         upgrade_sde
+      ;;
+   esac
+
+   # get definition for PROJECT_NAME and so on
+   source "${envfile}" || exit 1
+
+   [ -z "${PROJECT_NAME}" ] && internal_fail "PROJECT_NAME is undefined in \"${relpath}\""
+
+   # copy project
+   r_${OPTION_MODE}_project "${TRAVIS_BRANCH}" || fail "${OPTION_MODE} failed"
+   project_dir="$RVAL"
+
+   # enter project
+   case "${OPTION_CD}" in
+      'DEFAULT'|cd)
+         rexekutor cd "${project_dir}" || exit 1
+      ;;
+
+      env)
+         # how can this work in a script ???
+         rexekutor mulle-sde "${project_dir}" || exit 1
+      ;;
+   esac
+
+   if [ -z "${MULLE_FETCH_SEARCH_PATH}" ]
+   then
+      shopt -s nullglob
+      for searchpath in "/mnt/search"/*
+      do
+         r_colon_concat "${MULLE_FETCH_SEARCH_PATH}" "${searchpath}"
+         MULLE_FETCH_SEARCH_PATH="${RVAL}"
+      done
+      shopt -u nullglob
+
+      export MULLE_FETCH_SEARCH_PATH
+   fi
+
+   # do something in project
+   case "${OPTION_RUN}" in
+      fast)
+         run_travis_fast "$@"
+      ;;
+
+      travis)
+         run_travis "$@"
+      ;;
+
+      eval)
+         eval_exekutor "$@"
+      ;;
+
+      *)
+         exekutor "$@"
+      ;;
+   esac
+}
+
+
+########
+###
+### INIT - You usually won't edit code below
+###
+
+trap_fail()
+{
+   exit 1
+}
+
+
+_init()
+{
+   #
+   # minimal setup exit
+   #
+   if [ "$1" = "version" ]
+   then
+      printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
+      exit 0
+   fi
+
+   #
+   # leading backslash ? looks like we're getting called from
+   # mingw via a .BAT or so
+   #
+   case "$PATH" in
+      '\\'*)
+         PATH="${PATH//\\/\/}"
+      ;;
+   esac
+
+   if [ -z "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}" ]
+   then
+      MULLE_BASHFUNCTIONS_LIBEXEC_DIR="`mulle-bashfunctions-env libexec-dir 2> /dev/null`"
+      if [ -z "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}" ]
+      then
+         if [ -z "`command -v "${executablepath}"`" ]
+         then
+            echo "Fatal Error: Could not find mulle-bashfunctions-env in PATH ($PATH) - mulle-bashfunctions not installed ?" >&2
+         else
+            echo "Fatal Error: Could not find libexec of mulle-bashfunctions-env ($PWD)" >&2
+         fi
+         exit 1
+      fi
+   fi
+
+   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-bashfunctions.sh" "minimal" &&
+   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-path.sh" &&
+   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-file.sh" ||
+      fail "failed to load bashfunctions from ${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}"
+
+   #  set -e # more pain then gain in the end
+   #  set -u # doesn't work with my style
+
+   trap trap_fail INT
+   set -o pipefail
+
+   call_main "${FOOXX_FLAGS}" "$@"
+}
+
+
+_init "$@" # will call main indirectly via call_main
+
+###
+### INIT
+###
+########

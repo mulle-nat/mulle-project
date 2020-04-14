@@ -4,6 +4,7 @@
 
 post_release()
 {
-   exekutor mulle-project-debian
+   # as technical flags like -n are sent over, rexekutor is fine
+   rexekutor mulle-project-debian "$@"
 }
 

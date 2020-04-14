@@ -1,0 +1,18 @@
+#! /bin/sh
+
+#
+# we have a different name for this command, because the chance of
+# forgetting a parameter is high and accidentally running a proper
+# mulle-project-distribute is hard to roll back
+#
+
+mulle-project-distribute \
+   "$@" \
+   --debname prerelease \
+   --branch prerelease  \
+   --no-latest-tag \
+   --tag-suffix "-prerelease" \
+   --mulle-tap-name "prerelease" \
+   --mulle-tap-user "mulle-nat" \
+   --codeon-tap-name "prerelease" \
+   --publisher-tap "mulle-nat/prerelease"

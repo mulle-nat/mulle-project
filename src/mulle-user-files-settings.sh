@@ -31,24 +31,39 @@
 #
 
 #######
-# Load in some user files, that define more permanent info
+# Load in some user file, that define permanent info
 #######
 
 INFO_DIR="${INFO_DIR:-.mulle/etc/project}"
 
-# if there is a formula-info.sh file read it
-if [ "${DO_GENERATE_FORMULA}" = 'YES' ]
-then
-   if [ -f "${INFO_DIR}/generate-formula.sh" ]
+source_file()
+{
+   if [ "${VERBOSE}" = 'YES' ]
    then
-      source_file "${INFO_DIR}/generate-formula.sh"
+      echo "Read \"$1\"" >&2
    fi
+   . "$1"
+}
+
+
+# if there is a version-info.sh file read it
+if [ -f "${INFO_DIR}/version-info.sh" ]
+then
+   DO_GIT_RELEASE='YES'
+   source_file "${INFO_DIR}/version-info.sh"
 fi
 
-# if there is a post-release.sh file read it
-if [ -f "${INFO_DIR}/post-release.sh" ]
+# if there is a formula-info.sh file read it
+if [ -f "${INFO_DIR}/formula-info.sh" ]
 then
-   DO_POST_RELEASE='YES'
-   source_file "${INFO_DIR}/post-release.sh"
+   DO_GENERATE_FORMULA='YES'
+   DO_PUSH_FORMULA='YES'
+   source_file "${INFO_DIR}/formula-info.sh"
+fi
+
+# if there is a formula-info.sh file read it
+if [ -f "${INFO_DIR}/publisher-info.sh" ]
+then
+   source_file "${INFO_DIR}/publisher-info.sh"
 fi
 

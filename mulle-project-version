@@ -45,6 +45,10 @@ Usage: mulle-project-version [options] [projectname]
    \`major.minor.patch\` or \`((major << 20) | (minor << 8) | patch)\`, where
    other shift integer values are possible.
 
+   Major : incompatible API changes
+   Minor : API additions
+   Patch : Fixes
+
    Examples:
       static int   version = ((1 << 16) | (2 << 5) | 3)
       VERSION="1.2.3"
@@ -143,7 +147,13 @@ get_version()
 
       if [ -z "${VERSIONNAME}" ]
       then
-         VERSIONNAME="`get_versionname_from_project "${PROJECT}"`"
+         if [ ! -z "${PROJECT_UPCASE_IDENTIFIER}" ]
+         then
+            VERSIONNAME="${PROJECT_UPCASE_IDENTIFIER}_VERSION"
+         else
+            r_de_camel_case_upcase_identifier "${PROJECT}"
+            VERSIONNAME="${RVAL}_VERSION"
+         fi
       fi
 
       if [ ! -f "${VERSIONFILE}" -a -f "VERSION" ]
@@ -260,7 +270,7 @@ write_version()
       #
       local other
 
-      set -o noglob ; IFS=$'\n'
+      set -o noglob; IFS=$'\n'
       for other in ${VERSIONFILEMIRRORS}
       do
          IFS="${DEFAULT_IFS}" ; set +o noglob
@@ -451,7 +461,8 @@ parse_arguments()
 
    options_setup_trace "${MULLE_TRACE}"
 
-   DIRECTORY_NAME="`basename -- "$PWD"`"
+   r_basename "${PWD}"
+   DIRECTORY_NAME="${RVAL}"
 
    if [ -z "${PROJECT}" ]
    then
@@ -564,6 +575,8 @@ _init()
    . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-path.sh"             || exit 1
    # shellcheck source=../mulle-bashfunctions/src/mulle-file.sh
    . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-file.sh"             || exit 1
+   # shellcheck source=../mulle-bashfunctions/src/mulle-case.sh
+   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-case.sh"             || exit 1
 
 
    #

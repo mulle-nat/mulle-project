@@ -1,3 +1,8 @@
+## 2.2.0
+
+* new scripts mulle-project-travis-ci-prerelease mulle-project-prerelease mulle-project-local-travis mulle-project-add-missing-branch-identifier
+
+
 ## 2.1.0
 
 * moved to mulle-bashfunctions v2

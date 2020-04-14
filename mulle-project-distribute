@@ -34,7 +34,7 @@
 #    https://github.com/mulle-sde/mulle-project
 #
 # Run this somewhat like this (for real: remove -n):
-#    mulle-project-release -v -n --publisher mulle-nat --publisher-tap mulle-kybernetik/software/
+#    mulle-project-distribute -v -n --publisher mulle-nat --publisher-tap mulle-kybernetik/software/
 #
 [ "${TRACE}" = 'YES' ] && set -x && : "$0" "$@"
 
@@ -44,9 +44,12 @@ usage()
    cat <<EOF >&2
 Usage: mulle-project-distribute [options]
 
-   Distribute the project via github, homebrew, debian.
+   Distribute the project via github and homebrew. Debian is indirectly
+   supported by calling mulle-project-debian.
 
 Options:
+   --branch <name>   : branch to push to (release)
+   --debname <name>  : debian repository name (main)
    --no-git          : suppress git operations (implies --no-post-release)
    --no-formula      : suppress formula operations (implies --no-post-release)
    --no-formula-push : do not publish the formula to github
@@ -143,7 +146,19 @@ __environment_main()
       DEPENDENCIES="`egrep -v '^#' .DEPENDENCIES`"
    fi
 
-   MULLE_KYBERNETIK_TAP="${MULLE_KYBERNETIK_TAP:-mulle-kybernetik/software/}"
+   TAP_USER="${TAP_USER:-mulle-kybernetik}"
+   TAP_NAME="${TAP_NAME:-software}"
+
+   MULLE_TAP_USER="${MULLE_TAP_USER:-${TAP_USER}}"
+   MULLE_TAP_NAME="${MULLE_TAP_NAME:-${TAP_NAME}}"
+
+   CODEON_TAP_USER="${CODEON_TAP_USER:-codeon-gmbh}"
+   CODEON_TAP_NAME="${CODEON_TAP_NAME:-software}"
+
+   # TODO: so much hard coding, should put this outside into
+   # source-able files
+
+   MULLE_KYBERNETIK_TAP="${MULLE_KYBERNETIK_TAP:-${MULLE_TAP_USER}/${MULLE_TAP_NAME}/}"
    case "${MULLE_KYBERNETIK_TAP}" in
       */)
       ;;
@@ -153,7 +168,7 @@ __environment_main()
       ;;
    esac
 
-   MULLE_SDE_TAP="${MULLE_SDE_TAP:-mulle-kybernetik/software/}"
+   MULLE_SDE_TAP="${MULLE_SDE_TAP:-${MULLE_TAP_USER}/${MULLE_TAP_NAME}/}"
    case "${MULLE_SDE_TAP}" in
       */)
       ;;
@@ -164,7 +179,7 @@ __environment_main()
    esac
 
 
-   MULLE_NAT_TAP="${MULLE_NAT_TAP:-mulle-kybernetik/software/}"
+   MULLE_NAT_TAP="${MULLE_NAT_TAP:-${MULLE_TAP_USER}/${MULLE_TAP_NAME}/}"
    case "${MULLE_NAT_TAP}" in
       */)
       ;;
@@ -174,7 +189,7 @@ __environment_main()
       ;;
    esac
 
-   MULLE_C_TAP="${MULLE_C_TAP:-mulle-kybernetik/software/}"
+   MULLE_C_TAP="${MULLE_C_TAP:-${MULLE_TAP_USER}/${MULLE_TAP_NAME}/}"
    case "${MULLE_C_TAP}" in
       */)
       ;;
@@ -184,7 +199,7 @@ __environment_main()
       ;;
    esac
 
-   MULLE_OBJC_TAP="${MULLE_OBJC_TAP:-mulle-kybernetik/software/}"
+   MULLE_OBJC_TAP="${MULLE_OBJC_TAP:-${MULLE_TAP_USER}/${MULLE_TAP_NAME}/}"
    case "${MULLE_OBJC_TAP}" in
       */)
       ;;
@@ -194,7 +209,57 @@ __environment_main()
       ;;
    esac
 
-   BUILDTOOLS_TAP="${BUILDTOOLS_TAP:-mulle-kybernetik/software/}"
+   MULLE_CONCURRENT_TAP="${MULLE_CONCURRENT_TAP:-${MULLE_TAP_USER}/${MULLE_TAP_NAME}/}"
+   case "${MULLE_CONCURRENT_TAP}" in
+      */)
+      ;;
+
+      *)
+         MULLE_CONCURRENT_TAP="${MULLE_CORE_TAP}/"
+      ;;
+   esac
+
+   MULLE_CORE_TAP="${MULLE_CORE_TAP:-${MULLE_TAP_USER}/${MULLE_TAP_NAME}/}"
+   case "${MULLE_CORE_TAP}" in
+      */)
+      ;;
+
+      *)
+         MULLE_CORE_TAP="${MULLE_CORE_TAP}/"
+      ;;
+   esac
+
+   MULLE_FOUNDATION_TAP="${MULLE_FOUNDATION_TAP:-${MULLE_TAP_USER}/${MULLE_TAP_NAME}/}"
+   case "${MULLE_FOUNDATION_TAP}" in
+      */)
+      ;;
+
+      *)
+         MULLE_FOUNDATION_TAP="${MULLE_FOUNDATION_TAP}/"
+      ;;
+   esac
+
+   MULLE_WEB_TAP="${MULLE_WEB_TAP:-${MULLE_TAP_USER}/${MULLE_TAP_NAME}/}"
+   case "${MULLE_WEB_TAP}" in
+      */)
+      ;;
+
+      *)
+         MULLE_WEB_TAP="${MULLE_WEB_TAP}/"
+      ;;
+   esac
+
+   MULLE_SCION_TAP="${MULLE_SCION_TAP:-${MULLE_TAP_USER}/${MULLE_TAP_NAME}/}"
+   case "${MULLE_SCION_TAP}" in
+      */)
+      ;;
+
+      *)
+         MULLE_SCION_TAP="${MULLE_SCION_TAP}/"
+      ;;
+   esac
+
+   BUILDTOOLS_TAP="${BUILDTOOLS_TAP:-${MULLE_TAP_USER}/${MULLE_TAP_NAME}/}"
    case "${BUILDTOOLS_TAP}" in
       */)
       ;;
@@ -204,7 +269,7 @@ __environment_main()
       ;;
    esac
 
-   TOOLS_TAP="${TOOLS_TAP:-mulle-kybernetik/software/}"
+   TOOLS_TAP="${TOOLS_TAP:-${MULLE_TAP_USER}/${MULLE_TAP_NAME}/}"
    case "${TOOLS_TAP}" in
       */)
       ;;
@@ -224,12 +289,39 @@ __environment_main()
       ;;
    esac
 
+   CODEON_TAP="${CODEON_TAP:-${CODEON_TAP_USER}/${CODEON_TAP_NAME}/}"
+   case "${CODEON_TAP}" in
+      */)
+      ;;
 
-   # where to grab the archive off
-   ARCHIVE_URL="${ARCHIVE_URL:-https://github.com/${PUBLISHER}/${PROJECT}/archive/${VERSION}.tar.gz}"
+      *)
+         CODEON_TAP="${CODEON_TAP}/"
+      ;;
+   esac
 
-   # written into formula for project, will be evaled
-   HOMEPAGE_URL="${HOMEPAGE_URL:-https://github.com/${PUBLISHER}/${PROJECT}}"
+   # --- GIT ---
+
+   if [ -z "${VERSION}" ]
+   then
+      fail "Could not figure out the version. (hint: use VERSIONNAME, VERSIONFILE)"
+   fi
+
+   # tag to tag your release
+   if [ "${OPTION_TAG}" = "YES" ]
+   then
+      TAG="${TAG:-${TAG_PREFIX}${VERSION}${TAG_SUFFIX}}"
+   else
+      TAG=""
+   fi
+
+   # git remote to push to, usually origin
+   ORIGIN="${ORIGIN:-origin}"
+
+   # git remote to push to, usually github, can be empty
+   GITHUB="${GITHUB:-github}"
+
+   # git branch to release to, source is always current
+   BRANCH="${BRANCH:-release}"
 
 
    # --- HOMEBREW TAP ---
@@ -245,31 +337,19 @@ __environment_main()
 
    if [ ! -z "${PUBLISHER_TAP}" ]
    then
-      tmp="`basename -- ${PUBLISHER_TAP}`"
+      r_basename "${PUBLISHER_TAP}"
+      tmp="${RVAL}"
       HOMEBREW_TAP="${HOMEBREW_TAP:-${TAPS_LOCATION}/homebrew-${tmp}}"
    fi
 
    RBFILE="${RBFILE:-${NAME}.rb}"
 
+  # where to grab the archive off
+   ARCHIVE_URL="${ARCHIVE_URL:-https://github.com/${PUBLISHER}/${PROJECT}/archive/${TAG}.tar.gz}"
 
-   # --- GIT ---
+   # written into formula for project, will be evaled
+   HOMEPAGE_URL="${HOMEPAGE_URL:-https://github.com/${PUBLISHER}/${PROJECT}}"
 
-   if [ -z "${VERSION}" ]
-   then
-      fail "Could not figure out the version. (hint: use VERSIONNAME, VERSIONFILE)"
-   fi
-
-   # tag to tag your release
-   TAG="${TAG:-${TAG_PREFIX}${VERSION}}"
-
-   # git remote to push to, usually origin
-   ORIGIN="${ORIGIN:-origin}"
-
-   # git remote to push to, usually github, can be empty
-   GITHUB="${GITHUB:-github}"
-
-   # git branch to release to, source is always current
-   BRANCH="${BRANCH:-release}"
 }
 
 
@@ -283,6 +363,9 @@ main()
    local OPTION_DO_GIT_RELEASE=""
    local OPTION_DO_GENERATE_FORMULA=""
    local OPTION_DO_POST_RELEASE=""
+   local OPTION_TAG="YES"
+
+   source_file "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-user-files-settings.sh" "$@"   || exit 1
 
    while [ $# -ne 0 ]
    do
@@ -323,6 +406,10 @@ main()
             OPTION_DO_GENERATE_FORMULA='NO'
          ;;
 
+         --no-tag)
+            OPTION_TAG="NO"
+         ;;
+
          --no-latest-tag)
             OPTION_LATEST_TAG=""
          ;;
@@ -351,22 +438,28 @@ main()
             BUILDTOOLS_TAP="$1"
          ;;
 
-         --tools-tap)
-            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
-            shift
-            TOOLS_TAP="$1"
-         ;;
-
          --branch)
             [ $# -eq 1 ] && fail "missing parameter for \"$1\""
             shift
             BRANCH="$1"
          ;;
 
+         --debname|--debian-repository)
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
+            shift
+            DEBIAN_REPOSITORY="$1"
+         ;;
+
          --dependency-tap)
             [ $# -eq 1 ] && fail "missing parameter for \"$1\""
             shift
             DEPENDENCY_TAP="$1"
+         ;;
+
+         --codeon-tap)
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
+            shift
+            CODEON_TAP="$1"
          ;;
 
          --github)
@@ -405,6 +498,7 @@ main()
             PUBLISHER_TAP="$1"
          ;;
 
+
          --tag)
             [ $# -eq 1 ] && fail "missing parameter for \"$1\""
             shift
@@ -415,6 +509,61 @@ main()
             [ $# -eq 1 ] && fail "missing parameter for \"$1\""
             shift
             TAG_PREFIX="$1"
+         ;;
+
+         --tag-suffix)
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
+            shift
+            TAG_SUFFIX="$1"
+         ;;
+
+         --tap-name)
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
+            shift
+
+            TAP_NAME="$1"
+         ;;
+
+         --tap-user)
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
+            shift
+
+            TAP_USER="$1"
+         ;;
+
+         --codeon-tap-name)
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
+            shift
+
+            CODEON_TAP_NAME="$1"
+         ;;
+
+         --codeon-tap-user)
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
+            shift
+
+            CODEON_TAP_USER="$1"
+         ;;
+
+         --mulle-tap-name)
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
+            shift
+
+            MULLE_TAP_NAME="$1"
+         ;;
+
+         --mulle-tap-user)
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
+            shift
+
+            MULLE_TAP_USER="$1"
+         ;;
+
+
+         --tools-tap)
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
+            shift
+            TOOLS_TAP="$1"
          ;;
 
          --taps-location)
@@ -432,9 +581,10 @@ main()
          --*)
             [ $# -eq 1 ] && fail "missing parameter for \"$1\""
 
-            varname="`sed 's/^..//' <<< "$1"`"
-            varname="`tr '-' '_' <<< "${varname}"`"
-            varname="`tr '[a-z]' '[A-Z]' <<< "${varname}"`"
+            varname="${1#..}" # not sure anymore what this does
+            varname="${varname//-/_}"
+            r_uppercase "${varname}"
+            varname="${RVAL}"
             if ! egrep -q -s '^[A-Z_][A-Z0-9_]*$' <<< "${varname}" > /dev/null
             then
                fail "invalid variable specification \"${varname}\", created by \"$1\""
@@ -460,14 +610,13 @@ main()
    then
       log_warning "No .mulle/etc/project folder found."
    fi
-
    #
    # order of includes is important its a bit weird coded, due to being
-   # old
+   # old. We slurp in user values before the parameters, so that these
+   # can be overridden by the parameters to the script
    #
-   source_file "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-user-files.sh" "$@"   || exit 1
+   source_file "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-user-files.sh" "$@"      || exit 1
    source_file "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-version.sh" "$@"      || exit 1
-   source_file "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-publisher.sh" "$@"    || exit 1
 
   __environment_main
 
@@ -517,17 +666,24 @@ main()
       fail "Nothing to do! .mulle/etc/project/version-info.sh and .mulle/etc/project/formula-info.sh are missing"
    fi
 
+   local exit_or_continue_if_dry_run
+
+   exit_or_continue_if_dry_run="return"
+   if [ "${MULLE_FLAG_EXEKUTOR_DRY_RUN}" = 'YES' ]
+   then
+      exit_or_continue_if_dry_run=':'
+   fi
 
    if [ "${DO_GIT_RELEASE}" = 'YES' ]
    then
-     # do the release
-      git_verify_main "${BRANCH}" "${ORIGIN}" "${TAG}" "${GITHUB}" "${OPTION_LATEST_TAG}" || exit 1
+      # do the release
+      git_verify_main "${BRANCH}" "${ORIGIN}" "${TAG}" "${GITHUB}" "${OPTION_LATEST_TAG}" || ${exit_or_continue_if_dry_run} 1
 
       if [ "${VERIFY_ONLY}" != 'YES' ]
       then
          log_info "Git release..."
 
-         git_commit_main "${BRANCH}" "${ORIGIN}" "${TAG}" "${GITHUB}" "${OPTION_LATEST_TAG}" || exit 1
+         git_commit_main "${BRANCH}" "${ORIGIN}" "${TAG}" "${GITHUB}" "${OPTION_LATEST_TAG}" || ${exit_or_continue_if_dry_run}  1
       fi
    else
       log_fluff "No git release"
@@ -560,10 +716,11 @@ main()
                                 "${DESC}" \
                                 "${ARCHIVE_URL}" \
                                 "${HOMEBREW_TAP}" \
-                                "${RBFILE}"
+                                "${RBFILE}" \
+                                "${TAG}"
          then
             log_error "Homebrew generation failed!"
-            return 1
+            ${exit_or_continue_if_dry_run}  1
          fi
       fi
    else
@@ -576,12 +733,15 @@ main()
       if ! homebrew_push "${NAME}" \
                          "${VERSION}" \
                          "${HOMEBREW_TAP}" \
-                         "${RBFILE}"
+                         "${RBFILE}" \
+                         "${TAG}"
       then
          log_error "Homebrew formula push failed!"
-         return 1
+         ${exit_or_continue_if_dry_run} 1
       fi
    fi
+
+   DEBIAN_REPOSITORY="${DEBIAN_REPOSITORY:-main}"
 
    #
    # check if someone installed a post_release function
@@ -594,7 +754,8 @@ main()
          if [ "`type -t post_release`" = "function" ]
          then
             log_info "Post release..."
-            post_release "${PROJECT}" \
+            post_release ${MULLE_TECHNICAL_FLAGS} \
+                         "${PROJECT}" \
                          "${NAME}" \
                          "${VERSION}" \
                          "${DEPENDENCIES}" \
@@ -602,7 +763,9 @@ main()
                          "${HOMEPAGE_URL}" \
                          "${DESC}" \
                          "${ARCHIVE_URL}" \
-                         "${DEBIAN_DEPENDENCIES}"
+                         "${DEBIAN_DEPENDENCIES}" \
+                         "${DEBIAN_REPOSITORY}" \
+                         "${TAG}"
          else
             log_fluff "No post release"
          fi

@@ -40,17 +40,6 @@ git_tag_exists()
 }
 
 
-git_tag_must_not_exist()
-{
-   log_entry "git_tag_must_not_exist" "$@"
-
-   if git_tag_exists "${tag}"
-   then
-      fail "Tag \"${tag}\" already exists"
-   fi
-}
-
-
 git_ref_for_tag()
 {
    log_entry "git_ref_for_tag" "$@"
@@ -102,9 +91,9 @@ git_commits_from_tag()
 }
 
 
-git_must_be_clean()
+git_is_clean()
 {
-   log_entry "git_must_be_clean" "$@"
+   log_entry "git_is_clean" "$@"
 
    local name
 
@@ -112,16 +101,14 @@ git_must_be_clean()
 
    if [ ! -d .git ]
    then
-      fail "\"${name}\" is not a git repository"
+      log_error "\"${name}\" is not a git repository"
+      return 1
    fi
 
    local clean
 
    clean=`rexekutor git status -s --untracked-files=no`
-   if [ "${clean}" != "" ]
-   then
-      fail "repository \"${name}\" is tainted"
-   fi
+   [ "${clean}" = "" ]
 }
 
 
@@ -176,7 +163,8 @@ git_untag_all()
 
       for i in ".git/refs/remotes"/*
       do
-         remote="`basename -- "${i}"`"
+         r_basename "${i}"
+         remote="${RVAL}"
          log_info "Trying to remove tag \"${tag}\" on remote \"${remote}\""
          exekutor git push "${remote}" ":${tag}" # failure is OK
       done
@@ -205,7 +193,7 @@ _git_parse_params()
    [ $# -ne 0 ] && shift
 
    case "${tag}" in
-      -*|"")
+      -*)
          fail "Invalid tag \"${tag}\""
       ;;
    esac
@@ -238,6 +226,13 @@ _git_verify_main()
    _git_parse_params "$@"
 
    local have_github
+   local return_or_continue_if_dry_run
+
+   return_or_continue_if_dry_run="return"
+   if [ "${MULLE_FLAG_EXEKUTOR_DRY_RUN}" = 'YES' ]
+   then
+      return_or_continue_if_dry_run=':'
+   fi
 
    log_verbose "Verify repository \"`pwd -P`\""
 
@@ -249,16 +244,24 @@ _git_verify_main()
    fi
 
    log_verbose "Check clean state of project"
-   rexekutor git_must_be_clean
-
-   if git_tag_exists "${tag}"
+   if ! rexekutor git_is_clean
    then
-      log_warning "Tag \"${tag}\" already exists"
+      log_error "repository is tainted"
+      ${return_or_continue_if_dry_run} 1
+   fi
+
+   if [ ! -z "${tag}" ]
+   then
+      if git_tag_exists "${tag}"
+      then
+         log_warning "Tag \"${tag}\" already exists"
+      fi
    fi
 
    if ! _git_check_remote "${origin}"
    then
-      fail "\"${origin}\" not accessible (If present, maybe needs an initial push ?)"
+      log_error "\"${origin}\" not accessible (If present, maybe needs an initial push ?)"
+      ${return_or_continue_if_dry_run} 1
    fi
 
    #
@@ -267,19 +270,22 @@ _git_verify_main()
    log_verbose "Check if remotes need merge"
    if ! git_repo_can_push "${origin}" "${branch}"
    then
-      fail "You need to merge \"${origin}/${branch}\" first"
+      log_error "You need to merge \"${origin}/${branch}\" first"
+      ${return_or_continue_if_dry_run} 1
    fi
 
    if ! git_repo_can_push "${origin}" "${dstbranch}"
    then
-      fail "You need to merge \"${origin}/${dstbranch}\" first"
+      log_error "You need to merge \"${origin}/${dstbranch}\" first"
+      ${return_or_continue_if_dry_run} 1
    fi
 
    if [ "${have_github}" = 'YES' ]
    then
       if ! git_repo_can_push "${github}" "${dstbranch}"
       then
-         fail "You need to merge \"${github}/${dstbranch}\" first"
+         log_error "You need to merge \"${github}/${dstbranch}\" first"
+         ${return_or_continue_if_dry_run} 1
       fi
    fi
 }
@@ -311,23 +317,35 @@ _git_commit_main()
       have_github='YES'
    fi
 
+   local return_or_continue_if_dry_run
+
+   return_or_continue_if_dry_run="return"
+   if [ "${MULLE_FLAG_EXEKUTOR_DRY_RUN}" = 'YES' ]
+   then
+      return_or_continue_if_dry_run=':'
+   fi
+
    log_verbose "Check that the tag \"${tag}\" does not exist yet"
-   rexekutor git_tag_must_not_exist "${tag}" || return 1
+   if rexekutor git_tag_exists "${tag}"
+   then
+      log_error "Tag \"${tag}\" already exists"
+      ${return_or_continue_if_dry_run} 4
+   fi
 
    #
    # make it a release
    #
    log_info "Push clean state of \"${branch}\" to \"${origin}\""
-   exekutor git push "${origin}" "${branch}"  || return 1
+   exekutor git push "${origin}" "${branch}"  || ${return_or_continue_if_dry_run} 1
 
    log_info "Make \"${dstbranch}\" a release, by rebasing on \"${branch}\""
-   exekutor git checkout -B "${dstbranch}"    || return 1
-   exekutor git rebase "${branch}"            || return 1
+   exekutor git checkout -B "${dstbranch}"    || ${return_or_continue_if_dry_run} 1
+   exekutor git rebase "${branch}"            || ${return_or_continue_if_dry_run} 1
 
    # if rebase fails, we shouldn't be hitting tag now
 
    log_info "Tag \"${dstbranch}\" with \"${tag}\""
-   exekutor git tag "${tag}"                  || return 1
+   exekutor git tag "${tag}"                  || ${return_or_continue_if_dry_run} 1
 
    if [ ! -z "${latesttag}" ]
    then
@@ -335,18 +353,19 @@ _git_commit_main()
       git_untag_all "${latesttag}"
 
       log_info "Tag \"${dstbranch}\" with \"${latesttag}\""
-      exekutor git tag "${latesttag}"                  || return 1
+      exekutor git tag "${latesttag}"         || ${return_or_continue_if_dry_run} 1
    fi
 
    log_info "Push \"${dstbranch}\" with tags to \"${origin}\""
-   exekutor git push "${origin}" "${dstbranch}" --tags || return 1
+   exekutor git push "${origin}" "${dstbranch}" --tags || ${return_or_continue_if_dry_run} 1
 
    if [ "${have_github}" = 'YES' ]
    then
       log_info "Push \"${dstbranch}\" with tags to \"${github}\""
-      exekutor git push "${github}" "${dstbranch}" --tags || return 1
+      exekutor git push "${github}" "${dstbranch}" --tags || ${return_or_continue_if_dry_run} 1
    fi
 }
+
 
 git_verify_main()
 {
@@ -362,6 +381,18 @@ git_verify_main()
    return $?
 }
 
+
+git_assert_not_on_release_branch()
+{
+   local branch
+
+   branch="`exekutor git rev-parse --abbrev-ref HEAD`"
+   branch="${branch:-master}" # for dry run
+   if [ "${branch}" = "release" ]
+   then
+      fail "Don't call it from release branch"
+   fi
+}
 
 git_commit_main()
 {
@@ -380,8 +411,10 @@ git_commit_main()
    _git_commit_main "${branch}" "$@"
    rval=$?
 
+   # not sure why I didn't do this always before
    log_verbose "Checkout \"${branch}\" again"
-   exekutor git checkout "${branch}" || return 1
+   exekutor git checkout "${branch}"
+
    return $rval
 }
 

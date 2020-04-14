@@ -17,9 +17,10 @@ Usage:
    There is no signing involved.
 
    Options:
-      --root <path> : default is /usr
-      --no-update   : don't execute did-update.sh in the taps directory
-      --no-publish  : don't publish to tap
+      --root <path>    : default is /usr
+      --debname <name> : repository name parameter for did-update.sh (main)
+      --no-update      : don't execute did-update.sh in the taps directory
+      --no-publish     : don't publish to tap
 EOF
    exit 1
 }
@@ -65,43 +66,43 @@ write_control()
 }
 
 
-create_debian()
+r_create_debian()
 {
-   log_entry "create_debian" "$@"
+   log_entry "r_create_debian" "$@"
 
    local directory
 
    directory="${PROJECT}_${VERSION}"
 
-   rmdir_safer -rf "/tmp/${directory}"
+   rmdir_safer "/tmp/${directory}"
    mkdir_if_missing "/tmp/${directory}/DEBIAN"
 
    log_verbose "Run mulle-install --prefix \"/tmp/${directory}${OPTION_ROOT}\""
 
    exekutor mulle-make install -k --prefix "/tmp/${directory}${OPTION_ROOT}" >&2 || exit 1
 
-   redirect_exekutor "/tmp/${directory}/DEBIAN/control" write_control
+   redirect_exekutor "/tmp/${directory}/DEBIAN/control" write_control || exit 1
 
    # brew install dpkg
    (
-      cd "/tmp" ;
+      exekutor cd "/tmp"
 
       # we use gzip, because on trusty xz is not always available
       # and trusty is used on travis-ci
 
       # building packages on OSX can be shit, if something plunks down
       # .DS_Store files
-      find "${directory}" \( -name ._.DS_Store -o -name .DS_Store \) -exec rm -f {} \;
+      exekutor find "${directory}" \( -name ._.DS_Store -o -name .DS_Store \) -exec rm -f {} \;
 
-      dpkg-deb -Zgzip -b "${directory}" >&2 || exit 1
+      exekutor dpkg-deb -Zgzip -b "${directory}" >&2 || exit 1
 
       if [ "${OPTION_REMOVE_TMP}" = 'YES' ]
       then
-         rm -rf "${directory}"
+         rmdir_safer "${directory}"
       fi
-   )
+   ) || exit 1
 
-   echo "/tmp/${directory}.deb"
+   RVAL="/tmp/${directory}.deb"
 }
 
 
@@ -121,8 +122,13 @@ main()
    then
       . .mulle/etc/project/formula-info.sh
    fi
+   if [ -f ".mulle/etc/project/publisher-info.sh" ]
+   then
+      . .mulle/etc/project/publisher-info.sh
+   fi
 
-   EXE_DIR="`dirname -- "$0"`"
+   r_dirname "$0"
+   EXE_DIR="${RVAL}"
    LIBEXEC_DIR="`"${EXE_DIR}/mulle-project-env" libexec-dir`" || exit 1
 
    while [ $# -ne 0 ]
@@ -136,6 +142,13 @@ main()
       case "$1" in
          -h|--help|help)
             usage
+         ;;
+
+         --debname)
+            [ $# -eq 1 ] && fail "missing argument to $1"
+            shift
+
+            DEBIAN_REPOSITORY="$1"
          ;;
 
          --no-update)
@@ -197,13 +210,42 @@ main()
 
    options_setup_trace "${MULLE_TRACE}"
 
-   # assume mulle-project debian is called from ./bin/release.sh
+   #
+   # parameters sent by mulle-project-distribute
+   # we only care about DEBIAN_REPOSITORY as we already have code for
+   # the rest...
+   #
+   # PROJECT
+   # NAME
+   # VERSION
+   # DEPENDENCIES
+   # BUILD_DEPENDENCIES
+   # HOMEPAGE_URL
+   # DESC
+   # ARCHIVE_URL
+   # DEBIAN_DEPENDENCIES
+   # DEBIAN_REPOSITORY
 
-   . "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-publisher.sh"
+   log_debug "Arguments: $*"
+
+   [ $# -eq 0 ] || shift  # PROJECT
+   [ $# -eq 0 ] || shift  # NAME
+   [ $# -eq 0 ] || shift  # VERSION
+   [ $# -eq 0 ] || shift  # DEPENDENCIES
+   [ $# -eq 0 ] || shift  # BUILD_DEPENDENCIES
+   [ $# -eq 0 ] || shift  # HOMEPAGE_URL
+   [ $# -eq 0 ] || shift  # DESC
+   [ $# -eq 0 ] || shift  # ARCHIVE_URL
+   [ $# -eq 0 ] || shift  # DEBIAN_DEPENDENCIES
+
+   DEBIAN_REPOSITORY="${1:-${DEBIAN_REPOSITORY}}" ; [ $# -eq 0 ] || shift  # DEBIAN_REPOSITORY
+
+   [ $# -eq 0 ] || shift  # TAG
 
    if [ -z "${PROJECT}" ]
    then
-      PROJECT="`basename -- "$PWD"`"
+      r_basename "${PWD}"
+      PROJECT="${RVAL}"
    fi
 
    if [ -z "`command -v dpkg-deb`" ]
@@ -219,7 +261,8 @@ main()
       esac
    fi
 
-   debianfile="`create_debian`" || exit 1
+   r_create_debian || exit 1
+   debianfile="${RVAL}"
 
    if [ "${OPTION_PUBLISH}" = 'YES' ]
    then
@@ -227,19 +270,23 @@ main()
 
       if [ -d "${DEBIAN_DISTS}" ]
       then
-         mkdir "${DEBIAN_DISTS}/all" 2> /dev/null
+         exekutor mkdir "${DEBIAN_DISTS}/all" 2> /dev/null
 
          log_info "Publishing \"${debianfile}\"..."
-         mv "${debianfile}" "${DEBIAN_DISTS}/all/"
+         exekutor mv "${debianfile}" "${DEBIAN_DISTS}/all/"
 
          if [ "${OPTION_UPDATE}" = 'YES' ] && [ -x "${DEBIAN_DISTS}/did-update.sh" ]
          then
             (
-              log_info "Executing ./did-update.sh in ..."
+              log_info "Executing ./did-update.sh ${DEBIAN_REPOSITORY:-main} in ..."
 
-              cd "${DEBIAN_DISTS}"
-              # let some script take over
-              ./did-update.sh "${debianfile}"
+              #
+              # this calls srcO/debian-software/did-upload.sh
+              #
+              r_basename "${debianfile}"
+
+              exekutor cd "${DEBIAN_DISTS}" && \
+              exekutor ./did-update.sh "${DEBIAN_REPOSITORY:-main}" "${RVAL}"
             ) || exit 1
          fi
       else

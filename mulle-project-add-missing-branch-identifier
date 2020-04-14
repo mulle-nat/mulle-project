@@ -1,0 +1,352 @@
+#! /usr/bin/env bash
+
+[ "${TRACE}" = 'YES' -o "${MULLE_PROJECT_ADD_MISSING_BRANCH_IDENTIFIER_TRACE}" = 'YES' ] && set -x && : "$0" "$@"
+
+
+MULLE_EXECUTABLE_VERSION="0.0.0"
+
+
+print_flags()
+{
+   echo "   -f               : force operation"
+
+   ##
+   ## ADD YOUR FLAGS HERE
+   ##
+
+   options_technical_flags_usage "            : "
+}
+
+
+usage()
+{
+   [ $# -ne 0 ] && log_error "$*"
+
+   cat <<EOF >&2
+Usage:
+   mulle-project-add-missing-branch-identifier [flags]
+
+   If the branch of your dependency is empty, this script will add an empty one
+   of the form \${UPCASE_IDENTIFIER_BRANCH}. This is per-se harmless and can be
+   very useful. It will also as a bonus wrap URL, nodetype and tag.
+
+   For this command to work, all dependencies must have been fetched already.
+
+   Example:
+      mulle-project-add-missing-branch-identifier --user 'mulle-*' \\
+                                                  --repo '!farm*' --repo '*'
+
+Flags:
+   --user <pattern> : specify github users to match, multiple uses are
+                      possible, wildcards are possible
+   --repo <pattern> : specify repository names to match, multiple uses are
+                      possible, wildcards are possible
+EOF
+   print_flags | LC_ALL=C sort >&2
+
+   exit 1
+}
+
+
+
+
+search_and_replace()
+{
+   log_entry "search_and_replace" "$@"
+
+   local matching_users="$1"
+   local matching_repos="$2"
+
+   local lines
+   local line
+
+   #
+   # uses mulle-sourcetree-parser.h library
+   #
+   lines="`get_dependency_address_nodetype_branch_tag_url`"
+
+   set -o noglob; IFS=$'\n'
+   for line in ${lines}
+   do
+      set +o noglob; IFS="${DEFAULT_IFS}"
+
+      local _address
+      local _nodetype
+      local _branch
+      local _url
+      local _host
+      local _user
+      local _repo
+      local _nodetype_identifier
+      local _nodetype_fallback
+      local _branch_identifier
+      local _branch_fallback
+      local _url_identifier
+      local _url_fallback
+      local _tag_identifier
+      local _tag_fallback
+
+      if ! parse_sourcetree_nodetype_branch_tag_url "${line}"
+      then
+         continue
+      fi
+
+      if [ ! -z "${_user}" ] && ! is_matching_wildcards "${matching_users}" "${_user}"
+      then
+         log_fluff "\"${_user}\" does not match \"${matching_users}\""
+         continue
+      fi
+      if [ ! -z "${_repo}" ] && ! is_matching_wildcards "${matching_repos}" "${_repo}"
+      then
+         log_fluff "\"${_repo}\" does not match \"${matching_repos}\""
+         continue
+      fi
+
+      local upcaseid
+      local name
+
+      r_basename "${_address}"
+      r_de_camel_case_upcase_identifier "${RVAL}"
+      upcaseid="${RVAL}"
+
+      local newnodetype
+      local newbranch
+      local newurl
+      local newtag
+
+      if [ -z "${_nodetype_fallback}" ]
+      then
+         newnodetype="\${${upcaseid}_NODETYPE}"
+      else
+         newnodetype="\${${upcaseid}_NODETYPE:-${_nodetype_fallback}}"
+      fi
+
+      if [ -z "${_branch_fallback}" ]
+      then
+         newbranch="\${${upcaseid}_BRANCH}"
+      else
+         newbranch="\${${upcaseid}_BRANCH:-${_branch_fallback}}"
+      fi
+
+      if [ -z "${_url_fallback}" ]
+      then
+         newurl="\${${upcaseid}_URL}"
+      else
+         newurl="\${${upcaseid}_URL:-${_url_fallback}}"
+      fi
+
+      if [ -z "${_tag_fallback}" ]
+      then
+         newtag="\${${upcaseid}_TAG}"
+      else
+         newtag="\${${upcaseid}_TAG:-${_tag_fallback}}"
+      fi
+
+      local action
+
+      action='NO'
+      if [ "${newnodetype}" != "${_nodetype}" ]
+      then
+         exekutor mulle-sourcetree \
+                        ${MULLE_TECHNICAL_FLAGS} \
+                        ${MULLE_SOURCETREE_FLAGS} \
+                     set "${_address}" nodetype "${newnodetype}"
+         action='YES'
+      fi
+
+      if [ "${newbranch}" != "${_branch}" ]
+      then
+         exekutor mulle-sourcetree \
+                        ${MULLE_TECHNICAL_FLAGS} \
+                        ${MULLE_SOURCETREE_FLAGS} \
+                     set "${_address}" branch "${newbranch}"
+         action='YES'
+      fi
+
+      if [ "${newurl}" != "${_url}" ]
+      then
+         exekutor mulle-sourcetree \
+                        ${MULLE_TECHNICAL_FLAGS} \
+                        ${MULLE_SOURCETREE_FLAGS} \
+                     set "${_address}" url "${newurl}"
+         action='YES'
+      fi
+
+      if [ "${newtag}" != "${_tag}" ]
+      then
+         exekutor mulle-sourcetree \
+                        ${MULLE_TECHNICAL_FLAGS} \
+                        ${MULLE_SOURCETREE_FLAGS} \
+                     set "${_address}" tag "${newtag}"
+         action='YES'
+      fi
+      if [ "${action}" = 'NO' ]
+      then
+         log_fluff "No change for ${_address}"
+      fi
+   done
+
+   set +o noglob; IFS="${DEFAULT_IFS}"
+}
+
+
+main()
+{
+   local MULLE_FLAG_MAGNUM_FORCE='NO'
+
+   # technical flags
+   local MULLE_TRACE
+   local MULLE_FLAG_EXEKUTOR_DRY_RUN='NO'
+   local MULLE_FLAG_LOG_LOCAL='NO'
+   local MULLE_FLAG_LOG_DEBUG='NO'
+   local MULLE_FLAG_LOG_EXEKUTOR='NO'
+   local MULLE_FLAG_LOG_FLUFF='NO'
+   local MULLE_FLAG_LOG_SCRIPTS='NO'
+   local MULLE_FLAG_LOG_SETTINGS='NO'
+   local MULLE_FLAG_LOG_VERBOSE='NO'
+   local MULLE_FLAG_LOG_MERGE='NO'
+   local MULLE_TRACE_POSTPONE='NO'
+
+   local OPTION_USERS
+   local OPTION_REPOS
+
+   #
+   # simple flag handling
+   #
+   while [ $# -ne 0 ]
+   do
+      if options_technical_flags "$1"
+      then
+         shift
+         continue
+      fi
+
+      case "$1" in
+         -f|--force)
+            MULLE_FLAG_MAGNUM_FORCE='YES'
+         ;;
+
+         -h*|--help|help)
+            usage
+         ;;
+
+         --mulle)
+            r_colon_concat "${OPTION_USERS}" 'mulle-*'
+            OPTION_USERS="${RVAL}"
+            r_colon_concat "${OPTION_USERS}" 'Mulle*'
+            OPTION_USERS="${RVAL}"
+         ;;
+
+         --user)
+            [ $# -eq 1 ] && usage "Missing argument to \"$1\""
+            shift
+
+            r_colon_concat "${OPTION_USERS}" "$1"
+            OPTION_USERS="${RVAL}"
+         ;;
+
+         --repo)
+            [ $# -eq 1 ] && usage "Missing argument to \"$1\""
+            shift
+
+            r_colon_concat "${OPTION_REPOS}" "$1"
+            OPTION_REPOS="${RVAL}"
+         ;;
+
+         --version)
+            printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
+            exit 0
+         ;;
+
+         -*)
+            usage "Unknown flag \"$1\""
+         ;;
+
+         *)
+            break
+         ;;
+      esac
+
+      shift
+   done
+
+   options_setup_trace "${MULLE_TRACE}"
+
+   search_and_replace "${OPTION_USERS}" "${OPTION_REPOS}"
+}
+
+
+########
+###
+### INIT - You usually won't edit code below
+###
+
+trap_fail()
+{
+   exit 1
+}
+
+
+_init()
+{
+   #
+   # minimal setup exit
+   #
+   if [ "$1" = "version" ]
+   then
+      printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
+      exit 0
+   fi
+
+   #
+   # leading backslash ? looks like we're getting called from
+   # mingw via a .BAT or so
+   #
+   case "$PATH" in
+      '\\'*)
+         PATH="${PATH//\\/\/}"
+      ;;
+   esac
+
+   if [ -z "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}" ]
+   then
+      MULLE_BASHFUNCTIONS_LIBEXEC_DIR="`mulle-bashfunctions-env libexec-dir 2> /dev/null`"
+      if [ -z "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}" ]
+      then
+         if [ -z "`command -v "${executablepath}"`" ]
+         then
+            echo "Fatal Error: Could not find mulle-bashfunctions-env in PATH ($PATH) - mulle-bashfunctions not installed ?" >&2
+         else
+            echo "Fatal Error: Could not find libexec of mulle-bashfunctions-env ($PWD)" >&2
+         fi
+         exit 1
+      fi
+   fi
+
+   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-bashfunctions.sh" "minimal" &&
+   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-path.sh" &&
+   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-case.sh" &&
+   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-file.sh" ||
+      fail "failed to load bashfunctions from ${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}"
+
+   INSTALLED_MULLE_PROJECT_VERSION="`mulle-project-env version`" || exit 1
+   MULLE_PROJECT_LIBEXEC_DIR="`mulle-project-env libexec-dir`" || exit 1
+
+   . "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-sourcetree-parser.sh" || exit 1
+
+   #  set -e # more pain then gain in the end
+   #  set -u # doesn't work with my style
+
+   trap trap_fail INT
+   set -o pipefail
+
+   call_main "${MULLE_PROJECT_ADD_MISSING_BRANCH_IDENTIFIER_FLAGS}" "$@"
+}
+
+
+_init "$@" # will call main indirectly via call_main
+
+###
+### INIT
+###
+########
