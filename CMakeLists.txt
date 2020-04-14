@@ -11,7 +11,6 @@ version-info.sh.template)
 set( LIBRARY_SCRIPTS
 src/mulle-git.sh
 src/mulle-homebrew.sh
-src/mulle-publisher.sh
 src/mulle-user-files.sh
 src/mulle-version.sh
 )
