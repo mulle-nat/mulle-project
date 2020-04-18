@@ -13,8 +13,8 @@ print_flags()
    cat <<EOF
    --branch <name> : git branch to clone, affects TRAVIS_BRANCH
    --copy          : copy project (default)
-   --env           : enter the mulle-sde environment
    --clone         : git clone project
+   --no-source-env : do not load mulle-sde environment
    --symlink       : symlink project, dangerous!
    --travis        : execute all script files found in .travis.d
    --travis-fast   : execute only the script phase file found in .travis.d
@@ -115,9 +115,9 @@ r_symlink_project()
 }
 
 
-run_travis_fast()
+run_travis_script()
 {
-   log_entry "run_travis_fast" "$@"
+   log_entry "run_travis_script" "$@"
 
    [ ! -d .travis.d ] && fail "There is no .travis.d directory in this project."
 
@@ -125,17 +125,15 @@ run_travis_fast()
 }
 
 
-run_travis()
+run_travis_install()
 {
-   log_entry "run_travis" "$@"
+   log_entry "run_travis_install" "$@"
 
    [ ! -d .travis.d ] && fail "There is no .travis.d directory in this project."
 
    [ ! -f ".travis.d/before_install.${MULLE_UNAME}" ]      || source ".travis.d/before_install.${MULLE_UNAME}"
    [ ! -f ".travis.d/before_install-aux.${MULLE_UNAME}" ]  || source ".travis.d/before_install-aux.${MULLE_UNAME}"
    [ ! -f ".travis.d/before_install-user.${MULLE_UNAME}" ] || source ".travis.d/before_install-user.${MULLE_UNAME}"
-
-   run_travis_fast "$@"
 }
 
 
@@ -161,6 +159,31 @@ upgrade_sde()
 }
 
 
+container_exit()
+{
+   log_entry "container_exit" "$@"
+
+   local shell="$1"; shift
+
+   if [ "$1" -ne 0 -a "${shell}" = 'YES' ]
+   then
+      exekutor "${BASH}"
+   fi
+   exit $1
+}
+
+
+container_fail()
+{
+   log_entry "container_fail" "$@"
+
+   local shell="$1"; shift
+
+   log_error "$@"
+   container_exit 1
+}
+
+
 main()
 {
    local MULLE_FLAG_MAGNUM_FORCE='NO'
@@ -180,6 +203,8 @@ main()
    local OPTION_MODE='copy'
    local OPTION_CD='DEFAULT'
    local OPTION_RUN='DEFAULT'
+   local OPTION_SHELL='YES'
+   local OPTION_SOURCE_ENV='YES'
    local OPTION_UPGRADE_SDE='DEFAULT'
 
    TRAVIS_BRANCH="${TRAVIS_BRANCH}"
@@ -212,12 +237,24 @@ main()
          ##
          ## ADD YOUR FLAGS HERE
          ##
+         --shell)
+            OPTION_SHELL='YES'
+         ;;
+
+         --no-shell)
+            OPTION_SHELL='NO'
+         ;;
+
          --upgrade-sde)
             OPTION_UPGRADE_SDE='YES'
          ;;
 
-         --cd|--env)
-            OPTION_DE="${1:2}"
+         --source-env)
+            OPTION_SOURCE_ENV='YES'
+         ;;
+
+         --no-source-env)
+            OPTION_SOURCE_ENV='NO'
          ;;
 
          --copy|--clone|--symlink)
@@ -257,17 +294,26 @@ main()
 
    options_setup_trace "${MULLE_TRACE}"
 
-   local envfile
-   local relpath
+   # copy project
+   r_${OPTION_MODE}_project "${TRAVIS_BRANCH}" || container_fail "${OPTION_SHELL}" "${OPTION_MODE} failed"
+   project_dir="$RVAL"
 
-   relpath=".mulle/etc/env/environment-project.sh"
-   envfile="${MOUNT_POINT}/${relpath}"
-   if [ ! -f "${envfile}" ]
-   then
-      fail "Mount a mulle-sde project unto this container with
-${C_RESET_BOLD}--volume \"\${PWD}:/mnt/project\""
-   fi
+   # enter project
+   case "${OPTION_CD}" in
+      'DEFAULT'|cd)
+         rexekutor cd "${project_dir}" || container_exit "${OPTION_SHELL}" 1
+      ;;
+   esac
 
+   # preinstall what's needed
+   # need to be in project to get at .travis.d here
+   case "${OPTION_RUN}" in
+      travis)
+         run_travis_install "$@"
+      ;;
+   esac
+
+   # possibly upgrade sde now, after travis has installed its stuff
    case "${OPTION_UPGRADE_SDE}"  in
       DEFAULT)
          if [ -d /mnt/sde ]
@@ -282,27 +328,30 @@ ${C_RESET_BOLD}--volume \"\${PWD}:/mnt/project\""
       ;;
    esac
 
-   # get definition for PROJECT_NAME and so on
-   source "${envfile}" || exit 1
+   # load project environment, if so desired (usually yes)
+   if [ "${OPTION_SOURCE_ENV}" = 'YES' ]
+   then
+      local envfile
+      local relpath
 
-   [ -z "${PROJECT_NAME}" ] && internal_fail "PROJECT_NAME is undefined in \"${relpath}\""
+      relpath=".mulle/etc/env/environment-project.sh"
+      envfile="${MOUNT_POINT}/${relpath}"
+      if [ ! -f "${envfile}" ]
+      then
+         fail "Mount a mulle-sde project unto this container with
+${C_RESET_BOLD}--volume \"\${PWD}:/mnt/project\""
+      fi
 
-   # copy project
-   r_${OPTION_MODE}_project "${TRAVIS_BRANCH}" || fail "${OPTION_MODE} failed"
-   project_dir="$RVAL"
+      # get definition for PROJECT_NAME and so on
+      source "${envfile}" || container_exit "${OPTION_SHELL}" 1
 
-   # enter project
-   case "${OPTION_CD}" in
-      'DEFAULT'|cd)
-         rexekutor cd "${project_dir}" || exit 1
-      ;;
+      [ -z "${PROJECT_NAME}" ] && container_fail "${OPTION_SHELL}" "PROJECT_NAME is undefined in \"${relpath}\""
+   fi
 
-      env)
-         # how can this work in a script ???
-         rexekutor mulle-sde "${project_dir}" || exit 1
-      ;;
-   esac
-
+   #
+   # MULLE_FETCH_SEARCH_PATH is host specific and therefore usually
+   # empty
+   #
    if [ -z "${MULLE_FETCH_SEARCH_PATH}" ]
    then
       shopt -s nullglob
@@ -318,20 +367,19 @@ ${C_RESET_BOLD}--volume \"\${PWD}:/mnt/project\""
 
    # do something in project
    case "${OPTION_RUN}" in
-      fast)
-         run_travis_fast "$@"
-      ;;
-
-      travis)
-         run_travis "$@"
+      fast|travis)
+         run_travis_script "$@"
+         container_exit "${OPTION_SHELL}" $?
       ;;
 
       eval)
          eval_exekutor "$@"
+         container_exit "${OPTION_SHELL}" $?
       ;;
 
       *)
          exekutor "$@"
+         container_exit "${OPTION_SHELL}" $?
       ;;
    esac
 }

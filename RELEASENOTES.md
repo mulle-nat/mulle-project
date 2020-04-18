@@ -1,3 +1,7 @@
+### 2.2.1
+
+* improved support for non mulle-sde projects with a .travis.d folder nonetheless
+
 ## 2.2.0
 
 * new scripts mulle-project-travis-ci-prerelease mulle-project-prerelease mulle-project-local-travis mulle-project-add-missing-branch-identifier

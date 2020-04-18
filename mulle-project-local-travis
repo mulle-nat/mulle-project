@@ -64,8 +64,10 @@ main()
    local MULLE_FLAG_LOG_MERGE='NO'
    local MULLE_TRACE_POSTPONE='NO'
    local OPTION_UPGRADE_SDE_PATH=
+   local OPTION_SOURCE_ENV='YES'
    local OPTION_EXPOSE_FETCH_PATH='NO'
    local OPTION_FAST='YES'
+   local OPTION_SHELL='YES'
    local project_dir
 
    #
@@ -91,6 +93,22 @@ main()
          --version)
             printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
             exit 0
+         ;;
+
+         --source-env)
+            OPTION_SOURCE_ENV='YES'
+         ;;
+
+         --no-source-env)
+            OPTION_SOURCE_ENV='NO'
+         ;;
+
+         --shell)
+            OPTION_SHELL='YES'
+         ;;
+
+         --no-shell)
+            OPTION_SHELL='NO'
          ;;
 
          --travis-fast|--fast)
@@ -127,13 +145,27 @@ main()
    options_setup_trace "${MULLE_TRACE}"
 
    project_dir="`mulle-sde project-dir`"
-   [ -z "${project_dir}" ] && fail "There is no mulle-sde project here"
-   rexekutor cd "${project_dir}" || exit 1
-   [ ! -d ".travis.d" ] && fail "The project lacks the mulle-objc/travis extension"
+   if [ ! -z "${project_dir}" ]
+   then
+      rexekutor cd "${project_dir}" || exit 1
+   fi
+
+   [ ! -d ".travis.d" ] && fail "The project lacks a .travis.d folder (mulle-sde/travis extension is not installed)"
 
    local cmd
 
-   cmd="sudo docker run -i -t -h \"travis-ci.local\""
+   case "${MULLE_UNAME}" in
+      darwin)
+      ;;
+
+      *)
+         cmd="sudo "
+      ;;
+   esac
+
+   r_concat "${cmd}" "docker run -i -t -h \"travis-ci.local\""
+   cmd="${RVAL}"
+
    cmd="${cmd} --volume \"${PWD}:/mnt/project:ro\""
 
    #
@@ -143,6 +175,10 @@ main()
    then
       if [ -z "${MULLE_FETCH_SEARCH_PATH}" ]
       then
+         if [ -z "${project_dir}" ]
+         then
+            fail "There is no mulle-sde project here and MULLE_FETCH_SEARCH_PATH is undefined"
+         fi
          MULLE_FETCH_SEARCH_PATH="`mulle-env -c env | sed -n 's/^MULLE_FETCH_SEARCH_PATH=\(.*\)/\1/p'`"
       fi
 
@@ -178,7 +214,21 @@ main()
       cmd="${cmd} --travis"
    fi
 
-   eval_exekutor sudo "${cmd}"
+   if [ "${OPTION_SOURCE_ENV}" = 'YES' ]
+   then
+      cmd="${cmd} --source-env"
+   else
+      cmd="${cmd} --no-source-env"
+   fi
+
+   if [ "${OPTION_SHELL}" = 'YES' ]
+   then
+      cmd="${cmd} --shell"
+   else
+      cmd="${cmd} --no-shell"
+   fi
+
+   eval_exekutor "${cmd}"
 }
 
 

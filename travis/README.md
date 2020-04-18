@@ -20,12 +20,13 @@ the docker commands.
 You need to `docker build` the container "travis-ci-local" once before
 running the tests in the directory containing `Dockerfile` and
 `run-mulle-sde-project`. It depends on the container specified by the
-`Dockerfile` in  `mulle-objc-developer`, so build it first:
+`Dockerfile` in  [mulle-objc-developer](//github.com/mulle-objc/mulle-objc-developer),
+so build it first:
 
 ```
-cd mulle-objc-developer
-docker build -t mulle-objc-developer .
-cd travis
+docker build -t mulle-objc-developer https://raw.githubusercontent.com/mulle-objc/mulle-objc-developer/release/Dockerfile
+
+cd mulle-project/travis
 docker build -t travis-ci-local .
 ```
 
