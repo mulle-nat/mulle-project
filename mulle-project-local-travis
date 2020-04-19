@@ -8,11 +8,12 @@ MULLE_EXECUTABLE_VERSION="0.0.0"
 
 print_flags()
 {
-   echo "   -f          : force operation"
-   echo "   -e          : expose current MULLE_FETCH_SEARCH_PATH to docker"
-   echo "   --travis    : take travis.d slow path, before_install and script"
-   echo "   --fast      : take travis.d fast path, script only"
-   echo "   --sde <dir> : path to sde parent folder, to upgrade sde tools"
+   echo "   -f              : force operation"
+   echo "   -e              : expose current MULLE_FETCH_SEARCH_PATH to docker"
+   echo "   --no-source-env : do not load mulle-sde environment"
+   echo "   --travis        : take travis.d slow path, before_install and script"
+   echo "   --fast          : take travis.d fast path, script only"
+   echo "   --sde <dir>     : path to sde parent folder, to upgrade sde tools"
    ##
    ## ADD YOUR FLAGS HERE
    ##
@@ -32,6 +33,9 @@ Usage:
 
    Works in conjunction with the mulle-objc-developer travis docker.
    Runs a local instance of travis in docker, sort of.
+
+   Use --no-source-env if you have no mulle-sde project, but a compatible
+   .travis.d folder nonetheless.
 
 Example:
    Run with MULLE_FETCH_SEARCH_PATH expose (readonly) to docker,

@@ -31,7 +31,9 @@ docker build -t travis-ci-local .
 ```
 
 You can rebuild and use `--squash` after `-t`, to reduce image size.
-(Newer docker versions only)
+(Newer docker versions only). After a new mulle-objc release you
+should use docker build --pull to rebuild a new container.
+
 
 At this point you should be able to get to the help usage of the
 **`run-mulle-sde-project`** program on the docker:

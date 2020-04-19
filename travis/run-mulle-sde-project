@@ -309,7 +309,7 @@ main()
    # need to be in project to get at .travis.d here
    case "${OPTION_RUN}" in
       travis)
-         run_travis_install "$@"
+         run_travis_install "$@" || container_exit "${OPTION_SHELL}" 1
       ;;
    esac
 
