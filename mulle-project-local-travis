@@ -10,6 +10,7 @@ print_flags()
 {
    echo "   -f              : force operation"
    echo "   -e              : expose current MULLE_FETCH_SEARCH_PATH to docker"
+   echo "   -i386           : run docker in 32 bit if available"
    echo "   --no-source-env : do not load mulle-sde environment"
    echo "   --travis        : take travis.d slow path, before_install and script"
    echo "   --fast          : take travis.d fast path, script only"
@@ -72,6 +73,7 @@ main()
    local OPTION_EXPOSE_FETCH_PATH='NO'
    local OPTION_FAST='YES'
    local OPTION_SHELL='YES'
+   local OPTION_SUFFIX=
    local project_dir
 
    #
@@ -97,6 +99,14 @@ main()
          --version)
             printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
             exit 0
+         ;;
+
+         --x86_64)
+            OPTION_SUFFIX=
+         ;;
+
+         --i386)
+            OPTION_SUFFIX="-32"
          ;;
 
          --source-env)
@@ -209,7 +219,9 @@ main()
 
    # end of flags
 
-   cmd="${cmd} travis-ci-local"
+   cmd="${cmd} travis-ci-local${OPTION_SUFFIX}"
+
+   cmd="${cmd} ${MULLE_TECHNICAL_FLAGS}"
 
    if [ "${OPTION_FAST}" = 'YES' ]
    then
