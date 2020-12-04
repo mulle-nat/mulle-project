@@ -48,10 +48,11 @@ Usage: mulle-project-distribute [options]
    supported by calling mulle-project-debian.
 
 Options:
-   --branch <name>   : branch to push to (release)
-   --debname <name>  : debian repository name (main)
+   --branch <name>   : branch to push to (${BRANCH:-release})
+   --debname <name>  : debian repository name (${DEBIAN_REPOSITORY:-main})
    --no-git          : suppress git operations (implies --no-post-release)
    --no-formula      : suppress formula operations (implies --no-post-release)
+   --no-version-tag  : don't tag with the current version
    --no-formula-push : do not publish the formula to github
    --verify-only     : check but do not acually commit anything
    --post-release    : reenable post-release after --no-git or -no-formula
@@ -307,7 +308,7 @@ __environment_main()
    fi
 
    # tag to tag your release
-   if [ "${OPTION_TAG}" = "YES" ]
+   if [ "${OPTION_VERSION_TAG}" = "YES" ]
    then
       TAG="${TAG:-${TAG_PREFIX}${VERSION}${TAG_SUFFIX}}"
    else
@@ -359,11 +360,11 @@ main()
    OPTION_LATEST_TAG="latest"
    VERIFY_ONLY='NO'
 
-   local OPTION_DO_PUSH_FORMULA=""
-   local OPTION_DO_GIT_RELEASE=""
-   local OPTION_DO_GENERATE_FORMULA=""
-   local OPTION_DO_POST_RELEASE=""
-   local OPTION_TAG="YES"
+   local OPTION_DO_PUSH_FORMULA="DEFAULT"
+   local OPTION_DO_GIT_RELEASE="DEFAULT"
+   local OPTION_DO_GENERATE_FORMULA="DEFAULT"
+   local OPTION_DO_POST_RELEASE="DEFAULT"
+   local OPTION_VERSION_TAG="YES"
 
    source_file "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-user-files-settings.sh" "$@"   || exit 1
 
@@ -377,7 +378,7 @@ main()
 
       case "$1" in
          -h*|--help|help)
-            usage
+            help='YES'
          ;;
 
          # single arg long (kinda lame)
@@ -407,18 +408,29 @@ main()
          ;;
 
          --no-tag)
-            OPTION_TAG="NO"
+            OPTION_VERSION_TAG="NO"
+            OPTION_LATEST_TAG="NO"
+         ;;
+
+         --no-version-tag)
+            OPTION_VERSION_TAG="NO"
+         ;;
+
+         --latest-tag)
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
+            shift
+            OPTION_LATEST_TAG="$1"
          ;;
 
          --no-latest-tag)
             OPTION_LATEST_TAG=""
          ;;
 
-         --formula-push)
+         --push-formula|formula-push)
             OPTION_DO_PUSH_FORMULA='YES'
          ;;
 
-         --no-formula-push)
+         --no-push-formula|--no-formula-push)
             OPTION_DO_PUSH_FORMULA='NO'
          ;;
 
@@ -498,7 +510,6 @@ main()
             PUBLISHER_TAP="$1"
          ;;
 
-
          --tag)
             [ $# -eq 1 ] && fail "missing parameter for \"$1\""
             shift
@@ -559,7 +570,6 @@ main()
             MULLE_TAP_USER="$1"
          ;;
 
-
          --tools-tap)
             [ $# -eq 1 ] && fail "missing parameter for \"$1\""
             shift
@@ -604,6 +614,11 @@ main()
       shift
    done
 
+   if [ "${help}" = 'YES' ]
+   then
+      usage
+   fi
+
    options_setup_trace "${MULLE_TRACE}"
 
    if [ ! -d ".mulle/etc/project" ]
@@ -636,10 +651,22 @@ main()
       log_trace2 "OPTION_DO_PUSH_FORMULA     = ${OPTION_DO_PUSH_FORMULA}"
    fi
 
-   DO_GIT_RELEASE="${OPTION_DO_GIT_RELEASE:-${DO_GIT_RELEASE}}"
-   DO_GENERATE_FORMULA="${OPTION_DO_GENERATE_FORMULA:-${DO_GENERATE_FORMULA}}"
-   DO_POST_RELEASE="${OPTION_DO_POST_RELEASE:-${DO_POST_RELEASE}}"
-   DO_PUSH_FORMULA="${OPTION_DO_PUSH_FORMULA:-${DO_PUSH_FORMULA}}"
+   if [ "${OPTION_DO_GIT_RELEASE}" != 'DEFAULT' ]
+   then
+      DO_GIT_RELEASE="${OPTION_DO_GIT_RELEASE}"
+   fi
+   if [ "${OPTION_DO_GENERATE_FORMULA}" != 'DEFAULT' ]
+   then
+      DO_GENERATE_FORMULA="${OPTION_DO_GENERATE_FORMULA}"
+   fi
+   if [ "${OPTION_DO_POST_RELEASE}" != 'DEFAULT' ]
+   then
+      DO_POST_RELEASE="${OPTION_DO_POST_RELEASE}"
+   fi
+   if [ "${OPTION_DO_PUSH_FORMULA}" != 'DEFAULT' ]
+   then
+      DO_PUSH_FORMULA="${OPTION_DO_PUSH_FORMULA}"
+   fi
 
    if [ "${MULLE_FLAG_LOG_SETTINGS}" = 'YES' ]
    then

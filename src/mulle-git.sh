@@ -325,11 +325,14 @@ _git_commit_main()
       return_or_continue_if_dry_run=':'
    fi
 
-   log_verbose "Check that the tag \"${tag}\" does not exist yet"
-   if rexekutor git_tag_exists "${tag}"
+   if [ ! -z "${tag}" ]
    then
-      log_error "Tag \"${tag}\" already exists"
-      ${return_or_continue_if_dry_run} 4
+      log_verbose "Check that the tag \"${tag}\" does not exist yet"
+      if rexekutor git_tag_exists "${tag}"
+      then
+         log_error "Tag \"${tag}\" already exists"
+         ${return_or_continue_if_dry_run} 4
+      fi
    fi
 
    #
@@ -344,8 +347,11 @@ _git_commit_main()
 
    # if rebase fails, we shouldn't be hitting tag now
 
-   log_info "Tag \"${dstbranch}\" with \"${tag}\""
-   exekutor git tag "${tag}"                  || ${return_or_continue_if_dry_run} 1
+   if [ ! -z "${tag}" ]
+   then
+      log_info "Tag \"${dstbranch}\" with \"${tag}\""
+      exekutor git tag "${tag}"                  || ${return_or_continue_if_dry_run} 1
+   fi
 
    if [ ! -z "${latesttag}" ]
    then

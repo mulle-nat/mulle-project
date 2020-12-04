@@ -77,8 +77,9 @@ compute_markers()
    local major
    local minor
    local patch
+   local custom
 
-   get_major_minor_patch "${version}"
+   get_major_minor_patch_custom "${version}"
 
    if [ "${patch}" -eq "${OPTION_FIRST_PATCH}" ]
    then
@@ -89,7 +90,15 @@ compute_markers()
          echo "##"
       fi
    else
-      echo "###"
+      case "${version}" in
+         *\.*\.*\.*\.*)
+            echo "####"
+         ;;
+
+         *)
+            echo "###"
+         ;;
+      esac
    fi
 }
 

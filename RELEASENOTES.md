@@ -1,3 +1,8 @@
+## 2.3.0
+
+* i386 support for travis
+
+
 ### 2.2.1
 
 * improved support for non mulle-sde projects with a .travis.d folder nonetheless

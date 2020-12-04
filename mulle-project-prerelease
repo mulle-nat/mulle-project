@@ -8,11 +8,9 @@
 
 mulle-project-distribute \
    "$@" \
-   --debname prerelease \
    --branch prerelease  \
-   --no-latest-tag \
-   --tag-suffix "-prerelease" \
-   --mulle-tap-name "prerelease" \
-   --mulle-tap-user "mulle-nat" \
-   --codeon-tap-name "prerelease" \
-   --publisher-tap "mulle-nat/prerelease"
+   --latest-tag latest-prerelease \
+   --no-version-tag \
+   --no-formula \
+   --no-push-formula \
+   --no-post-release

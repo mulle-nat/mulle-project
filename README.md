@@ -14,7 +14,8 @@
 
 The process is quite involved and has organically grown over time. For starters
 it is recommended to get familiar with `mulle-project-version` and
-`mulle-project-releasenotes` only.
+`mulle-project-releasenotes` only. Many of the other utilities are very
+specialized for mulle-objc release purposes.
 
 
 Command                      | Description
@@ -24,12 +25,17 @@ Command                      | Description
 `mulle-project-distribute`   | Create and publish releases (github)
 `mulle-project-init`         | Initial setup and update
 `mulle-project-releasenotes` | Create releasenotes from git logs
-`mulle-project-untag`        | Remove tags from multiple repositories
+`mulle-project-tag`          | Create tags for repo and all remotes
+`mulle-project-untag`        | Remove tags from repo and all remotes
 `mulle-project-distribute`   | Combines `mulle-project-untag` and `mulle-project-distribute`
+`mulle-project-redistribute` | Hack
 `mulle-project-version`      | Examine and change project versions
+`mulle-project-package-json` | Create package.json file
 `mulle-project-local-travis` | Test in a local travis-ci like docker
-`mulle-project-sloppy-distribute` v           | Commit current changes, up the version count and distribute with releasenotes given on commandline
+`mulle-project-latest-current-tag` | Produce a release blog version info entry
+`mulle-project-sloppy-distribute`             | Commit current changes, up the version count and distribute with releasenotes given on commandline
 `mulle-project-travis-ci-prerelease`          | Create an environment-host-travis-ci-prerelease.sh file for prerelease tests
+`mulle-project-ci-prerelease` | Create an environment-host-ci-prerelease file file for prerelease tests
 `mulle-project-add-missing-branch-identifier` | Massages sourcetree configs for use with `mulle-project-travis-ci-prerelease`
 
 #### What `mulle-project-distribute` does

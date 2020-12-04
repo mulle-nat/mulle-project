@@ -1,0 +1,47 @@
+#! /usr/bin/env bash
+
+
+# get latest release
+
+main()
+{
+   local commit
+   local tag
+   local version
+   #
+   # get commit tagged as "latest" (assume its the old version and latest
+   # has not been tagged yet)
+   #
+   commit="`git rev-list -n 1 latest`"
+   if [ ! -z "${commit}" ]
+   then
+      tag="`git tag -l --points-at "${commit}" \
+            | sort -r -n \
+            | egrep '[0-9]*\.[0-9]*\.[0-9]*' | head -1`"
+   fi
+
+   version="`mulle-project-version -s`"
+
+   if [ ! -z "${version}" ]
+   then
+      local repo
+      local user
+      local dir
+
+      dir="${PWD}"
+
+      repo="`basename -- "${dir}" `"
+      dir="`dirname -- "${dir}" `"
+      user="`basename -- "${dir}" `"
+
+      case "${user}" in
+         srcS)
+            user="mulle-sde"
+         ;;
+      esac
+
+      echo "[${repo}](//github.com/${user}/${repo}/RELEASENOTES.md) | ${version} | ${tag:--} |"
+   fi
+}
+
+main "$@" | sort

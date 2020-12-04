@@ -54,18 +54,24 @@ Usage: mulle-project-version [options] [projectname]
       VERSION="1.2.3"
       #define VERSION   "1.2.3"
 
+   For special purposed like mulle-gdb you can have an additional custom
+   part makeing the version look like this "1.2.3.4"
+
 Options:
    ++                    : shorthand for --increment-patch --write
    --add-patch <value>   : add value to patch version part, needs --write
+   --custom-versioning   : use custom versioning (four numbers)
    --first-patch-one     : set patch to 1 for minor/major increments
    --first-patch-zero    : set patch to 0 for minor/major increments
    --increment-major     : add 1 to major versionpart, needs --write
    --increment-minor     : add 1 to minor version part, needs --write
    --increment-patch     : add 1 to patch version part, needs --write
+   --increment-custom    : add 1 to custom (fourth) version part, needs --write
    --language <name>     : project language, (c, obj, cpp, bash etc)
    --no-info             : do not read -info.sh files
    --no-tag-warning      : do not warn if git tag exists
    --print-latest-tag    : print latest release tag
+   --releasenotes        : read RELEASENOTES.md version
    --read-xcode-version  : read version from Xcode project
    --set <value>         : set version, needs --write to persist change
    --versionname <name>  : version variable name
@@ -76,6 +82,7 @@ Options:
 Environment:
    VERSIONFILE           : File to look for master version number
    VERSIONNAME           : Variable name of the version number
+   VERSIONCUSTOM         : Set to YES for custom versioning
    VERSIONFILEMIRRORS    : Other files containing the version number
 
 EOF
@@ -165,10 +172,10 @@ get_version()
             VERSIONNAME=""
          fi
       else
-         VERSION="`get_project_version "${VERSIONFILE}" "${VERSIONNAME}"`"
+         VERSION="`get_project_version "${VERSIONFILE}" "${VERSIONNAME}" "${VERSIONCUSTOM}"`"
          if [ -z "${VERSION}" ]
          then
-            VERSION="`get_project_version "src/version.h" "${VERSIONNAME}"`"
+            VERSION="`get_project_version "src/version.h" "${VERSIONNAME}" "${VERSIONCUSTOM}"`"
             if [ ! -z "${VERSION}" ]
             then
                VERSIONFILE="src/version.h"
@@ -191,6 +198,27 @@ Hint: specify VERSIONNAME, VERSIONFILE in .mulle/etc/project/version-info.sh"
 }
 
 
+
+get_latest_releasenote_version()
+{
+   log_entry "get_latest_releasenote_version" "$@"
+
+   local filename="$1"
+
+   if [ ! -f "${filename}" ]
+   then
+      log_debug "Releasenote file \"${filename}\" not found"
+      return 1
+   fi
+
+   sed -n 's/^#*[[:space:]]*\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p' \
+          "${filename}" \
+   | head -1
+
+   return 0
+}
+
+
 warn_version()
 {
    log_entry "warn_version" "$@"
@@ -203,12 +231,30 @@ warn_version()
       else
          local last
 
-         last="`git_last_tag`"
+         last="`rexekutor git tag -l --sort=-creatordate | egrep -x '[0-9]*\.[0-9]*\.[0-9]*' | head -1`"
+
          if [ ! -z "${last}" ]
          then
             log_info "Version is ${VERSION}. Last git tag is \"${last}\"."
          else
             log_info  "No git tag \"${VERSION}\" exists. (git fetch --tags maybe ?)"
+         fi
+      fi
+
+      local releasenotes_version
+
+      if releasenotes_version="`get_latest_releasenote_version "RELEASENOTES.md"`"
+      then
+         if [ -z "${releasenotes_version}" ]
+         then
+            log_warning "No version found in RELEASENOTES.md"
+         else
+            if [ "${releasenotes_version}" != "${VERSION}" ]
+            then
+               log_warning "Last RELEASENOTES.md version is ${releasenotes_version}"
+            else
+               log_info "Last RELEASENOTES.md version is ${VERSION}"
+            fi
          fi
       fi
    fi
@@ -220,18 +266,23 @@ edit_version()
    log_entry "edit_version" "$@"
 
    [ "${OPTION_ADD_MAJOR}" -ne 0 ] &&
-      [ "${OPTION_ADD_MINOR}" -ne 0 -o "${OPTION_ADD_PATCH}" -ne 0 ] &&
+      [ "${OPTION_ADD_MINOR}" -ne 0 -o "${OPTION_ADD_PATCH}" -ne 0 -o "${OPTION_ADD_CUSTOM}" -ne 0 ] &&
          fail "only specify major to increment"
 
    [ "${OPTION_ADD_MINOR}" -ne 0 ] &&
-      [ "${OPTION_ADD_PATCH}" -ne 0 ] &&
+      [ "${OPTION_ADD_PATCH}" -ne 0 -o "${OPTION_ADD_CUSTOM}" -ne 0 ] &&
          fail "only specify minor to increment"
+
+   [ "${OPTION_ADD_PATCH}" -ne 0 ] &&
+      [ "${OPTION_ADD_CUSTOM}" -ne 0 ] &&
+         fail "only specify patch to increment"
 
    OLDVERSION="${VERSION}"
 
    if [ "${OPTION_ADD_MAJOR}" -ne 0 -o \
         "${OPTION_ADD_MINOR}" -ne 0 -o \
-        "${OPTION_ADD_PATCH}" -ne 0 ]
+        "${OPTION_ADD_PATCH}" -ne 0 -o \
+        "${OPTION_ADD_CUSTOM}" -ne 0 ]
    then
       if [ -z "${VERSIONFILE}" ]
       then
@@ -242,8 +293,10 @@ edit_version()
                                     "${OPTION_ADD_MAJOR}" \
                                     "${OPTION_ADD_MINOR}" \
                                     "${OPTION_ADD_PATCH}" \
+                                    "${OPTION_ADD_CUSTOM}" \
                                     "0" \
-                                    "${OPTION_FIRST_PATCH}"`" || exit 1
+                                    "${OPTION_FIRST_PATCH}" \
+                                    "${OPTION_FIRST_CUSTOM}"`" || exit 1
    fi
 }
 
@@ -259,7 +312,8 @@ write_version()
 
    if [ "${OPTION_WRITE_XCODE_VERSION}" = 'YES' ]
    then
-      inplace_sed -e 's|^\([[:space:]]*CURRENT_PROJECT_VERSION[[:space:]]*=[[:space:]]*["]*\)'${XCODE_VERSION}'\(.*\)|\1'${VERSION}'\2|' "${ACTUAL_XCODEPROJ}/project.pbxproj"
+      inplace_sed -e 's|^\([[:space:]]*CURRENT_PROJECT_VERSION[[:space:]]*=[[:space:]]*["]*\)'${XCODE_VERSION}'\(.*\)|\1'${VERSION}'\2|' \
+                     "${ACTUAL_XCODEPROJ}/project.pbxproj"
    fi
 
    if [ "${OPTION_WRITE}" = 'YES' ]
@@ -277,13 +331,19 @@ write_version()
 
          if [ ! -z "${other}" ]
          then
-            set_project_version "${VERSION}" "${other}" "${VERSIONMIRRORNAME}" || exit 1
+            set_project_version "${VERSION}" \
+                                "${other}" \
+                                "${VERSIONMIRRORNAME}" \
+                                "${VERSIONCUSTOM}" || exit 1
          fi
       done
       IFS="${DEFAULT_IFS}" ; set +o noglob
 
       # set mirrors first before "real", which is nicer in case of fails
-      set_project_version "${VERSION}" "${VERSIONFILE}" "${VERSIONNAME}" || exit 1
+      set_project_version "${VERSION}" \
+                          "${VERSIONFILE}" \
+                          "${VERSIONNAME}" \
+                          "${VERSIONCUSTOM}" || exit 1
    fi
 }
 
@@ -297,7 +357,7 @@ verify_version()
       ;;
    esac
 
-   VERIFY_VERSION="`"$0" "$@" --reset`"
+   VERIFY_VERSION="`rexekutor "$0" "$@" --reset`"
 
    if [ "${VERSION}" != "${VERIFY_VERSION}" ]
    then
@@ -336,20 +396,16 @@ parse_arguments()
             OPTION_WRITE='YES'
          ;;
 
+         --custom-versioning)
+            OPTION_CUSTOM_VERSIONING='YES'
+         ;;
+
          --no-tag-warning)
             OPTION_TAG_WARNING='NO'
          ;;
 
          --increment-major)
             OPTION_ADD_MAJOR="1"
-         ;;
-
-         --increment-major)
-            OPTION_ADD_MAJOR="1"
-         ;;
-
-         --increment-minor)
-            OPTION_ADD_MINOR="1"
          ;;
 
          --increment-minor)
@@ -360,6 +416,11 @@ parse_arguments()
             OPTION_ADD_PATCH="1"
          ;;
 
+         --increment-custom)
+            OPTION_ADD_CUSTOM="1"
+         ;;
+
+
          --print-latest-tag)
             git_last_tag
             exit $?
@@ -369,6 +430,7 @@ parse_arguments()
             OPTION_ADD_PATCH="0"
             OPTION_ADD_MINOR="0"
             OPTION_ADD_MAJOR="0"
+            OPTION_ADD_CUSTOM="0"
             OPTION_WRITE_XCODE_VERSION='NO'
             OPTION_WRITE='NO'
             OPTION_TAG_WARNING='NO'
@@ -395,6 +457,17 @@ parse_arguments()
             shift
 
             OPTION_ADD_PATCH="$1"
+         ;;
+
+         --first-custom-one)
+            OPTION_FIRST_CUSTOM="1"
+         ;;
+
+         --add-custom)
+            [ $# -eq 1 ] && fail "missing argument to $1"
+            shift
+
+            OPTION_ADD_CUSTOM="$1"
          ;;
 
          --write)
@@ -479,14 +552,16 @@ main()
    local OPTION_ADD_MAJOR="0"
    local OPTION_ADD_MINOR="0"
    local OPTION_ADD_PATCH="0"
+   local OPTION_ADD_CUSTOM="0"
    local OPTION_FIRST_PATCH="0"
+   local OPTION_FIRST_CUSTOM="0"
    local OPTION_READ_INFO='YES'
    local OPTION_READ_XCODE_VERSION='NO'
    local OPTION_WRITE='DEFAULT'
    local OPTION_WRITE_XCODE_VERSION='DEFAULT'
    local OPTION_XCODEPROJ=""
    local OPTION_TAG_WARNING='YES'
-
+   local OPTION_CUSTOM_VERSIONING
    local OPTION_VERSIONNAME
    local OPTION_VERSIONFILE
 
@@ -515,6 +590,7 @@ main()
 
    VERSIONNAME="${OPTION_VERSIONNAME:-${VERSIONNAME}}"
    VERSIONFILE="${OPTION_VERSIONFILE:-${VERSIONFILE}}"
+   VERSIONCUSTOM="${OPTION_CUSTOM_VERSIONING:-${VERSIONCUSTOM}}"
 
    if [ "${OPTION_WRITE}" = "${DEFAULT}" ]
    then
@@ -548,6 +624,7 @@ main()
    log_verbose "VERSION=${VERSION}"
    log_verbose "VERSIONNAME=${VERSIONNAME}"
    log_verbose "VERSIONFILE=${VERSIONFILE}"
+   log_verbose "VERSIONCUSTOM=${VERSIONCUSTOM}"
 
    if ! [ "${OPTION_WRITE}" = 'YES' -o "${OPTION_WRITE_XCODE_VERSION}" = 'YES' ]
    then
@@ -578,7 +655,6 @@ _init()
    # shellcheck source=../mulle-bashfunctions/src/mulle-case.sh
    . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-case.sh"             || exit 1
 
-
    #
    # prefer local mulle-project if available
    # Do not embed it anymore!
@@ -604,5 +680,3 @@ EOF
 
 _init "$@"
 main "$@"
-
-

@@ -1,6 +1,6 @@
 #! /usr/bin/env bash
 
-[ "${TRACE}" = 'YES' -o "${MULLE_PROJECT_TRAVIS_CI_PRERELEASE_TRACE}" = 'YES' ] && set -x && : "$0" "$@"
+[ "${TRACE}" = 'YES' -o "${MULLE_PROJECT_CI_PRERELEASE_TRACE}" = 'YES' ] && set -x && : "$0" "$@"
 
 
 MULLE_EXECUTABLE_VERSION="0.0.0"
@@ -25,27 +25,28 @@ usage()
 
    cat <<EOF >&2
 Usage:
-   mulle_project_travis_ci_prerelease [flags]
+   mulle_project_ci_prerelease [flags]
 
    Generate environment variable settings to map the sourcetree dependencies to
    a different branch, nodetype, url. This is useful for testing prereleases
-   on travis, where you want to clone from a different branch rather than
-   downloading a tagged archive from release.
+   with github actions, where you want to clone from a different branch rather
+   than downloading a tagged archive from release.
 
-   On Travis Ci, with the default flag values, set MULLE_HOSTNAME to
-   "travis-ci-prerelease" in the settings. This will be picked up and the
+   On Github actions, with the default flag values, set MULLE_HOSTNAME to
+   "ci-prerelease" in the settings. This will be picked up and the
    environment variables will be used in the next build.
 
    Example:
-      mulle-project-travis-ci-prerelease --user 'mulle-*'
+      mulle-project-ci-prerelease --user 'mulle-*' --user '!mintomic'
 
 Flags:
-   --user <pattern> : specify github users to match, multiple uses are
-                      possible, wildcards are possible
-   --repo <pattern> : specify repository names to match, multiple uses are
-                      possible, wildcards are possible
+   --user <pattern> : specify github users to match in the URL of the
+                      dependency. Multiple users and wildcards are possible
+   --repo <pattern> : specify repository names to match in the URL of the
+                      dependency. Multiple uses and wildcards are possible
    --branch <name>  : specify github branch to pull from (prerelease)
-   --scope <name>   : specify environment scope (host-travis-ci-<branch>)
+   --scope <name>   : specify environment scope (host-ci-prerelease)
+   --mulle          : standard values for mulle-c/mulle-objc projects
 
 EOF
    print_flags | LC_ALL=C sort >&2
@@ -210,7 +211,7 @@ main()
 
             r_colon_concat "${OPTION_REPOS}" '!mintomic*'
             OPTION_REPOS="${RVAL}"
-            r_colon_concat "${OPTION_REPOS}" '!farmhash*'
+            r_colon_concat "${OPTION_REPOS}" '!*farmhash*'
             OPTION_REPOS="${RVAL}"
             r_colon_concat "${OPTION_REPOS}" '*'
             OPTION_REPOS="${RVAL}"
@@ -261,7 +262,7 @@ main()
    options_setup_trace "${MULLE_TRACE}"
 
    produce_environment "${OPTION_BRANCH:-prerelease}" \
-                       "${OPTION_SCOPE:-host-travis-ci-${OPTION_BRANCH:-prerelease}}" \
+                       "${OPTION_SCOPE:-host-ci-${OPTION_BRANCH:-prerelease}}" \
                        "${OPTION_USERS}" \
                        "${OPTION_REPOS}"
 }
@@ -306,9 +307,11 @@ _init()
       then
          if [ -z "`command -v "${executablepath}"`" ]
          then
-            echo "Fatal Error: Could not find mulle-bashfunctions-env in PATH ($PATH) - mulle-bashfunctions not installed ?" >&2
+            echo "Fatal Error: Could not find mulle-bashfunctions-env in \
+PATH ($PATH) - mulle-bashfunctions not installed ?" >&2
          else
-            echo "Fatal Error: Could not find libexec of mulle-bashfunctions-env ($PWD)" >&2
+            echo "Fatal Error: Could not find libexec of \
+mulle-bashfunctions-env ($PWD)" >&2
          fi
          exit 1
       fi
@@ -330,7 +333,7 @@ _init()
 
    . "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-sourcetree-parser.sh" || exit 1
 
-   call_main "${MULLE_PROJECT_TRAVIS_CI_PRERELEASE_FLAGS}" "$@"
+   call_main "${MULLE_PROJECT_CI_PRERELEASE_FLAGS}" "$@"
 }
 
 

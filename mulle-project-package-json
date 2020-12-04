@@ -1,0 +1,504 @@
+#! /usr/bin/env bash
+
+[ "${TRACE}" = 'YES' -o "${MULLE_PROJECT_PACKAGE_JSON_TRACE}" = 'YES' ] && set -x && : "$0" "$@"
+
+
+MULLE_EXECUTABLE_VERSION="0.0.0"
+
+
+print_flags()
+{
+   echo "   -o <file>   : output JSON to file"
+
+   options_technical_flags_usage "       : "
+}
+
+
+usage()
+{
+   [ $# -ne 0 ] && log_error "$*"
+
+
+   cat <<EOF >&2
+Usage:
+   mulle-project-package-json [flags]
+
+   Create a package.json file from .mulle/etc/project and
+   .mulle/etc/sourcetree/config contents.
+
+Flags:
+EOF
+   print_flags | LC_ALL=C sort >&2
+
+   exit 1
+}
+
+
+read_project_environment()
+{
+   log_entry "read_project_environment" "$@"
+
+   if [ -f ".mulle/etc/env/environment-project.sh" ]
+   then
+      log_fluff "Reading project settings"
+      . ".mulle/etc/env/environment-project.sh"
+   fi
+
+   if [ -z "${PROJECT_TYPE}" ]
+   then
+      if [ -f ".mulle/share/env/environment-project.sh" ]
+      then
+         log_fluff "Reading v2 project settings"
+         . ".mulle/share/env/environment-project.sh"
+      fi
+   fi
+
+   [ -z "${PROJECT_TYPE}" ] && \
+     fail "Could not find required PROJECT_TYPE in environment."
+}
+
+
+get_url()
+{
+   local repository
+   local name
+   local user
+
+   if [ -f ".git/config" ]
+   then
+      repository="`rexekutor grep 'url\ =\ git@github.com:' .git/config \
+                 | rexekutor sed 's|^.*github.com:\([^/]*\)/\([^/.]*\).*|https://github.com/\1/\2|'`"
+   fi
+
+   if [ -z "${repository}" ]
+   then
+      r_basename "${PWD}"
+      name="${RVAL}"
+      r_dirname "${PWD}"
+      r_basename "${RVAL}"
+      user="${RVAL}"
+
+      repository="https://github.com/${user}/${name}"
+   fi
+
+   echo "${repository}"
+}
+
+
+get_repository()
+{
+   if [ ! -z "${PROJECT_REPOSITORY}" ]
+   then
+      echo "${PROJECT_REPOSITORY}"
+      return 0
+   fi
+
+   local repository
+   local name
+   local user
+
+   if [ -f ".git/config" ]
+   then
+      repository="`rexekutor grep 'url\ =\ git@github.com:' .git/config \
+                 | rexekutor sed 's|^.*github.com:\([^/]*\)/\([^/.]*\).*|\1/\2|'`"
+   fi
+
+   if [ -z "${repository}" ]
+   then
+      r_basename "${PWD}"
+      name="${RVAL}"
+      r_dirname "${PWD}"
+      r_basename "${RVAL}"
+      user="${RVAL}"
+
+      repository="${user}/${name}"
+   fi
+
+   echo "${repository}"
+}
+
+
+get_homepage()
+{
+   if [ ! -z "${PROJECT_HOMEPAGE}" ]
+   then
+      echo "${PROJECT_HOMEPAGE}"
+      return 0
+   fi
+
+   get_url
+}
+
+
+
+print_version()
+{
+   local version
+
+   # picks up our environment though
+   version="`PROJECT_UPCASE_IDENTIFIER= rexekutor mulle-project-version -s`" || exit 1
+   printf "%s" "${INDENT}\"version\" : \"${version}\""
+}
+
+
+print_name()
+{
+   [ -z "${PROJECT_NAME}" ] && exit 1
+
+   printf "%s" "${INDENT}\"name\" : \"${PROJECT_NAME}\"";
+}
+
+
+get_description()
+{
+   if [ ! -z "${DESC}" ]
+   then
+      echo "${DESC}"
+   else
+      if [ -f "README.md" ]
+      then
+         rexekutor head -4 "README.md" \
+         | rexekutor egrep '^####' \
+         | rexekutor sed -e 's/^####//' -e 's/^ //g'
+      fi
+   fi
+}
+
+
+print_description()
+{
+   printf "%s" "${INDENT}\"description\" : \"`get_description`\"";
+}
+
+
+print_homepage()
+{
+   printf "%s" "${INDENT}\"homepage\" : \"`get_homepage`\"";
+}
+
+
+print_bugs()
+{
+   printf "%s" "${INDENT}\"bugs\" : \"`get_url`/issues\"";
+}
+
+
+print_keywords()
+{
+   printf "%s" "${INDENT}\"keywords\" : []"
+}
+
+
+get_license_text()
+{
+   if [ -f LICENSE ]
+   then
+      head -1 LICENSE
+   else
+      if [ -f LICENSE.txt ]
+      then
+         head -1 LICENSE.txt
+      fi
+   fi
+}
+
+
+get_license()
+{
+   local line
+
+   # grep LICENSE.txt
+   line="`get_license_text`"
+   case "${line}" in
+      *BSD-3*)
+         echo "BSD-3-Clause"
+      ;;
+
+      *)
+         echo "UNLICENSED"    # dunno
+      ;;
+   esac
+}
+
+
+print_license()
+{
+   local license
+
+   license="`get_license`"
+   printf "%s" "${INDENT}\"license\" : \"${license}\""
+}
+
+
+print_author()
+{
+   printf "%s" "${INDENT}\"author\" : \"Nat\!\""
+}
+
+
+print_repository()
+{
+   printf "%s\n" "${INDENT}\"repository\" : {"
+   printf "%s\n" "${INDENT}${INDENT}\"type\" : \"git\","
+   printf "%s\n" "${INDENT}${INDENT}\"url\" : \"`get_repository`\""
+   printf "%s"   "${INDENT}}"
+}
+
+
+
+print_dependencies()
+{
+
+   printf "${INDENT}\"dependencies\" : {"
+
+   local sep
+
+   sep="\\n${INDENT}${INDENT}"
+
+   local url
+   local name
+   local line
+
+   set -f
+   IFS=$'\n'
+   for line in `rexekutor mulle-sde dependency list -- \
+                                               --output-eval \
+                                               --output-no-column \
+                                               --output-no-header \
+                                               --format "%a;%u\\n"`
+   do
+
+      name="${line%%;*}"
+      url="${line#*;}"
+
+      case "${url}" in
+         *github.com*/archive/*)
+            local s
+            local user
+            local repo
+
+            s="${url#*:}"
+            s="${s#//}"
+            s="${s#github.com/}"
+
+            user="${s%%/*}"
+            s="${s#*/}"
+            repo="${s%/*}"
+            repo="${repo%%/*}"
+            if [ ! -z "${user}" -a ! -z "${repo}" ]
+            then
+               printf "${sep}"
+               sep=",\\n${INDENT}${INDENT}"
+               printf "\"%s\" : \"%s/%s\"" "${name}" "${user}" "${repo}"
+            fi
+         ;;
+
+         *)
+            if [ ! -z "${url}" ]
+            then
+               printf "${sep}"
+               sep=",\\n${INDENT}${INDENT}"
+               printf "\"%s\" : \"%s\"" "${name}" "${url}"
+            fi
+         ;;
+      esac
+   done
+   IFS="${DEFAULT_IFS}"
+   set +f
+
+   printf "\n${INDENT}}"
+}
+
+
+print_json()
+{
+   INDENT="   "
+   echo "{"
+      print_name
+      printf ",\n"
+      print_version
+      printf ",\n"
+      print_description
+      printf ",\n"
+      print_homepage
+      printf ",\n"
+      print_bugs
+      printf ",\n"
+      print_keywords
+      printf ",\n"
+      print_license
+      printf ",\n"
+      print_repository
+      printf ",\n"
+      print_dependencies
+      echo
+   echo "}"
+}
+
+
+main()
+{
+   local MULLE_FLAG_MAGNUM_FORCE='NO'
+   # technical flags
+   local MULLE_TRACE
+   local MULLE_FLAG_EXEKUTOR_DRY_RUN='NO'
+   local MULLE_FLAG_LOG_LOCAL='NO'
+   local MULLE_FLAG_LOG_DEBUG='NO'
+   local MULLE_FLAG_LOG_EXEKUTOR='NO'
+   local MULLE_FLAG_LOG_FLUFF='NO'
+   local MULLE_FLAG_LOG_SCRIPTS='NO'
+   local MULLE_FLAG_LOG_SETTINGS='NO'
+   local MULLE_FLAG_LOG_VERBOSE='NO'
+   local MULLE_FLAG_LOG_MERGE='NO'
+   local MULLE_TRACE_POSTPONE='NO'
+
+   local OPTION_OUTPUT_FILE="-"
+   #
+   # simple flag handling
+   #
+   while [ $# -ne 0 ]
+   do
+      if options_technical_flags "$1"
+      then
+         shift
+         continue
+      fi
+
+      case "$1" in
+         -f|--force)
+            MULLE_FLAG_MAGNUM_FORCE='YES'
+         ;;
+
+         -h*|--help|help)
+            usage
+         ;;
+
+         -o|--output-file)
+            [ $# -eq 1 ] && fail "Missing argument to \"$1\""
+            shift
+
+            OPTION_OUTPUT_FILE="$1"
+         ;;
+
+         --version)
+            printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
+            exit 0
+         ;;
+
+
+         ##
+         ## ADD YOUR FLAGS HERE
+         ##
+
+         -*)
+            usage "Unknown flag \"$1\""
+         ;;
+
+         *)
+            break
+         ;;
+      esac
+
+      shift
+   done
+
+   options_setup_trace "${MULLE_TRACE}"
+
+
+   directory="`rexekutor mulle-sde project-dir`"
+   if [ -z "${directory}" ]
+   then
+      fail "No mulle-sde project found"
+   fi
+   rexekutor cd "${directory}" || exit 1
+
+   #
+   # get local project environment
+   #
+   if [ -z "${MULLE_VIRTUAL_ROOT}" ]
+   then
+      MULLE_VIRTUAL_ROOT="`PATH=/bin:/usr/bin pwd -P`"
+      MULLE_SHELL_MODE="" . ".mulle/share/env/environment.sh" || exit 1
+   fi
+
+   local text
+
+   if [ "${OPTION_OUTPUT_FILE}" = '-' ]
+   then
+      print_json
+   else
+      text="`print_json`"
+      redirect_exekutor "${OPTION_OUTPUT_FILE}" echo "${text}"
+   fi
+}
+
+
+
+########
+###
+### INIT - You usually won't edit code below
+###
+
+trap_fail()
+{
+   exit 1
+}
+
+
+_init()
+{
+   #
+   # minimal setup exit
+   #
+   if [ "$1" = "version" ]
+   then
+      printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
+      exit 0
+   fi
+
+   #
+   # leading backslash ? looks like we're getting called from
+   # mingw via a .BAT or so
+   #
+   case "$PATH" in
+      '\\'*)
+         PATH="${PATH//\\/\/}"
+      ;;
+   esac
+
+   if [ -z "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}" ]
+   then
+      MULLE_BASHFUNCTIONS_LIBEXEC_DIR="`mulle-bashfunctions-env libexec-dir 2> /dev/null`"
+      if [ -z "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}" ]
+      then
+         if [ -z "`command -v "${executablepath}"`" ]
+         then
+            echo "Fatal Error: Could not find mulle-bashfunctions-env in PATH ($PATH) - mulle-bashfunctions not installed ?" >&2
+         else
+            echo "Fatal Error: Could not find libexec of mulle-bashfunctions-env ($PWD)" >&2
+         fi
+         exit 1
+      fi
+   fi
+
+   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-bashfunctions.sh" "minimal" &&
+   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-path.sh" &&
+   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-file.sh" ||
+      fail "failed to load bashfunctions from ${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}"
+
+   #  set -e # more pain then gain in the end
+   #  set -u # doesn't work with my style
+
+   trap trap_fail INT
+   set -o pipefail
+
+   call_main "${MULLE_PROJECT_PACKAGE_JSON_FLAGS}" "$@"
+}
+
+
+_init "$@" # will call main indirectly via call_main
+
+
+### INIT
+###
+########
