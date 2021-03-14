@@ -1,0 +1,44 @@
+#! /usr/bin/env bash
+#
+# This script creates git submodule calls for a repository
+#
+
+IFS=$'\n'
+for line in `mulle-sde dependency list -r -- "$@" \
+                                             --dedupe-mode url-filename \
+                                             --output-no-column \
+                                             --output-no-header \
+                                             --output-eval \
+                                             --format '%n;%u\n' `
+do
+   nodetype="${line%;*}"
+   url="${line##*;}"
+
+   case "${nodetype}" in
+      tar)
+         case "${url}" in
+            *github.com/*)
+               s="${url#*github.com/}"
+               user="${s%%/*}"
+               s="${s#*/}"
+               repo="${s%%/*}"
+
+               url="https://github.com/${user}/${repo}"
+            ;;
+         esac
+      ;;
+
+      git)
+         repo="${url##*/}"
+      ;;
+
+      *)
+         continue
+      ;;
+   esac
+
+   echo git submodule add "${url}" "submodule/${repo}"
+done
+
+echo mulle-sde environment --global set MULLE_FETCH_SEARCH_PATH \
+"'"'${PWD}/submodule:${MULLE_FETCH_SEARCH_PATH}'"'"

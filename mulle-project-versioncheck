@@ -9,6 +9,7 @@ MULLE_EXECUTABLE_VERSION="0.0.0"
 print_flags()
 {
    echo "   -f          : force operation"
+   echo "   --reflect   : write into ${PROJECT_SOURCE_DIR:-src}/reflect"
 
    ##
    ## ADD YOUR FLAGS HERE
@@ -25,13 +26,10 @@ usage()
 
    cat <<EOF >&2
 Usage:
-   mulle-project-dependency-versions [flags]
+   mulle-project-versioncheck [flags]
 
    Produces version checks for dependencies for C headers.
 
-   ##
-   ## ADD YOUR USAGE HERE
-   ##
 
 Flags:
 EOF
@@ -78,13 +76,33 @@ emit_version_check()
    local identifier
    local name
 
-   identifier="`mulle-sde environment get PROJECT_UPCASE_IDENTIFIER`"
-   name="`mulle-sde environment get PROJECT_NAME`"
+   name="`mulle-sde environment get PROJECT_NAME`" || exit 1
+   r_identifier "${name}"
+   r_tweaked_de_camel_case "${RVAL}"
+   r_uppercase "${RVAL}"
+   identifier="${RVAL}"
 
-   echo "# if defined( ${identifier}_VERSION) && \\
-     ${identifier}_VERSION < ((${major} << 20) | (${minor} << 8) | ${patch})"
+   local max_major
+   local max_minor
+
+   if [ ${major} -gt 0 ]
+   then
+      max_major=$(( major + 1))
+      max_minor=0
+   else
+      max_major=${major}
+      max_minor=$(( minor + 1))
+   fi
+
+   echo "#if defined( ${identifier}_VERSION)"
+   echo "# if ${identifier}_VERSION < ((${major} << 20) | (${minor} << 8) | ${patch})"
    echo "#  error \"${name} is too old\""
    echo "# endif"
+   echo "# if ${identifier}_VERSION >= ((${max_major} << 20) | (${max_minor} << 8) | 0)"
+   echo "#  error \"${name} is too new\""
+   echo "# endif"
+   echo "#endif"
+   echo
 }
 
 
@@ -100,8 +118,8 @@ emit_include_file()
  *   Any edits will be lost.
  */"
 
-   echo "#ifndef ${main_identifier}_CHECK_H__"
-   echo "#define ${main_identifier}_CHECK_H__"
+#   echo "#ifndef ${main_identifier}_CHECK_H__"
+#   echo "#define ${main_identifier}_CHECK_H__"
 
    set -f
    IFS=$'\n'
@@ -110,7 +128,7 @@ emit_include_file()
       r_basename "${name}"
       if [ "${RVAL}" = "${name}" ]
       then
-         dependency="stash/${name}"
+         dependency="${MULLE_SOURCETREE_STASH_DIRNAME:-stash}/${name}"
       else
          dependency="${name}"
       fi
@@ -122,8 +140,8 @@ emit_include_file()
       )
       fi
    done
-
-   echo "#endif"
+   set +f; IFS="${DEFAULT_IFS}"
+#   echo "#endif"
 
 }
 
@@ -143,6 +161,8 @@ main()
    local MULLE_FLAG_LOG_VERBOSE='NO'
    local MULLE_FLAG_LOG_MERGE='NO'
    local MULLE_TRACE_POSTPONE='NO'
+
+   local OPTION_REFLECT
 
    #
    # simple flag handling
@@ -164,11 +184,14 @@ main()
             usage
          ;;
 
+         --reflect)
+            OPTION_REFLECT='YES'
+         ;;
+
          --version)
             printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
             exit 0
          ;;
-
 
          ##
          ## ADD YOUR FLAGS HERE
@@ -190,18 +213,35 @@ main()
 
 
    local main_identifier
+   local name
 
-   main_identifier="`mulle-sde environment get PROJECT_UPCASE_IDENTIFIER`" || exit 1
+   name="`rexekutor mulle-sde environment get PROJECT_NAME`" || exit 1
+   r_identifier "${name}"
+   PROJECT_IDENTIFIER="${identifier}"
 
-   if [ ! -d "stash" ]
+   r_uppercase "${RVAL}"
+   PROJECT_UPCASE_IDENTIFIER="${RVAL}"
+
+   if [ ! -d "${MULLE_SOURCETREE_STASH_DIRNAME:-stash}" ]
    then
-      log_warning "There is no stash directory here, nothing to do
+      log_warning "There is no ${MULLE_SOURCETREE_STASH_DIRNAME:-stash} directory here, nothing to do
 ${C_INFO}Run mulle-sde fetch if this is unexpected."
       return 0
    fi
 
-   emit_include_file "${main_identifier}"
 
+   if [ "${OPTION_REFLECT}" = 'YES' ]
+   then
+      local name
+
+      dstfile="${PROJECT_SOURCE_DIR:-src}/reflect/_${name}-versioncheck.h"
+      r_mkdir_parent_if_missing "${dstfile}"
+
+      text="`emit_include_file "${PROJECT_UPCASE_IDENTIFIER}" `"
+      redirect_exekutor "${dstfile}" echo "${text}"
+   else
+      emit_include_file "${PROJECT_UPCASE_IDENTIFIER}"
+   fi
 }
 
 

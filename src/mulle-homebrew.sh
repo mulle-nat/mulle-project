@@ -370,7 +370,7 @@ formula_push()
    local homebrewtap="$1" ; shift
    local tag="$1"; shift
 
-   HOMEBREW_TAP_BRANCH="${HOMEBREW_TAP_BRANCH:-master}"
+   HOMEBREW_TAP_BRANCH="${HOMEBREW_TAP_BRANCH:-${GIT_DEFAULT_BRANCH:-master}}"
    HOMEBREW_TAP_REMOTE="${HOMEBREW_TAP_REMOTE:-origin}"
 
    #

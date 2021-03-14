@@ -174,7 +174,7 @@ git_untag_all()
 
 _git_parse_params()
 {
-   branch="${1:-master}"
+   branch="${1:-${GIT_DEFAULT_BRANCH:-master}}"
    [ $# -ne 0 ] && shift
 
    dstbranch="${1:-release}"
@@ -380,7 +380,7 @@ git_verify_main()
    local branch
 
    branch="`rexekutor git rev-parse --abbrev-ref HEAD`"
-   branch="${branch:-master}" # for dry run
+   branch="${branch:-${GIT_DEFAULT_BRANCH:-master}}" # for dry run
 
    _git_verify_main "${branch}" "$@"
 
@@ -393,7 +393,7 @@ git_assert_not_on_release_branch()
    local branch
 
    branch="`exekutor git rev-parse --abbrev-ref HEAD`"
-   branch="${branch:-master}" # for dry run
+   branch="${branch:-${GIT_DEFAULT_BRANCH:-master}}" # for dry run
    if [ "${branch}" = "release" ]
    then
       fail "Don't call it from release branch"
@@ -408,7 +408,7 @@ git_commit_main()
    local rval
 
    branch="`exekutor git rev-parse --abbrev-ref HEAD`"
-   branch="${branch:-master}" # for dry run
+   branch="${branch:-${GIT_DEFAULT_BRANCH:-master}}" # for dry run
    if [ "${branch}" = "release" ]
    then
       fail "Don't call it from release branch"

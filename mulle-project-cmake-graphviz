@@ -1,0 +1,132 @@
+#! /usr/bin/env bash
+#
+#   Copyright (c) 2020 Nat! - Mulle kybernetiK
+#   All rights reserved.
+#
+#   Redistribution and use in source and binary forms, with or without
+#   modification, are permitted provided that the following conditions are met:
+#
+#   Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+#   Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+#   Neither the name of Mulle kybernetiK nor the names of its contributors
+#   may be used to endorse or promote products derived from this software
+#   without specific prior written permission.
+#
+#   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+#   AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+#   IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+#   ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+#   LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+#   CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+#   SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+#   INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+#   CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+#   ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+#   POSSIBILITY OF SUCH DAMAGE.
+#
+
+# places to search for cmake files
+CMAKE_INCLUDE_PATH=cmake
+
+# run it in a mulle-sde project to get a graphviz file, showing the way
+# files are included
+
+get_include_filenames()
+{
+   local filename="$1"
+
+   sed -n -e '/^#/d' \
+          -e "s/.*include( *\\([A-Za-z0-9_]*\\).*/\\1.cmake/p" \
+          "${filename}"
+}
+
+
+dump_includes()
+{
+   local filename="$1"
+
+   local name
+
+   name="`basename -- "${filename}"`"
+
+   #
+   # these are evaluated at cmake runtime and can't be dumped
+   #
+   if [ "${name}" = "_Dependencies.cmake" ]
+   then
+      echo "   \"${name}\" -> \"dependency/include/*/cmake/DependenciesAndLibraries.cmake\""
+   else
+      sed -n -e '/^#/d' \
+             -e "s/.*include( *\\([A-Za-z0-9_]*\\).*/   \"${name}\" -> \"\\1.cmake\"/p" \
+             "${filename}"
+   fi
+}
+
+
+find_include()
+{
+   local name="$1"
+
+   find ${CMAKE_INCLUDE_PATH} -name "${name}" -print
+}
+
+
+dump_file()
+{
+   local filename="$1"
+
+   local includes
+   local name
+   local includepath
+
+   if fgrep -x -q "${filename}" <<< "${DUMPED}"
+   then
+      return
+   fi
+   DUMPED="${filename}
+${DUMPED}"
+
+   dump_includes "${filename}"
+   includes="`get_include_filenames "${filename}"`"
+
+   for name in ${includes}
+   do
+      includepath="`find_include "${name}"`"
+      if [ ! -z "${includepath}" ]
+      then
+         dump_file "${includepath}"
+      else
+         :
+         # doesn't really matter if optional though
+         # echo "*** cmake file \"${name}\" not found" >&2
+      fi
+   done
+}
+
+
+
+main()
+{
+   cat <<EOF
+digraph cmake
+{
+   rankdir="LR"
+   node [shape="note"]
+   graph [ordering="out"]
+
+EOF
+
+   IFS=$'\n'
+   dump_file "CMakeLists.txt"
+
+   cat <<EOF
+}
+EOF
+}
+
+main "$@"

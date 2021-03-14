@@ -1,0 +1,317 @@
+#! /usr/bin/env bash
+
+[ "${TRACE}" = 'YES' -o "${MULLE_PROJECT_SOURCETREE_UPDATE_TAGS_TRACE}" = 'YES' ] && set -x && : "$0" "$@"
+
+
+MULLE_EXECUTABLE_VERSION="0.0.2"
+
+
+print_flags()
+{
+   echo "   --symlink   : update all dependencies currently symlinked"
+   echo "   --mulle     : update those with mulle_ or Mulle prefix"
+   echo "    -o <file>  : output commands into file"
+   echo "    -e         : execute commands"
+
+   options_technical_flags_usage "       : "
+}
+
+
+usage()
+{
+   [ $# -ne 0 ] && log_error "$*"
+
+
+   cat <<EOF >&2
+Usage:
+   mulle-project-sourcetree-update-tags [flags] <project pattern>*
+
+   For all dependencies in the local sourcetree config, try to figure out
+   the current version and generate an appropriate semver qualifier for it
+   usually ^<version>. Generates a bunch of mulle-sde commands to update your
+   sourcetree with.
+
+   Currently only works with dependencies that utilize mulle-project-version.
+
+Flags:
+EOF
+   print_flags | LC_ALL=C sort >&2
+
+   exit 1
+}
+
+
+print_commands()
+{
+   log_entry "print_commands" "$@"
+
+   local url
+   local name
+   local tag
+   local line
+
+   local stash_dir
+
+   stash_dir="${MULLE_SOURCETREE_STASH_DIRNAME:-stash}"
+   if [ ! -d "${stash_dir}" ]
+   then
+      log_warning "Could not locate the stash directory. H"
+   fi
+
+   set -f
+   IFS=$'\n'
+   for line in `rexekutor mulle-sde dependency list -- \
+                                                    --dedupe-mode url-filename \
+                                                    --output-eval \
+                                                    --output-no-column \
+                                                    --output-no-header \
+                                                    --format "%a;%t;%u\\n"`
+   do
+      name="${line%%;*}"
+      line="${line#*;}"
+      tag="${line%%;*}"
+      url="${line#*;}"
+
+      local found
+
+      if [ ! -z "${OPTION_MATCHERS}" -o $# -ne 0 ]
+      then
+         for matcher in "$@" ${OPTION_MATCHERS}
+         do
+            case "${name}" in
+               ${matcher})
+                  found='YES'
+                  break
+               ;;
+            esac
+         done
+
+         [ -z "${found}" ] && continue
+      fi
+
+      local version
+
+      filename="`mulle-sde dependency source-dir "${name}" `" || exit 1
+
+      if [ "${OPTION_SYMLINKED}" = 'YES' ]
+      then
+         if [ -l "${filename}" -a ! -f "${filename}" ]
+         then
+            version="`( cd "${filename}" ; mulle-project-version -s 2> /dev/null)`"
+         fi
+      else
+         if [ -d "${filename}" ]
+         then
+            version="`( cd "${filename}" ; mulle-project-version -s 2> /dev/null)`"
+         fi
+      fi
+
+      if [ -z "${version}" ]
+      then
+         log_warning "Couldn't figure out the version for ${name}"
+         continue
+      fi
+
+      echo "mulle-sde dependency set '${name}' tag '^${version}'"
+   done
+
+   IFS="${DEFAULT_IFS}"
+   set +f
+}
+
+
+
+main()
+{
+   local MULLE_FLAG_MAGNUM_FORCE='NO'
+   # technical flags
+   local MULLE_TRACE
+   local MULLE_FLAG_EXEKUTOR_DRY_RUN='NO'
+   local MULLE_FLAG_LOG_LOCAL='NO'
+   local MULLE_FLAG_LOG_DEBUG='NO'
+   local MULLE_FLAG_LOG_EXEKUTOR='NO'
+   local MULLE_FLAG_LOG_FLUFF='NO'
+   local MULLE_FLAG_LOG_SCRIPTS='NO'
+   local MULLE_FLAG_LOG_SETTINGS='NO'
+   local MULLE_FLAG_LOG_VERBOSE='NO'
+   local MULLE_FLAG_LOG_MERGE='NO'
+   local MULLE_TRACE_POSTPONE='NO'
+
+   local OPTION_OUTPUT_FILE="-"
+   local OPTION_MATCHERS
+   local OPTION_SYMLINKED
+
+   #
+   # simple flag handling
+   #
+   while [ $# -ne 0 ]
+   do
+      if options_technical_flags "$1"
+      then
+         shift
+         continue
+      fi
+
+      case "$1" in
+         -h*|--help|help)
+            usage
+         ;;
+
+         --symlinked)
+            OPTION_SYMLINKED='YES'
+         ;;
+
+         --mulle)
+            OPTION_MATCHERS="mulle_* Mulle*"
+         ;;
+
+         -o|--output-file)
+            [ $# -eq 1 ] && fail "Missing argument to \"$1\""
+            shift
+
+            OPTION_OUTPUT_FILE="$1"
+         ;;
+
+         -e|--execute-commands)
+            OPTION_EXECUTE_COMMANDS='YES'
+         ;;
+
+         --version)
+            printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
+            exit 0
+         ;;
+
+
+         ##
+         ## ADD YOUR FLAGS HERE
+         ##
+
+         -*)
+            usage "Unknown flag \"$1\""
+         ;;
+
+         *)
+            break
+         ;;
+      esac
+
+      shift
+   done
+
+   options_setup_trace "${MULLE_TRACE}"
+
+
+   directory="`rexekutor mulle-sde project-dir`"
+   if [ -z "${directory}" ]
+   then
+      fail "No mulle-sde project found"
+   fi
+   rexekutor cd "${directory}" || exit 1
+#
+#   #
+#   # get local project environment
+#   #
+#   if [ -z "${MULLE_VIRTUAL_ROOT}" ]
+#   then
+#      MULLE_VIRTUAL_ROOT="`PATH=/bin:/usr/bin pwd -P`"
+#      MULLE_SHELL_MODE="" . ".mulle/share/env/environment.sh" || exit 1
+#   fi
+
+   local text
+
+   if [ "${OPTION_OUTPUT_FILE}" = '-' -a "${OPTION_EXECUTE_COMMANDS}" != 'YES' ]
+   then
+      print_commands "$@" ${OPTION_MATCHERS}
+   else
+      text="`print_commands "$@" ${OPTION_MATCHERS} `"
+      if [ "${OPTION_OUTPUT_FILE}" != '-' ]
+      then
+         redirect_exekutor "${OPTION_OUTPUT_FILE}" echo "${text}"
+      fi
+      if [ "${OPTION_EXECUTE_COMMANDS}" = 'YES' ]
+      then
+         local line
+         set -f
+
+         IFS=$'\n'
+         for line in ${text}
+         do
+            eval_exekutor "${line}"
+         done
+
+         IFS="${DEFAULT_IFS}"
+         set +f
+      fi
+   fi
+}
+
+
+
+########
+###
+### INIT - You usually won't edit code below
+###
+
+trap_fail()
+{
+   exit 1
+}
+
+
+_init()
+{
+   #
+   # minimal setup exit
+   #
+   if [ "$1" = "version" ]
+   then
+      printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
+      exit 0
+   fi
+
+   #
+   # leading backslash ? looks like we're getting called from
+   # mingw via a .BAT or so
+   #
+   case "$PATH" in
+      '\\'*)
+         PATH="${PATH//\\/\/}"
+      ;;
+   esac
+
+   if [ -z "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}" ]
+   then
+      MULLE_BASHFUNCTIONS_LIBEXEC_DIR="`mulle-bashfunctions-env libexec-dir 2> /dev/null`"
+      if [ -z "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}" ]
+      then
+         if [ -z "`command -v "${executablepath}"`" ]
+         then
+            echo "Fatal Error: Could not find mulle-bashfunctions-env in PATH ($PATH) - mulle-bashfunctions not installed ?" >&2
+         else
+            echo "Fatal Error: Could not find libexec of mulle-bashfunctions-env ($PWD)" >&2
+         fi
+         exit 1
+      fi
+   fi
+
+   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-bashfunctions.sh" "minimal" &&
+   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-path.sh" &&
+   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-file.sh" ||
+      fail "failed to load bashfunctions from ${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}"
+
+   #  set -e # more pain then gain in the end
+   #  set -u # doesn't work with my style
+
+   trap trap_fail INT
+   set -o pipefail
+
+   call_main "${MULLE_PROJECT_PACKAGE_JSON_FLAGS}" "$@"
+}
+
+
+_init "$@" # will call main indirectly via call_main
+
+
+### INIT
+###
+########

@@ -3,7 +3,7 @@
 [ "${TRACE}" = 'YES' -o "${MULLE_PROJECT_PACKAGE_JSON_TRACE}" = 'YES' ] && set -x && : "$0" "$@"
 
 
-MULLE_EXECUTABLE_VERSION="0.0.0"
+MULLE_EXECUTABLE_VERSION="0.0.2"
 
 
 print_flags()
@@ -25,6 +25,12 @@ Usage:
 
    Create a package.json file from .mulle/etc/project and
    .mulle/etc/sourcetree/config contents.
+
+   This script will query the GitHub API at least twice for each repository
+   it lists in its dependencies. The GitHub limit is 60 requests per hours
+   though for unauthenticated users. That means, if you have more than 30
+   dependencies, which you might have easily, you'll run into errors. See
+   mulle-fetch github for more info.
 
 Flags:
 EOF
@@ -67,7 +73,8 @@ get_url()
    if [ -f ".git/config" ]
    then
       repository="`rexekutor grep 'url\ =\ git@github.com:' .git/config \
-                 | rexekutor sed 's|^.*github.com:\([^/]*\)/\([^/.]*\).*|https://github.com/\1/\2|'`"
+                 | sed 's|^.*github.com:\([^/]*\)/\([^/.]*\).*|https://github.com/\1/\2|' \
+                 | head -1`"
    fi
 
    if [ -z "${repository}" ]
@@ -100,7 +107,8 @@ get_repository()
    if [ -f ".git/config" ]
    then
       repository="`rexekutor grep 'url\ =\ git@github.com:' .git/config \
-                 | rexekutor sed 's|^.*github.com:\([^/]*\)/\([^/.]*\).*|\1/\2|'`"
+                 | sed 's|^.*github.com:\([^/]*\)/\([^/.]*\).*|\1/\2|' \
+                 | head -1`"
    fi
 
    if [ -z "${repository}" ]
@@ -158,8 +166,8 @@ get_description()
       if [ -f "README.md" ]
       then
          rexekutor head -4 "README.md" \
-         | rexekutor egrep '^####' \
-         | rexekutor sed -e 's/^####//' -e 's/^ //g'
+         | egrep '^####' \
+         | sed -e 's/^####//' -e 's/^ //g'
       fi
    fi
 }
@@ -245,7 +253,6 @@ print_repository()
 }
 
 
-
 print_dependencies()
 {
 
@@ -257,18 +264,21 @@ print_dependencies()
 
    local url
    local name
+   local tag
    local line
 
    set -f
    IFS=$'\n'
-   for line in `rexekutor mulle-sde dependency list -- \
-                                               --output-eval \
-                                               --output-no-column \
-                                               --output-no-header \
-                                               --format "%a;%u\\n"`
+   for line in `rexekutor mulle-sde dependency list -r -- \
+                                                       --dedupe-mode url-filename \
+                                                       --output-eval \
+                                                       --output-no-column \
+                                                       --output-no-header \
+                                                       --format "%a;%t;%u\\n"`
    do
-
       name="${line%%;*}"
+      line="${line#*;}"
+      tag="${line%%;*}"
       url="${line#*;}"
 
       case "${url}" in
@@ -289,7 +299,8 @@ print_dependencies()
             then
                printf "${sep}"
                sep=",\\n${INDENT}${INDENT}"
-               printf "\"%s\" : \"%s/%s\"" "${name}" "${user}" "${repo}"
+               # use repo instead of name
+               printf "\"%s\" : \"git://github.com/%s/%s" "${repo}" "${user}" "${repo}"
             fi
          ;;
 
@@ -298,10 +309,41 @@ print_dependencies()
             then
                printf "${sep}"
                sep=",\\n${INDENT}${INDENT}"
-               printf "\"%s\" : \"%s\"" "${name}" "${url}"
+               printf "\"%s\" : \"%s" "${name}" "${url}"
             fi
          ;;
       esac
+
+      local print_tag
+
+      print_tag=">=0.0.1"
+      # if it isn't numeric it won't show up on github
+      case "${tag}" in
+         [0-9].*)
+            print_tag="^${tag#[Vv]}"
+         ;;
+
+         *)
+            local alias_tag
+
+            set -f
+            IFS=
+            for alias_tag in `${MULLE_FETCH:-mulle-fetch} github "${user}" "${repo}"  \
+                                                          get-tag-aliases "${tag}" `
+            do
+               case "${alias_tag}" in
+                  [vV][0-9]*\.[0-9]*\.[0-9]*|[0-9]*\.[0-9]*\.[0-9]*)
+                     print_tag="^${alias_tag#[Vv]}"
+                     break
+                  ;;
+               esac
+            done
+            set +f
+            IFS="${DEFAULT_IFS}"
+         ;;
+      esac
+      printf "#semver:${print_tag}\""
+
    done
    IFS="${DEFAULT_IFS}"
    set +f
