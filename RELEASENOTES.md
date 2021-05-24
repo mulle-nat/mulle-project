@@ -1,3 +1,7 @@
+### 2.3.1
+
+* Various small improvements
+
 ## 2.3.0
 
 * i386 support for travis
