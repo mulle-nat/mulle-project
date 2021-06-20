@@ -469,6 +469,14 @@ main()
             OPTION_ADD_U='YES'
          ;;
 
+         -0|--first-patch-zero)
+            OPTION_FIRST_PATCH="0"
+         ;;
+
+         -1|--first-patch-one)
+            OPTION_FIRST_PATCH="1"
+         ;;
+
          -a|--append)
             OPTION_APPEND='YES'
          ;;
@@ -479,6 +487,13 @@ main()
 
          -c|--commit)
             OPTION_COMMIT='YES'
+         ;;
+
+         -dm|--default_message)
+            [ $# -eq 1 ] && usage "missing argument for \"$1\""
+            shift
+
+            OPTION_DEFAULT_MESSAGE="$1"
          ;;
 
          -f)
@@ -499,24 +514,6 @@ main()
             RELEASENOTE_GREP="$1"
          ;;
 
-         -m|--message)
-            [ $# -eq 1 ] && usage "missing argument for \"$1\""
-            shift
-
-            OPTION_MESSAGE="$1"
-         ;;
-
-         -dm|--default_message)
-            [ $# -eq 1 ] && usage "missing argument for \"$1\""
-            shift
-
-            OPTION_DEFAULT_MESSAGE="$1"
-         ;;
-
-         --keep-tmp)
-            OPTION_KEEP_TMP='YES'
-         ;;
-
          -i|--input)
             [ $# -eq 1 ] && usage "missing argument for \"$1\""
             shift
@@ -524,15 +521,15 @@ main()
             OPTION_INPUT="$1"
          ;;
 
-         -o|--output)
-            [ $# -eq 1 ] && usage "missing argument to $1"
-            shift
-
-            OPTION_OUTPUT="$1"
+         --keep-tmp)
+            OPTION_KEEP_TMP='YES'
          ;;
 
-         -u|--unfiltered)
-            RELEASENOTE_GREP='^'  # should match everything
+         -m|--message)
+            [ $# -eq 1 ] && usage "missing argument for \"$1\""
+            shift
+
+            OPTION_MESSAGE="$1"
          ;;
 
          --missing)
@@ -543,11 +540,25 @@ main()
             OPTION_MD_ESCAPE='NO'
          ;;
 
+         -o|--output)
+            [ $# -eq 1 ] && usage "missing argument to $1"
+            shift
+
+            OPTION_OUTPUT="$1"
+         ;;
+
          --prefix)
             [ $# -eq 1 ] && usage "missing argument for \"$1\""
             shift
 
             OPTION_PREFIX="$1"
+         ;;
+
+         --print-latest-version)
+            shift
+            OPTION_INPUT="$1"
+            get_latest_releasenote_version "$1"
+            return $?
          ;;
 
          --tag)
@@ -557,6 +568,10 @@ main()
             OPTION_TAG="$1"
          ;;
 
+         -u|--unfiltered)
+            RELEASENOTE_GREP='^'  # should match everything
+         ;;
+
          --version)
             [ $# -eq 1 ] && usage "missing argument for \"$1\""
             shift
@@ -564,19 +579,9 @@ main()
             VERSION="$1"
          ;;
 
-         -0|--first-patch-zero)
-            OPTION_FIRST_PATCH="0"
-         ;;
-
-         -1|--first-patch-one)
-            OPTION_FIRST_PATCH="1"
-         ;;
-
-         --print-latest-version)
-            shift
-            OPTION_INPUT="$1"
-            get_latest_releasenote_version "$1"
-            return $?
+         -w|--write)
+            OPTION_INPUT="RELEASENOTES.md"
+            OPTION_OUTPUT="RELEASENOTES.md"
          ;;
 
          -*)
