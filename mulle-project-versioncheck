@@ -28,7 +28,7 @@ usage()
 Usage:
    mulle-project-versioncheck [flags]
 
-   Produces version checks for dependencies for C headers.
+   Produces version checks of dependencies for C headers.
 
 
 Flags:
@@ -142,7 +142,6 @@ emit_include_file()
    done
    set +f; IFS="${DEFAULT_IFS}"
 #   echo "#endif"
-
 }
 
 main()
@@ -229,13 +228,14 @@ ${C_INFO}Run mulle-sde fetch if this is unexpected."
       return 0
    fi
 
-
    if [ "${OPTION_REFLECT}" = 'YES' ]
    then
       local name
 
       dstfile="${PROJECT_SOURCE_DIR:-src}/reflect/_${name}-versioncheck.h"
       r_mkdir_parent_if_missing "${dstfile}"
+
+      log_info "${PROJECT_NAME}: ${dstfile}"
 
       text="`emit_include_file "${PROJECT_UPCASE_IDENTIFIER}" `"
       redirect_exekutor "${dstfile}" echo "${text}"

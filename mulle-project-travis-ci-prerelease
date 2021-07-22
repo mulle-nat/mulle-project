@@ -8,13 +8,14 @@ MULLE_EXECUTABLE_VERSION="0.0.0"
 
 print_flags()
 {
-   echo "   -f          : force operation"
+   echo "   -f               : force operation"
 
    ##
    ## ADD YOUR FLAGS HERE
    ##
 
-   options_technical_flags_usage "       : "
+   options_technical_flags_usage \
+                 "           : "
 }
 
 

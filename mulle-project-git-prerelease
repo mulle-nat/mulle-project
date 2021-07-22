@@ -1,0 +1,613 @@
+#! /usr/bin/env bash
+#
+#  mulle-project-wipe-prerelease.sh
+#  mulle-project
+#
+#  Copyright (c) 2021 Nat! - Mulle kybernetiK.
+#  Copyright (c) 2021 Codeon GmbH.
+#  All rights reserved.
+#
+#
+#  Redistribution and use in source and binary forms, with or without
+#  modification, are permitted provided that the following conditions are met:
+#
+#  Redistributions of source code must retain the above copyright notice, this
+#  list of conditions and the following disclaimer.
+#
+#  Redistributions in binary form must reproduce the above copyright notice,
+#  this list of conditions and the following disclaimer in the documentation
+#  and/or other materials provided with the distribution.
+#
+#  Neither the name of Mulle kybernetiK nor the names of its contributors
+#  may be used to endorse or promote products derived from this software
+#  without specific prior written permission.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+#  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+#  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+#  ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+#  LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+#  CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+#  SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+#  INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+#  CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+#  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+#  POSSIBILITY OF SUCH DAMAGE.
+#
+
+[ "${TRACE}" = 'YES' -o "${MULLE_PROJECT_GIT_PRERELEASE_TRACE}" = 'YES' ] && set -x && : "$0" "$@"
+
+
+MULLE_EXECUTABLE_VERSION="0.0.0"
+
+
+print_flags()
+{
+   echo "   -f                 : force push to remote prerelease branches"
+   echo "   --mulle            : combines, --no-origin, --sloppy, --safe-amend, --tag"
+   echo "   --check            : check if operation would succeed"
+   echo "   --tag <tag>        : force tag the commit" 
+   echo "   --clobber          : ignore commits in prerelease, clobber them"
+   echo "   --sloppy <message> : committing unsaved changes in master"
+   echo "   --always-amend     : always amend the commit [dangerous]"
+   echo "   --no-amend         : never amend, just create a new commit (default)"
+   echo "   --no-origin        : don't push to origin"
+   echo "   --no-github        : don't push to github"
+   echo "   --safe-amend       : amend if harmless, otherwise new commit"
+   echo "   --only-amend       : don't commit, if an amend is not possible"
+
+   options_technical_flags_usage \
+                "              : "
+}
+
+
+usage()
+{
+   [ $# -ne 0 ] && log_error "$*"
+
+
+   cat <<EOF >&2
+Usage:
+   mulle-project-git-prerelease [flags]
+
+   Use this only if this mental model works for you:
+
+      * there are two remotes "origin" and "github"
+      * changes happen on master, they are pushed to prerelease
+      * prerelease branches are clobbered
+      * version numbers are tagged, you don't push a prerelease, if the
+        version number is unchanged
+
+   Does some checks, so that you don't accidentally lose commits in the local
+   "prerelease" branch.
+
+   In force mode (-f), preferred:
+
+   Deletes current prerelease branch, copies current master to prerelease.
+   Force pushes to origin and github. Will therefore forcibly wipe remote
+   prelease branches.
+
+   In normal mode:
+
+   Checks out or creates prerelease branch from master. Rebases on master.
+   Pushes to remote prerelease branches.
+
+Flags:
+EOF
+   print_flags | LC_ALL=C sort >&2
+
+   exit 1
+}
+
+
+main()
+{
+   local MULLE_FLAG_MAGNUM_FORCE='NO'
+
+   # technical flags
+   local MULLE_TRACE
+   local MULLE_FLAG_EXEKUTOR_DRY_RUN='NO'
+   local MULLE_FLAG_LOG_LOCAL='NO'
+   local MULLE_FLAG_LOG_DEBUG='NO'
+   local MULLE_FLAG_LOG_EXEKUTOR='NO'
+   local MULLE_FLAG_LOG_FLUFF='NO'
+   local MULLE_FLAG_LOG_SCRIPTS='NO'
+   local MULLE_FLAG_LOG_SETTINGS='NO'
+   local MULLE_FLAG_LOG_VERBOSE='NO'
+   local MULLE_FLAG_LOG_MERGE='NO'
+   local MULLE_TRACE_POSTPONE='NO'
+
+   local OPTION_CHECK
+   local OPTION_CLOBBER
+   local OPTION_TAG
+   local OPTION_AMEND='NO'
+   local DEFAULT_ORIGIN='origin'
+   local DEFAULT_GITHUB='github'
+
+   #
+   # simple flag handling
+   #
+   while [ $# -ne 0 ]
+   do
+      if options_technical_flags "$1"
+      then
+         shift
+         continue
+      fi
+
+      case "$1" in
+         -f|--force)
+            MULLE_FLAG_MAGNUM_FORCE='YES'
+         ;;
+
+         -h*|--help|help)
+            usage
+         ;;
+
+         --amend)
+            OPTION_AMEND='YES'
+         ;;
+
+         --no-amend)
+            OPTION_AMEND='NO'
+         ;;
+
+         --safe-amend)
+            OPTION_AMEND='SAFE'
+         ;;
+
+         --only-amend)
+            OPTION_AMEND='ONLY'
+         ;;
+
+         --clobber)
+            OPTION_CLOBBER='YES'
+         ;;
+
+         --mulle)
+            OPTION_SLOPPY="prerelease"
+            OPTION_CLOBBER='YES'
+            OPTION_AMEND='SAFE'
+            OPTION_TAG="latest-prerelease"
+            DEFAULT_ORIGIN=
+            ORIGIN=
+         ;;
+
+         --sloppy)
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
+            shift
+
+            OPTION_SLOPPY="$1"
+         ;;
+
+         --check)
+            OPTION_CHECK='YES'
+         ;;
+
+         --github)
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
+            shift
+            GITHUB="$1"
+         ;;
+
+         --origin)
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
+            shift
+            ORIGIN="$1"
+         ;;
+
+         --no-origin)
+            DEFAULT_ORIGIN=
+            ORIGIN=
+         ;;
+
+         --no-github)
+            DEFAULT_GITHUB=
+            GITHUB=
+         ;;
+
+         --tag)
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
+            shift
+            OPTION_TAG="$1"
+         ;;
+
+         --version)
+            printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
+            exit 0
+         ;;
+
+
+         ##
+         ## ADD YOUR FLAGS HERE
+         ##
+
+         -*)
+            usage "Unknown flag \"$1\""
+         ;;
+
+         *)
+            break
+         ;;
+      esac
+
+      shift
+   done
+
+   options_setup_trace "${MULLE_TRACE}"
+
+   # git remote to push to, usually origin
+   ORIGIN="${ORIGIN:-${DEFAULT_ORIGIN}}"
+
+   # git remote to push to, usually github, can be empty
+   GITHUB="${GITHUB:-${DEFAULT_GITHUB}}"
+
+   # git branch to release to, source is always current
+   BRANCH="${BRANCH:-prerelease}"
+
+   local exit_or_continue_if_dry_run
+
+   exit_or_continue_if_dry_run="return"
+   if [ "${MULLE_FLAG_EXEKUTOR_DRY_RUN}" = 'YES' ]
+   then
+      exit_or_continue_if_dry_run=':'
+   fi
+
+   #
+   # Go to master, we only push from master (for now)
+   #
+   local rval
+
+   exekutor git checkout -q master
+   rval=$?
+   if [ $rval -ne 0 ]
+   then
+      fail "Could not checkout master"
+   fi
+
+   #
+   # If there are commits, possibly commit them
+   #
+   if ! git_is_clean
+   then
+      if [ -z "${OPTION_SLOPPY}" ]
+      then
+         fail "Repository is tainted"
+      fi
+
+      exekutor git add -u
+      rval=$?
+      if [ $rval -ne 0 ]
+      then
+         fail "git add -u failed ($rval)"
+      fi
+
+      local commit_options
+
+      r_git_commit_options "${OPTION_AMEND}" "${OPTION_SLOPPY:-prerelease}"
+      commit_options="${RVAL}"
+
+      eval_exekutor git commit ${commit_options}
+      rval=$?
+      if [ $rval -ne 0 ]
+      then
+         fail "Sloppy commit failed ($rval)"
+      fi
+
+      if ! git_is_clean
+      then
+         fail "Repository still tainted after sloppy commit :("
+      fi
+   fi
+
+   #
+   # If there is a failed rebase, get rid of it now
+   #
+   local rebase_name
+
+   rebase_name="`rexekutor cat ".git/rebase-apply/head-name" 2> /dev/null `"
+   if [ ! -z "${rebase_name}" ]
+   then
+      rebase_name="${rebase_name##*/}"
+      if [ "${rebase_name}" != "prerelease" ]
+      then
+         fail "There is a rebase going on, that's not a failed prerelease rebase"
+      fi
+
+      log_info "Cleaning up failed prerelease rebase"
+      rmdir_safer ".git/rebase-apply"
+   fi
+
+   #
+   # If there is a prerelease branch, check it
+   #
+   local exists
+   local justpush
+
+   if git_branch_exists "${BRANCH}"
+   then
+      exists='YES'
+
+      if [ "${OPTION_CLOBBER}" != 'YES' ]
+      then
+         #
+         # Ensure that prerelease is not ahead of master.
+         # We don't want to lose **local** commits accidentally pushed into the
+         # wrong branch, as can happen...
+         #
+         counts="`rexekutor git rev-list --left-right --count master...${BRANCH}`" || return 1
+
+         # clumsy
+         local master_count
+         local prerelease_count=0
+
+         for count in ${counts}
+         do
+            if [ -z "${master_count}" ]
+            then
+               master_count="${count}"
+            else
+               prerelease_count="${count}"
+            fi
+         done
+
+
+         if [ ${prerelease_count} -gt 0 ]
+         then
+            fail "Prerelease branch is ahead of master"
+         fi
+
+         if [ ${master_count:-0} -eq 0 ]
+         then
+            log_info "Prerelease is same as master, nothing to rebase"
+            justpush='YES'
+         fi
+      fi
+   fi
+
+   #
+   # Do some more general checks ?
+   #
+   local have_github
+   local have_origin
+   local rval
+
+   if [ ! -z "${GITHUB}" ]
+   then
+      _git_check_remote "${GITHUB}"
+      rval=$?
+
+      case $rval in
+         0|2)
+            have_github='YES'
+         ;;
+
+         1)
+            log_info "There is no remote named \"${GITHUB}\""
+         ;;
+      esac
+   fi
+
+   if [ ! -z "${ORIGIN}" ]
+   then
+      _git_check_remote "${ORIGIN}"
+      rval=$?
+
+      case $rval in
+         0|2)
+            have_origin='YES'
+         ;;
+
+         1)
+            log_info "There is no remote named \"${ORIGIN}\""
+         ;;
+      esac
+   fi
+
+   if [ "${OPTION_CHECK}" = 'YES' ]
+   then
+      log_info "OK"
+      return 0
+   fi
+
+   #
+   # Update prerelease branch from master
+   #
+   local rval
+
+   if [ "${justpush}" != 'YES' ]
+   then
+      if [ "${OPTION_CLOBBER}" = 'YES' ]
+      then
+         if [ "${exists}" = 'YES' ]
+         then
+            exekutor git branch -q -D "${BRANCH}"
+            rval=$?
+            if [ $rval -ne 0 ]
+            then
+               fail "\"${BRANCH}\" branch deletion failed ($rval)"
+            fi
+         fi
+
+         exekutor git checkout -q -b "${BRANCH}"
+         rval=$?
+         if [ $rval -ne 0 ]
+         then
+            fail "\"${BRANCH}\" branch creation failed ($rval)"
+         fi
+      else
+         local checkoutflags
+
+         if [ "${exists}" != 'YES' ]
+         then
+            checkoutflags="-b"
+         fi
+
+         exekutor git checkout -q ${checkoutflags} "${BRANCH}"
+         rval=$?
+         if [ $rval -ne 0 ]
+         then
+            fail "\"${BRANCH}\" checkout failed ($rval)"
+         fi
+
+         exekutor git rebase master
+         rval=$?
+         if [ $rval -ne 0 ]
+         then
+            fail "\"${BRANCH}\" rebase to \"master\" failed ($rval)"
+            return 1
+         fi
+      fi
+   else
+      exekutor git checkout -q "${BRANCH}"
+      rval=$?
+      if [ $rval -ne 0 ]
+      then
+         fail "\"${BRANCH}\" checkout failed ($rval)"
+      fi
+   fi
+
+   if [ ! -z "${OPTION_TAG}" ]
+   then
+       log_info "Tagging with \"${OPTION_TAG}\""
+       exekutor git tag -f "${OPTION_TAG}"
+   fi
+
+   if [ "${OPTION_CLOBBER}" = 'YES' -o "${MULLE_FLAG_MAGNUM_FORCE}" = 'YES' ]
+   then
+      pushflags="-f"
+   fi
+
+   if [ "${have_origin}" = 'YES' ]
+   then
+      if [ "${MULLE_FLAG_MAGNUM_FORCE}" = 'YES' ] || ! git_remote_branch_is_synced "${ORIGIN}" "${BRANCH}"
+      then
+         log_info "Pushing to \"${ORIGIN}/${BRANCH}\""
+         exekutor git push ${pushflags} "${ORIGIN}" "${BRANCH}"
+         rval=$?
+         if [ $rval -ne 0 ]
+         then
+            return $rval
+         fi
+      
+		   if [ ! -z "${OPTION_TAG}" ]
+		   then
+         	exekutor git push -f "${ORIGIN}" "${OPTION_TAG}"
+	         rval=$?
+	         if [ $rval -ne 0 ]
+	         then
+	            return $rval
+	         fi
+	      fi
+      else
+         log_info "Nothing needs to be pushed to \"${ORIGIN}/${BRANCH}\""
+      fi
+   fi
+
+   if [ "${have_github}" = 'YES' ]
+   then
+      if [ "${MULLE_FLAG_MAGNUM_FORCE}" = 'YES' ] || ! git_remote_branch_is_synced "${GITHUB}" "${BRANCH}"
+      then
+         log_info "Pushing to \"${GITHUB}/${BRANCH}\""
+         exekutor git push ${pushflags} "${GITHUB}" "${BRANCH}"
+         rval=$?
+         if [ $rval -ne 0 ]
+         then
+            return $rval
+         fi
+
+		   if [ ! -z "${OPTION_TAG}" ]
+		   then
+         	exekutor git push -f "${GITHUB}" "${OPTION_TAG}"
+	         rval=$?
+	         if [ $rval -ne 0 ]
+	         then
+	            return $rval
+	         fi
+	      fi
+      else
+         log_info "Nothing needs to be pushed to \"${GITHUB}/${BRANCH}\""
+      fi
+   fi
+
+   exekutor git checkout -q master
+   rval=$?
+   if [ $rval -ne 0 ]
+   then
+      fail "Could not checkout master"
+   fi
+}
+
+
+########
+###
+### INIT - You usually won't edit code below
+###
+
+trap_fail()
+{
+   exit 1
+}
+
+
+_init()
+{
+   #
+   # minimal setup exit
+   #
+   if [ "$1" = "version" ]
+   then
+      printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
+      exit 0
+   fi
+
+   #
+   # leading backslash ? looks like we're getting called from
+   # mingw via a .BAT or so
+   #
+   case "$PATH" in
+      '\\'*)
+         PATH="${PATH//\\/\/}"
+      ;;
+   esac
+
+   if [ -z "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}" ]
+   then
+      MULLE_BASHFUNCTIONS_LIBEXEC_DIR="`mulle-bashfunctions-env libexec-dir 2> /dev/null`"
+      if [ -z "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}" ]
+      then
+         if [ -z "`command -v "${executablepath}"`" ]
+         then
+            echo "Fatal Error: Could not find mulle-bashfunctions-env in PATH ($PATH) - mulle-bashfunctions not installed ?" >&2
+         else
+            echo "Fatal Error: Could not find libexec of mulle-bashfunctions-env ($PWD)" >&2
+         fi
+         exit 1
+      fi
+   fi
+
+   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-bashfunctions.sh" "minimal" &&
+   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-path.sh" &&
+   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-file.sh" ||
+      fail "failed to load bashfunctions from ${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}"
+
+   MULLE_PROJECT_LIBEXEC_DIR="`mulle-project-env libexec-dir`" || exit 1
+
+   . "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-git.sh" || exit 1
+
+   #  set -e # more pain then gain in the end
+   #  set -u # doesn't work with my style
+
+   trap trap_fail INT
+   set -o pipefail
+
+   call_main "${MULLE_PROJECT_GIT_PRERELEASE_FLAGS}" "$@"
+}
+
+
+_init "$@" # will call main indirectly via call_main
+
+###
+### INIT
+###
+########

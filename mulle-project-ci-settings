@@ -1,6 +1,6 @@
 #! /usr/bin/env bash
 
-[ "${TRACE}" = 'YES' -o "${MULLE_PROJECT_CI_PRERELEASE_TRACE}" = 'YES' ] && set -x && : "$0" "$@"
+[ "${TRACE}" = 'YES' -o "${MULLE_PROJECT_CI_SETTINGS_TRACE}" = 'YES' ] && set -x && : "$0" "$@"
 
 
 MULLE_EXECUTABLE_VERSION="0.0.0"
@@ -8,13 +8,14 @@ MULLE_EXECUTABLE_VERSION="0.0.0"
 
 print_flags()
 {
-   echo "   -f          : force operation"
+   echo "   -f               : force operation"
 
    ##
    ## ADD YOUR FLAGS HERE
    ##
 
-   options_technical_flags_usage "       : "
+   options_technical_flags_usage \
+                "            : "
 }
 
 
@@ -25,7 +26,7 @@ usage()
 
    cat <<EOF >&2
 Usage:
-   mulle_project_ci_prerelease [flags]
+   mulle-project-ci-settings [flags]
 
    Generate environment variable settings to map the sourcetree dependencies to
    a different branch, nodetype, url. This is useful for testing prereleases
@@ -36,8 +37,16 @@ Usage:
    "ci-prerelease" in the settings. This will be picked up and the
    environment variables will be used in the next build.
 
-   Example:
-      mulle-project-ci-prerelease --user 'mulle-*' --user '!mintomic'
+   It is important for this command to work, that all dependencies have been
+   fetched. This is not as easy as it may sound, especially if you use 
+   symlinks. It is important to do the cleaning and fetching in the proper
+   order. All symlinked dependencies are also completely fetched:
+
+   mulle-sde clean tidy ; mulle-sde clean fetch
+   mulle-sde test clean tidy ; mulle-sde test fetch
+
+Example:
+   mulle-project-ci-settings --user 'mulle-*' --user '!mintomic'
 
 Flags:
    --user <pattern> : specify github users to match in the URL of the
@@ -47,6 +56,7 @@ Flags:
    --branch <name>  : specify github branch to pull from (prerelease)
    --scope <name>   : specify environment scope (host-ci-prerelease)
    --mulle          : standard values for mulle-c/mulle-objc projects
+   --append         : don't overwrite existing file completely
 
 EOF
    print_flags | LC_ALL=C sort >&2
@@ -63,6 +73,7 @@ produce_environment()
    local mapped_scope="$2"
    local matching_users="$3"
    local matching_repos="$4"
+   local clobber="$5"
 
    [ -z "${mapped_branch}" ] && internal_fail "mapped_branch is empty"
    [ -z "${mapped_scope}" ]  && internal_fail "mapped_scope is empty"
@@ -75,10 +86,16 @@ produce_environment()
 
    local lines
 
+   if [ "${clobber}" = 'YES' ]
+   then
+      eval `mulle-env mulle-tool-env env`
+      remove_file_if_present "${MULLE_ENV_ETC_DIR}/environment-host-ci-prerelease.sh"
+   fi
+
    #
    # uses mulle-sourcetree-parser.h library
    #
-   lines="`get_dependency_address_nodetype_branch_tag_url -r`"
+   lines="`get_dependency_address_nodetype_branch_tag_url -r --bequeath `"
 
    set -o noglob; IFS=$'\n'
    for line in ${lines}
@@ -112,8 +129,15 @@ produce_environment()
       [ -z "${_host}" ]    && fail "Can't figure out host from URL ${_url}: ${line}"
       [ -z "${_user}" ]    && fail "Can't figure out user from URL ${_url}: ${line}"
       [ -z "${_repo}" ]    && fail "Can't figure out repo from URL ${_url}: ${line}"
+      #
+      # we need it to set to git for prerelease
+      #
       [ -z "${_nodetype_identifier}" ] && fail "Can't figure out node identifier: ${line}"
       [ -z "${_url_identifier}" ] && fail "Can't figure out URL from URL ${_url}: ${line}"
+      #
+      # we need it to set prerelease branch
+      #
+      [ -z "${_branch_identifier}" ] && fail "Can't figure out branch identifier: ${line}"
 
       if [ ! -z "${_user}" ] && ! is_matching_wildcards "${matching_users}" "${_user}"
       then
@@ -177,6 +201,7 @@ main()
    local OPTION_BRANCH
    local OPTION_USERS
    local OPTION_REPOS
+   local OPTION_CLOBBER='YES'
 
    #
    # simple flag handling
@@ -201,6 +226,10 @@ main()
          --version)
             printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
             exit 0
+         ;;
+
+         --append)
+            OPTION_CLOBBER='NO'
          ;;
 
          --mulle)
@@ -264,7 +293,8 @@ main()
    produce_environment "${OPTION_BRANCH:-prerelease}" \
                        "${OPTION_SCOPE:-host-ci-${OPTION_BRANCH:-prerelease}}" \
                        "${OPTION_USERS}" \
-                       "${OPTION_REPOS}"
+                       "${OPTION_REPOS}" \
+                       "${OPTION_CLOBBER}"
 }
 
 
@@ -333,7 +363,7 @@ mulle-bashfunctions-env ($PWD)" >&2
 
    . "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-sourcetree-parser.sh" || exit 1
 
-   call_main "${MULLE_PROJECT_CI_PRERELEASE_FLAGS}" "$@"
+   call_main "${MULLE_PROJECT_CI_SETTINGS_FLAGS}" "$@"
 }
 
 

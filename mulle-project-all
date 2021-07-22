@@ -1,0 +1,489 @@
+#! /usr/bin/env bash
+
+[ "${TRACE}" = 'YES' -o "${SHELL_ALL_TRACE}" = 'YES' ] && set -x && : "$0" "$@"
+
+
+print_flags()
+{
+   echo "   --eval             : evaluate command line"
+   echo "   --lenient          : lenient operation, errors don't preempt"
+   echo "   --parallel         : execute operations in parallel"
+   echo "   --repos-file <f>   : REPOS file to use"
+   echo "   --only-tests       : only execute in test directories"
+   echo "   --no-tests         : don't execute in test directories"
+   echo "   --no-others        : don't execute in other (demo) directories"
+   echo "   --no-subprojects   : don't execute in subproject directories"
+   echo "   --output-no-header : don't visually separate command output"
+   echo "   --project          : only execute in main project"
+
+   ##
+   ## ADD YOUR FLAG DESCRIPTION HERE
+   ##
+
+   options_technical_flags_usage \
+                "              : "
+}
+
+
+usage()
+{
+   [ $# -ne 0 ] && log_error "$*"
+
+
+   cat <<EOF >&2
+Usage:
+   mulle-project-all [flags] ...
+
+   Execute a command in all projects that are defined by the file "REPOS"
+   in the current directory. Can also traverse tests and subprojects.
+
+   Can execute commands in parallel on all input repositories.
+
+Example:
+   mulle-project-all -p --output-no-header pwd
+
+Flags:
+EOF
+   print_flags | LC_ALL=C sort >&2
+
+   exit 1
+}
+
+
+
+shell_it()
+{
+   log_entry "shell_it" "$1" ...
+
+   [ -z "$1" ] && return
+
+   (
+      rexekutor cd "$1"
+
+      case ",${OPTION_ADORN}," in
+         *,no-bar,*|*,no-top-bar,*|*,none,*)
+         ;;
+
+         *)
+            log_verbose "${C_RESET}---------------------"
+         ;;
+      esac
+
+      case ",${OPTION_ADORN}," in
+         *,no-echo,*|*,no-printf,*|*,none,*)
+         ;;
+
+         *,printf,*)
+            printf "%s " "$1"
+         ;;
+
+         *)
+            log_info "${C_RESET_BOLD}$1"
+         ;;
+      esac
+
+      case ",${OPTION_ADORN}," in
+         *,no-bar,*|*,no-bottom-bar,*|*,none,*)
+         ;;
+
+         *)
+            log_verbose "${C_RESET}---------------------"
+         ;;
+      esac
+
+
+      shift
+
+      if [ "${OPTION_EVAL}" = 'YES' ]
+      then
+         eval_exekutor "$@"
+         return $?
+      fi
+
+      exekutor "$@"
+   )
+}
+
+
+project_it()
+{
+   log_entry "project_it" "$1" "$2" ...
+
+   local project="$1"; shift
+   local mode="$1" ; shift 
+
+   case ",${mode}," in
+      *,no-main,*)
+      ;;
+
+      *)
+         if [ -z "${PROJECT_NAME}" ]
+         then
+            PROJECT_NAME="$1" ; export PROJECT_NAME
+         fi
+
+         if ! shell_it "${project}" "$@" && [ -z "${OPTION_LENIENT}" ]
+         then
+            exit 1
+         fi
+
+         PROJECT_NAME=
+      ;;
+   esac
+
+   case ",${mode}," in
+      *,no-subprojects,*)
+      ;;
+
+      *)
+         local subprojects
+         local subproject 
+
+         subprojects="`( cd "${project}"  ; 
+                         mulle-sde -N subproject list --format '%a\n' --output-no-header 2> /dev/null 
+                        ) `"
+         for subproject in ${subprojects}
+         do
+            case "${subproject}" in
+               craftinfo/*)
+                  # ignore
+               ;;
+
+               *)
+                  if [ -d "${project}/${subproject}" ]
+                  then
+                     SUBPROJECT_NAME="$1" ; export SUBPROJECT_NAME
+
+                     project_it "${project}/${subproject}" "${mode}" "$@"
+                  fi
+               ;;
+            esac
+         done
+      ;;
+   esac
+
+   case ",${mode}," in
+      *,no-tests,*)
+      ;;
+
+      *)
+         local tests 
+         local test 
+
+         tests="`( cd "${project}" ; mulle-env --search-here environment get MULLE_SDE_TEST_PATH 2> /dev/null )`"
+         tests="${tests:-test}"
+
+         IFS=':'
+         for test in ${tests}
+         do
+            IFS="${DEFAULT_IFS}"
+            if [ -d "${project}/${test}" ]
+            then
+               TEST_NAME="$1" ; export TEST_NAME
+
+               if ! shell_it "${project}/${test}" "$@" && [ -z "${OPTION_LENIENT}" ]
+               then
+                  exit 1
+               fi
+            fi
+         done
+         IFS="${DEFAULT_IFS}"
+      ;;
+   esac        
+
+   case ",${mode}," in
+      *,no-others,*)
+      ;;
+
+      *)
+         local others
+         local other
+
+         others="`( cd "${project}" ; mulle-env --search-here environment get MULLE_SDE_OTHER_PROJECTS_PATH 2> /dev/null )`"
+         others="${others:-demo}"
+
+         IFS=':'
+         for other in ${others}
+         do
+            IFS="${DEFAULT_IFS}"
+            if [ -d "${project}/${other}" ]
+            then
+               project_it "${project}/${other}" "${mode}" "$@"
+            fi
+         done
+         IFS="${DEFAULT_IFS}"
+      ;;
+   esac
+}
+
+
+parallel_execute_argument_first()
+{
+   log_entry "parallel_execute_argument_first" "$@"
+
+   local arguments="$1"; shift
+   local mode="$1"; shift
+   local exists_file="$1"; shift
+
+   local _parallel_statusfile
+   local _parallel_maxjobs
+   local _parallel_jobs
+   local _parallel_fails
+
+   [ $# -eq 0 ] && internal_fail "missing commandline"
+
+   _parallel_begin
+
+   local argument
+
+   set -o noglob;  IFS=$'\n'
+   for argument in ${arguments}
+   do
+      if [ ! -z "${argument}" ]
+      then
+         if [ ! -z "${exists_file}" ] && [ ! -e "${argument}/${exists_file}" ]
+         then
+            continue
+         fi
+
+         set +o noglob; IFS="${DEFAULT_IFS}"
+
+         wait_for_available_job "${_parallel_maxjobs}"
+         _parallel_jobs=$(($_parallel_jobs + 1))
+
+         log_debug "Running job #${_parallel_jobs}: $*"
+
+         (
+            project_it "${argument}" "${mode}" "$@"
+         ) &
+      fi
+   done
+
+   set +o noglob; IFS="${DEFAULT_IFS}"
+
+   _parallel_end
+}
+
+
+
+main()
+{
+   local MULLE_FLAG_MAGNUM_FORCE='NO'
+
+   # technical flags
+   local MULLE_TRACE
+   local MULLE_FLAG_EXEKUTOR_DRY_RUN='NO'
+   local MULLE_FLAG_LOG_LOCAL='NO'
+   local MULLE_FLAG_LOG_DEBUG='NO'
+   local MULLE_FLAG_LOG_EXEKUTOR='NO'
+   local MULLE_FLAG_LOG_FLUFF='NO'
+   local MULLE_FLAG_LOG_SCRIPTS='NO'
+   local MULLE_FLAG_LOG_SETTINGS='NO'
+   local MULLE_FLAG_LOG_VERBOSE='NO'
+   local MULLE_FLAG_LOG_MERGE='NO'
+   local MULLE_TRACE_POSTPONE='NO'
+
+   local OPTION_ADORN
+   local OPTION_LENIENT
+   local OPTION_MODE
+   local OPTION_REPOSFILE
+   local OPTION_PARALLEL
+   local OPTION_EVAL
+
+   #
+   # simple flag handling
+   #
+   while [ $# -ne 0 ]
+   do
+      if options_technical_flags "$1"
+      then
+         shift
+         continue
+      fi
+
+      case "$1" in
+         -h*|--help|help)
+            usage
+         ;;
+
+         -e|--eval)
+            OPTION_EVAL='YES'
+         ;;
+
+         -l|--lenient)
+            OPTION_LENIENT='YES'
+         ;;
+
+         -p|--parallel)
+            OPTION_PARALLEL='YES'
+         ;;
+
+         --if-exists-file)
+            [ $# -eq 1 ] && usage "missing argument to $1"
+            shift
+
+            OPTION_EXISTS_FILE="$1"
+         ;;
+
+         --tests|--tests-only)
+            OPTION_MODE='no-main,no-subprojects'
+         ;;
+
+         -m|--main-project-only|--project-only)
+            OPTION_MODE='no-tests,no-subprojects'
+         ;;
+
+         --no-project|--no-main-project)
+            r_comma_concat "${OPTION_MODE}" "no-main"
+            OPTION_MODE="${RVAL}"
+         ;;
+
+         --no-tests)
+            OPTION_MODE='no-tests'
+         ;;
+
+         --no-others)
+            r_comma_concat "${OPTION_MODE}" "no-others"
+            OPTION_MODE="${RVAL}"
+         ;;
+
+         --no-subprojects)
+            r_comma_concat "${OPTION_MODE}" "no-subprojects"
+            OPTION_MODE="${RVAL}"
+         ;;
+
+         -r|--repos-file)
+            [ $# -eq 1 ] && usage "missing argument to $1"
+            shift
+
+            OPTION_REPOSFILE="$1"
+         ;;         
+
+         --output-no-header)
+            OPTION_ADORN="none"
+         ;;
+
+         --version)
+            printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
+            exit 0
+         ;;
+
+         -*)
+            usage "Unknown flag \"$1\""
+         ;;
+
+         *)
+            break
+         ;;
+      esac
+
+      shift
+   done
+
+   options_setup_trace "${MULLE_TRACE}"
+
+   local reposfile 
+   local repos 
+
+   reposfile="${OPTION_REPOSFILE:-REPOS}"
+   repos="`rexekutor egrep -v '^#' "${reposfile}"`"
+   if [ -z "${repos}" ]
+   then
+      fail "No \"${reposfile}\" file found (${PWD})" 
+   fi
+
+   if [ "${OPTION_PARALLEL}" = 'YES' ]
+   then
+      parallel_execute_argument_first "${repos}" \
+                                      "${OPTION_MODE}" \
+                                      "${OPTION_EXISTS_FILE}" \
+                                      "$@"
+      return $?
+   fi
+
+   local i
+
+   for i in ${repos}
+   do
+      if [ ! -z "${i}" ]
+      then
+         if [ ! -z "${OPTION_EXISTS_FILE}" ] && [ ! -e "${i}/${OPTION_EXISTS_FILE}" ]
+         then
+            continue
+         fi
+         project_it "$i" "${OPTION_MODE}" "$@"
+      fi
+   done
+}
+
+
+########
+###
+### INIT - You usually won't edit code below
+###
+
+trap_fail()
+{
+   exit 1
+}
+
+
+_init()
+{
+   #
+   # minimal setup exit
+   #
+   if [ "$1" = "version" ]
+   then
+      printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
+      exit 0
+   fi
+
+   #
+   # leading backslash ? looks like we're getting called from
+   # mingw via a .BAT or so
+   #
+   case "$PATH" in
+      '\\'*)
+         PATH="${PATH//\\/\/}"
+      ;;
+   esac
+
+   if [ -z "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}" ]
+   then
+      MULLE_BASHFUNCTIONS_LIBEXEC_DIR="`mulle-bashfunctions-env libexec-dir 2> /dev/null`"
+      if [ -z "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}" ]
+      then
+         if [ -z "`command -v "${executablepath}"`" ]
+         then
+            echo "Fatal Error: Could not find mulle-bashfunctions-env in PATH ($PATH) - mulle-bashfunctions not installed ?" >&2
+         else
+            echo "Fatal Error: Could not find libexec of mulle-bashfunctions-env ($PWD)" >&2
+         fi
+         exit 1
+      fi
+   fi
+
+   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-bashfunctions.sh" "minimal" &&
+   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-path.sh" &&
+   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-file.sh" &&
+   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-parallel.sh" ||
+      fail "failed to load bashfunctions from ${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}"
+
+   #  set -e # more pain then gain in the end
+   #  set -u # doesn't work with my style
+
+   trap trap_fail INT
+   set -o pipefail
+
+   call_main "${MULLE_REPLACE_FLAGS}" "$@"
+}
+
+
+_init "$@" # will call main indirectly via call_main
+
+###
+### INIT
+###
+########
+

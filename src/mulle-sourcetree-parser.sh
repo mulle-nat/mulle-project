@@ -41,6 +41,9 @@ get_dependency_address_nodetype_branch_tag_url()
    #
    # don't push over technical flags, its too much and list
    # is readonly anyway
+   # need also to ignore no-bequeath, to get everything needed for a build
+   # maybe name no-bequeath no-link-bequeath ?
+   #
    rexekutor mulle-sourcetree \
                   ${MULLE_SOURCETREE_FLAGS} \
                   -N \

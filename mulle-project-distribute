@@ -42,7 +42,7 @@
 usage()
 {
    cat <<EOF >&2
-Usage: mulle-project-distribute [options]
+Usage: ${MULLE_EXECUTABLE_USAGE_NAME:-mulle-project-distribute} [options]
 
    Distribute the project via github and homebrew. Debian is indirectly
    supported by calling mulle-project-debian.
@@ -365,6 +365,7 @@ main()
    local OPTION_DO_GENERATE_FORMULA="DEFAULT"
    local OPTION_DO_POST_RELEASE="DEFAULT"
    local OPTION_VERSION_TAG="YES"
+   local OPTION_FORCE_PUSH="NO"
 
    source_file "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-user-files-settings.sh" "$@"   || exit 1
 
@@ -392,6 +393,10 @@ main()
 
          --echo)
             OPTION_ECHO='YES'
+         ;;
+
+        -f|--force-push)
+            OPTION_FORCE_PUSH='NO'
          ;;
 
          --no-git)
@@ -630,13 +635,13 @@ main()
    # old. We slurp in user values before the parameters, so that these
    # can be overridden by the parameters to the script
    #
-   source_file "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-user-files.sh" "$@"      || exit 1
-   source_file "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-version.sh" "$@"      || exit 1
+   source_file "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-user-files.sh" "$@" || exit 1
+   source_file "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-version.sh" "$@"    || exit 1
 
   __environment_main
 
-   source_file "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-homebrew.sh" "$@"       || exit 1
-   source_file "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-git.sh" "$@"            || exit 1
+   source_file "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-homebrew.sh" "$@"   || exit 1
+   source_file "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-git.sh" "$@"        || exit 1
 
    #
    # override values read from user files
@@ -704,18 +709,27 @@ main()
    if [ "${DO_GIT_RELEASE}" = 'YES' ]
    then
       # do the release
-      git_verify_main "${BRANCH}" "${ORIGIN}" "${TAG}" "${GITHUB}" "${OPTION_LATEST_TAG}" || ${exit_or_continue_if_dry_run} 1
+      git_verify_main "${BRANCH}" \
+                      "${ORIGIN}" \
+                      "${TAG}" \
+                      "${GITHUB}" \
+                      "${OPTION_LATEST_TAG}" \
+                      "${OPTION_FORCE_PUSH}" || ${exit_or_continue_if_dry_run} 1
 
       if [ "${VERIFY_ONLY}" != 'YES' ]
       then
          log_info "Git release..."
 
-         git_commit_main "${BRANCH}" "${ORIGIN}" "${TAG}" "${GITHUB}" "${OPTION_LATEST_TAG}" || ${exit_or_continue_if_dry_run}  1
+         git_commit_main "${BRANCH}" \
+                         "${ORIGIN}" \
+                         "${TAG}" \
+                         "${GITHUB}" \
+                         "${OPTION_LATEST_TAG}" \
+                         "${OPTION_FORCE_PUSH}" || ${exit_or_continue_if_dry_run} 1
       fi
    else
       log_fluff "No git release"
    fi
-
 
    if [ "${DO_GENERATE_FORMULA}" = 'YES' ]
    then

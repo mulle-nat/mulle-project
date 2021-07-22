@@ -36,7 +36,17 @@ git_tag_exists()
 
    local tag="$1"
 
-   rexekutor git rev-parse "${tag}" > /dev/null 2>&1
+   rexekutor git rev-parse --quiet --verify "${tag}" > /dev/null 2>&1
+}
+
+
+git_branch_exists()
+{
+   log_entry "git_branch_exists" "$@"
+
+   local branch="$1"
+
+   rexekutor git rev-parse --quiet --verify "${branch}" > /dev/null 2>&1
 }
 
 
@@ -112,6 +122,20 @@ git_is_clean()
 }
 
 
+#
+# branch can be empty, and usually is by default
+#
+git_can_amend()
+{
+   log_entry "git_can_amend" "$@"
+
+   local branch="$1"
+
+   # if 0 then egrep matched and this means that HEAD has no tags or
+   # has been pushed to any remotes
+   git log -1 --decorate -q ${branch} | egrep '\(HEAD -> [^,)]*\)' > /dev/null
+}
+
 # more convenient if not exekutored!
 git_repo_can_push()
 {
@@ -122,18 +146,56 @@ git_repo_can_push()
 
    local result
 
-   exekutor git fetch -q "${remote}" "${branch}"
+   if ! exekutor git fetch -q "${remote}" "${branch}"
+   then
+      return 1
+   fi
+
    result="`rexekutor git rev-list --left-right "HEAD...${remote}/${branch}" --ignore-submodules --count 2> /dev/null`"
    if [ $? -ne 0 ]
    then
       log_verbose "Remote \"${remote}\" does not have branch \"${branch}\" yet"
       return 0
    fi
-   result="`printf "%s\n" "${result}" | awk '{ print $2 }'`"
+   result="`awk '{ print $2 }' <<< "${result}" `"
    [ -z "${result}" ] || [ "${result}" -eq 0 ]  # -z test for exekutor
 }
 
 
+git_remote_branch_is_synced()
+{
+   log_entry "git_remote_branch_is_synced" "$@"
+
+   local remote="${1:-origin}"
+   local branch="${2:-release}"
+
+   local no_change
+
+   # get 0 0, don't know if spacing is always same
+   no_change="`rexekutor git rev-list --left-right "HEAD...HEAD" --ignore-submodules --count 2> /dev/null`"
+
+   if ! exekutor git fetch -q "${remote}" "${branch}"
+   then
+      return 2
+   fi
+
+   local result
+
+   result="`rexekutor git rev-list --left-right "HEAD...${remote}/${branch}" --ignore-submodules --count 2> /dev/null`"
+   if [ $? -ne 0 ]
+   then
+      log_verbose "Remote \"${remote}\" does not have branch \"${branch}\" yet"
+      return 0
+   fi
+
+   [ "${no_change}" = "${result}" ]
+}
+
+
+#
+# 1 no-remote
+# 2 remote there but no ref like name
+#
 _git_check_remote()
 {
    log_entry "_git_check_remote" "$@"
@@ -141,7 +203,7 @@ _git_check_remote()
    local name="$1"
 
    log_info "Check if remote \"${name}\" is present"
-   rexekutor git ls-remote -q --exit-code "${name}" > /dev/null 2> /dev/null
+   rexekutor git ls-remote -q --exit-code "${name}" > /dev/null
 }
 
 
@@ -192,6 +254,9 @@ _git_parse_params()
    latesttag="$1"
    [ $# -ne 0 ] && shift
 
+   forcepush="$1"
+   [ $# -ne 0 ] && shift
+
    case "${tag}" in
       -*)
          fail "Invalid tag \"${tag}\""
@@ -222,6 +287,7 @@ _git_verify_main()
    local tag
    local github
    local latesttag
+   local forcepush
 
    _git_parse_params "$@"
 
@@ -264,28 +330,31 @@ _git_verify_main()
       ${return_or_continue_if_dry_run} 1
    fi
 
-   #
-   # check that we can push
-   #
-   log_verbose "Check if remotes need merge"
-   if ! git_repo_can_push "${origin}" "${branch}"
+   if [ "${forcepush}" != 'YES' ]
    then
-      log_error "You need to merge \"${origin}/${branch}\" first"
-      ${return_or_continue_if_dry_run} 1
-   fi
-
-   if ! git_repo_can_push "${origin}" "${dstbranch}"
-   then
-      log_error "You need to merge \"${origin}/${dstbranch}\" first"
-      ${return_or_continue_if_dry_run} 1
-   fi
-
-   if [ "${have_github}" = 'YES' ]
-   then
-      if ! git_repo_can_push "${github}" "${dstbranch}"
+      #
+      # check that we can push
+      #
+      log_verbose "Check if remotes need merge"
+      if ! git_repo_can_push "${origin}" "${branch}"
       then
-         log_error "You need to merge \"${github}/${dstbranch}\" first"
+         log_error "You need to merge \"${origin}/${branch}\" first"
          ${return_or_continue_if_dry_run} 1
+      fi
+
+      if ! git_repo_can_push "${origin}" "${dstbranch}"
+      then
+         log_error "You need to merge \"${origin}/${dstbranch}\" first"
+         ${return_or_continue_if_dry_run} 1
+      fi
+
+      if [ "${have_github}" = 'YES' ]
+      then
+         if ! git_repo_can_push "${github}" "${dstbranch}"
+         then
+            log_error "You need to merge \"${github}/${dstbranch}\" first"
+            ${return_or_continue_if_dry_run} 1
+         fi
       fi
    fi
 }
@@ -307,6 +376,7 @@ _git_commit_main()
    local tag
    local github
    local latesttag
+   local forcepush
 
    _git_parse_params "$@"
 
@@ -399,6 +469,55 @@ git_assert_not_on_release_branch()
       fail "Don't call it from release branch"
    fi
 }
+
+
+r_git_commit_options()
+{
+   log_entry r_git_commit_options "$@"
+
+   local amend="$1"
+   local message="$2"
+
+   case "${amend}" in
+      'YES')
+         if git_can_amend
+         then
+            log_warning "Last commit was tagged or pushed. You may need to force push to remotes now."
+         fi
+         RVAL="--amend --no-edit"
+      ;;
+
+      'NO')
+         r_escaped_singlequotes "${message}"
+         RVAL="-m '${RVAL}'"
+      ;;
+
+      'DEFAULT'|'SAFE')
+         if ! git_can_amend
+         then
+            log_verbose "Will create a new commit as the last commat has been tagged or pushed"
+
+            r_escaped_singlequotes "${message}"
+            RVAL="-m '${RVAL}'"
+         else
+            RVAL="--amend --no-edit"
+         fi
+      ;;
+
+      'ONLY')
+         if ! git_can_amend
+         then
+            fail "Can not amend last commit as its been tagged or pushed"
+         fi
+         RVAL="--amend --no-edit"
+      ;;
+
+      *)
+         internal_fail "must specify an amend option"
+      ;;
+   esac
+}
+
 
 git_commit_main()
 {

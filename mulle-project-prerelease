@@ -6,11 +6,12 @@
 # mulle-project-distribute is hard to roll back
 #
 
-mulle-project-distribute \
-   "$@" \
-   --branch prerelease  \
-   --latest-tag latest-prerelease \
-   --no-version-tag \
-   --no-formula \
-   --no-push-formula \
-   --no-post-release
+MULLE_EXECUTABLE_USAGE_NAME=mulle-project-distribute \
+   mulle-project-distribute \
+      "$@" \
+      --branch prerelease  \
+      --latest-tag latest-prerelease \
+      --no-version-tag \
+      --no-formula \
+      --no-push-formula \
+      --no-post-release

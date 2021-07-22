@@ -19,7 +19,8 @@ print_flags()
    ## ADD YOUR FLAGS HERE
    ##
 
-   options_technical_flags_usage "       : "
+   options_technical_flags_usage \
+                "           : "
 }
 
 
@@ -191,7 +192,7 @@ main()
       then
          if [ -z "${project_dir}" ]
          then
-            fail "There is no mulle-sde project here and MULLE_FETCH_SEARCH_PATH is undefined"
+            fail "There is no mulle-sde project in \"${PWD#${MULLE_USER_PWD}/}\" and MULLE_FETCH_SEARCH_PATH is undefined"
          fi
          MULLE_FETCH_SEARCH_PATH="`mulle-env -c env | sed -n 's/^MULLE_FETCH_SEARCH_PATH=\(.*\)/\1/p'`"
       fi

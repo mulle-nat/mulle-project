@@ -38,13 +38,20 @@ usage()
    [ "$#" -ne 0 ] && log_error "$1"
 
    cat <<EOF >&2
-Usage: mulle-project-releasenotes [flags] [releasenotes]
+Usage:
+   mulle-project-releasenotes [flags] [releasenotes]
 
    Emit markup releasenotes for the current version. If no version is given,
    mulle-project-version is used to determine the current version.
 
+
    All comments from the last tag till HEAD will be collected.
    All comment lines starting with a '*' are included in the release notes.
+
+Examples:
+   Create initial RELEASENOTES.md with:
+
+      mulle-project-releasenotes --all > RELEASENOTES.md
 
 Flags:
    -a                       : prepend notes to first releasenote
@@ -381,7 +388,8 @@ merged_releasenotes()
          if [ "${MULLE_FLAG_MAGNUM_FORCE}" = 'NO' ]
          then
             rm "${tmpfile}"
-            fail "Releasenotes already contain a leading entry for \"${version}\""
+            log_info "Releasenotes already contain a leading entry for \"${version}\""
+            return 0
          fi
 
          if [ "${OPTION_INPUT}" = "-" ]
@@ -704,10 +712,14 @@ main()
       changed="`git ls-files -m "${OPTION_OUTPUT}"`"
       if [ ! -z "${changed}" ]
       then
-         if [ "${OPTION_ADD_U}" = 'YES' ]
+         if [ "${OPTION_ADD_U}" = 'YES' ] # second OPTION_ADD_U stage
          then
             exekutor git commit ${OPTION_COMMITFLAGS}
          else
+            if ! git_can_amend
+            then
+               fail "Automatic amend/commit not possible for tagged or already pushed commits"
+            fi
             exekutor git commit ${OPTION_COMMITFLAGS} "${OPTION_OUTPUT}"
          fi
       fi

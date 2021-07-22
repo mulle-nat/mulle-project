@@ -67,13 +67,16 @@ Options:
    --increment-minor     : add 1 to minor version part, needs --write
    --increment-patch     : add 1 to patch version part, needs --write
    --increment-custom    : add 1 to custom (fourth) version part, needs --write
+   --if-needed           : increment, if needed only (determined by status)
    --language <name>     : project language, (c, obj, cpp, bash etc)
    --no-info             : do not read -info.sh files
    --no-tag-warning      : do not warn if git tag exists
    --print-latest-tag    : print latest release tag
    --releasenotes        : read RELEASENOTES.md version
+   --no-releasenotes     : ignore RELEASENOTES.md version
    --read-xcode-version  : read version from Xcode project
    --set <value>         : set version, needs --write to persist change
+   --status              : prints. if project version needs a bump. Preempts.
    --versionname <name>  : version variable name
    --write               : update versionfile with new version
    --write-xcode-version : write version to Xcode project
@@ -198,7 +201,6 @@ Hint: specify VERSIONNAME, VERSIONFILE in .mulle/etc/project/version-info.sh"
 }
 
 
-
 get_latest_releasenote_version()
 {
    log_entry "get_latest_releasenote_version" "$@"
@@ -207,7 +209,7 @@ get_latest_releasenote_version()
 
    if [ ! -f "${filename}" ]
    then
-      log_debug "Releasenote file \"${filename}\" not found"
+      log_debug "Releasenote file \"${filename}\" not found."
       return 1
    fi
 
@@ -217,6 +219,146 @@ get_latest_releasenote_version()
 
    return 0
 }
+
+
+
+info_version()
+{
+   log_entry "info_version" "$@"
+
+   local version="$1"
+   local last="$2"
+
+   local last
+
+   if [ ! -z "${last}" ]
+   then
+      log_info "Version is ${version}. Last git tag is \"${last}\"."
+   else
+      log_info "No git tag \"${version}\" exists. (git fetch --tags maybe ?)"
+   fi
+}
+
+
+info_releasenotes()
+{
+   log_entry "info_releasenotes" "$@"
+
+   local version="$1"
+
+   local releasenotes_version
+
+   if releasenotes_version="`get_latest_releasenote_version "RELEASENOTES.md"`"
+   then
+      if [ -z "${releasenotes_version}" ]
+      then
+         log_warning "No version found in RELEASENOTES.md"
+      else
+         if [ "${releasenotes_version}" != "${version}" ]
+         then
+            log_warning "Last RELEASENOTES.md version is ${releasenotes_version}"
+         else
+            log_info "Last RELEASENOTES.md version is ${version}"
+         fi
+      fi
+   fi
+}
+
+
+status_version()
+{
+   log_entry "status_version" "$@"
+
+   local info
+
+   info=" "
+   if git_can_amend
+   then
+      info=", amendable "
+   fi
+
+   local last
+
+   last="`rexekutor git tag -l --sort=-creatordate | egrep -x '[0-9]*\.[0-9]*\.[0-9]*' | head -1`"
+   info_version "${VERSION}" "${last}"
+
+   if [ "${OPTION_RELEASENOTES}" != 'NO' ]
+   then
+      info_releasenotes "${VERSION}"
+   fi
+
+   if [ -z "${last}" ]
+   then
+      log_info "Project has never been tagged, so version is probably OK."
+      if ! git_is_clean
+      then
+         log_info "There are ${C_WARNING}uncommitted${info}${C_INFO}changes."
+         return 1
+      fi
+      return 0
+   fi
+
+   if [ "${VERSION}" = "${last}" ]
+   then
+      local counts
+
+      counts="`rexekutor git rev-list --left-right --count master...${last} `" || exit 1
+
+      log_debug "Counts for master...${last}: ${counts}"
+
+      # clumsy
+      local master_count
+      local last_count=0
+
+      for count in ${counts}
+      do
+         if [ -z "${master_count}" ]
+         then
+            master_count="${count}"
+         else
+            last_count="${count}"
+         fi
+      done
+
+      if [ "${MULLE_FLAG_LOG_SETTINGS}" = 'YES' ]
+      then
+         log_trace2 "master_count : ${master_count:-0}"
+         log_trace2 "last_count   : ${last_count}"
+      fi
+
+      if [ ${master_count:-0} -gt 0 ]
+      then
+         log_warning "Project version needs a bump, as there are commits."
+         if ! git_is_clean
+         then
+            log_info "There are ${C_WARNING}uncommitted${info}${C_INFO}changes."
+            rexekutor mulle-project-commit -v -n --status ${MULLE_PROJECT_COMMIT_FLAGS}
+         fi
+         return 1
+      fi
+
+      if ! git_is_clean
+      then
+         log_warning "Project version needs a bump, as there are uncommitted${info}changes."
+         rexekutor mulle-project-commit -v -n --status ${MULLE_PROJECT_COMMIT_FLAGS}
+         return 1
+      fi
+
+      log_info "Project version is OK, as there are no changes."
+      return 0
+   fi
+
+   if ! git_is_clean
+   then
+      log_info "Project version is already bumped, for the ${C_WARNING}uncommitted${info}${C_INFO}changes."
+      rexekutor mulle-project-commit -v -n --status ${MULLE_PROJECT_COMMIT_FLAGS}
+      return 1
+   fi
+
+   log_info "Project version is already bumped and there are no uncommitted changes."
+   return 0
+}
+
 
 
 warn_version()
@@ -229,33 +371,14 @@ warn_version()
       then
          log_warning "${VERSION} already exists as a git tag"
       else
-         local last
-
          last="`rexekutor git tag -l --sort=-creatordate | egrep -x '[0-9]*\.[0-9]*\.[0-9]*' | head -1`"
 
-         if [ ! -z "${last}" ]
-         then
-            log_info "Version is ${VERSION}. Last git tag is \"${last}\"."
-         else
-            log_info  "No git tag \"${VERSION}\" exists. (git fetch --tags maybe ?)"
-         fi
+         info_version "${VERSION}" "${last}"
       fi
 
-      local releasenotes_version
-
-      if releasenotes_version="`get_latest_releasenote_version "RELEASENOTES.md"`"
+      if [ "${OPTION_RELEASENOTES}" != 'NO' ]
       then
-         if [ -z "${releasenotes_version}" ]
-         then
-            log_warning "No version found in RELEASENOTES.md"
-         else
-            if [ "${releasenotes_version}" != "${VERSION}" ]
-            then
-               log_warning "Last RELEASENOTES.md version is ${releasenotes_version}"
-            else
-               log_info "Last RELEASENOTES.md version is ${VERSION}"
-            fi
-         fi
+         info_releasenotes "${VERSION}"
       fi
    fi
 }
@@ -310,12 +433,6 @@ write_version()
       fail "Version is immutable (VERSIONIMMUTABLE=${VERSIONIMMUTABLE})"
    fi
 
-   if [ "${OPTION_WRITE_XCODE_VERSION}" = 'YES' ]
-   then
-      inplace_sed -e 's|^\([[:space:]]*CURRENT_PROJECT_VERSION[[:space:]]*=[[:space:]]*["]*\)'${XCODE_VERSION}'\(.*\)|\1'${VERSION}'\2|' \
-                     "${ACTUAL_XCODEPROJ}/project.pbxproj"
-   fi
-
    if [ "${OPTION_WRITE}" = 'YES' ]
    then
       #
@@ -345,6 +462,17 @@ write_version()
                           "${VERSIONNAME}" \
                           "${VERSIONCUSTOM}" || exit 1
    fi
+
+   if [ "${OPTION_WRITE_XCODE_VERSION}" = 'YES' ]
+   then
+      inplace_sed -e 's|^\([[:space:]]*CURRENT_PROJECT_VERSION[[:space:]]*=[[:space:]]*["]*\)'${XCODE_VERSION}'\(.*\)|\1'${VERSION}'\2|' \
+                     "${ACTUAL_XCODEPROJ}/project.pbxproj"
+   fi
+
+   if [ "${OPTION_WRITE_EXTENSION_VERSIONS}" = 'YES' ]
+   then
+      exekutor mulle-project-extension-versions --project-version "${VERSION}" bump
+   fi
 }
 
 
@@ -353,11 +481,11 @@ verify_version()
    # lame ass bug check
    case "$*" in
       *--reset*)
-         internal_fail "verify called too oftena"
+         internal_fail "verify called too often"
       ;;
    esac
 
-   VERIFY_VERSION="`rexekutor "$0" "$@" --reset`"
+   VERIFY_VERSION="`rexekutor "$0" "$@" --reset`" || internal_fail "Could not get VERIFY_VERSION"
 
    if [ "${VERSION}" != "${VERIFY_VERSION}" ]
    then
@@ -391,6 +519,14 @@ parse_arguments()
             OPTION_READ_INFO='NO'
          ;;
 
+         --releasenotes)
+            OPTION_RELEASENOTES='YES'
+         ;;
+
+         --no-releasenotes)
+            OPTION_RELEASENOTES='NO'
+         ;;
+
          ++)
             OPTION_ADD_PATCH="1"
             OPTION_WRITE='YES'
@@ -402,6 +538,11 @@ parse_arguments()
 
          --no-tag-warning)
             OPTION_TAG_WARNING='NO'
+         ;;
+
+         --ignore-untracked)
+            r_concat "${MULLE_PROJECT_COMMIT_FLAGS}" "$1"
+            MULLE_PROJECT_COMMIT_FLAGS="${RVAL}"
          ;;
 
          --increment-major)
@@ -420,20 +561,13 @@ parse_arguments()
             OPTION_ADD_CUSTOM="1"
          ;;
 
+         --if-needed)
+            OPTION_IF_NEEDED='YES'
+         ;;
 
          --print-latest-tag)
             git_last_tag
             exit $?
-         ;;
-
-         --reset) # stupid option for verify must be last
-            OPTION_ADD_PATCH="0"
-            OPTION_ADD_MINOR="0"
-            OPTION_ADD_MAJOR="0"
-            OPTION_ADD_CUSTOM="0"
-            OPTION_WRITE_XCODE_VERSION='NO'
-            OPTION_WRITE='NO'
-            OPTION_TAG_WARNING='NO'
          ;;
 
          --first-patch-zero)
@@ -446,7 +580,6 @@ parse_arguments()
 
             OPTION_VERSION_SET="$1"
          ;;
-
 
          --first-patch-one)
             OPTION_FIRST_PATCH="1"
@@ -468,6 +601,10 @@ parse_arguments()
             shift
 
             OPTION_ADD_CUSTOM="$1"
+         ;;
+
+         --status)
+            OPTION_STATUS='YES'
          ;;
 
          --write)
@@ -497,6 +634,14 @@ parse_arguments()
             OPTION_WRITE_XCODE_VERSION='NO'
          ;;
 
+         --write-extension-versions)
+            OPTION_WRITE_EXTENSION_VERSIONS='YES'
+         ;;
+
+         --no-write-extension-versions)
+            OPTION_WRITE_EXTENSION_VERSIONS='NO'
+         ;;
+
          --language)
             [ $# -eq 1 ] && fail "missing argument to $1"
             shift
@@ -515,10 +660,17 @@ parse_arguments()
             OPTION_VERSIONFILE="$1"
          ;;
 
-         -t)
-            set -x
+         --reset) # stupid option for verify must be last in command line
+            OPTION_IF_NEEDED=""
+            OPTION_ADD_PATCH="0"
+            OPTION_ADD_MINOR="0"
+            OPTION_ADD_MAJOR="0"
+            OPTION_ADD_CUSTOM="0"
+            OPTION_WRITE_XCODE_VERSION='NO'
+            OPTION_WRITE='NO'
+            OPTION_WRITE_EXTENSION_VERSIONS='NO'
+            OPTION_TAG_WARNING='NO'
          ;;
-
 
          -*)
             usage "Unknown option $1"
@@ -559,11 +711,15 @@ main()
    local OPTION_READ_XCODE_VERSION='NO'
    local OPTION_WRITE='DEFAULT'
    local OPTION_WRITE_XCODE_VERSION='DEFAULT'
+   local OPTION_WRITE_EXTENSION_VERSIONS='DEFAULT'
    local OPTION_XCODEPROJ=""
    local OPTION_TAG_WARNING='YES'
    local OPTION_CUSTOM_VERSIONING
    local OPTION_VERSIONNAME
    local OPTION_VERSIONFILE
+   local OPTION_IS_OK
+   local OPTION_IF_NEEDED
+   local OPTION_RELEASENOTES
 
    if [ -f ".mulle/etc/project/.first_patch" ]
    then
@@ -601,13 +757,37 @@ main()
    then
       if [ "${OPTION_WRITE}" = "YES" ]
       then
-         OPTION_WRITE_XCODE_VERSION="${WRITE_XCODE_VERSION:-NO}"
+         OPTION_WRITE_XCODE_VERSION="${OPTION_WRITE_XCODE_VERSION:-NO}"
       else
          OPTION_WRITE_XCODE_VERSION="NO"
       fi
    fi
 
+   # do this by default
+   if [ "${OPTION_WRITE_EXTENSION_VERSIONS}" = 'DEFAULT' ]
+   then
+      if [ "${OPTION_WRITE}" = "YES" ]
+      then
+         OPTION_WRITE_EXTENSION_VERSIONS="${OPTION_WRITE_EXTENSION_VERSIONS:-YES}"
+      else
+         OPTION_WRITE_EXTENSION_VERSIONS="NO"
+      fi
+   fi
+
    get_version
+
+   if [ "${OPTION_STATUS}" = 'YES' ]
+   then
+      status_version
+      return $?
+   fi
+
+   if [ "${OPTION_IF_NEEDED}" = 'YES' ] && status_version
+   then
+      log_verbose "Nothing to do"
+      return 0
+   fi
+
 
    if [ ! -z "${OPTION_VERSION_SET}" ]
    then
@@ -626,14 +806,17 @@ main()
    log_verbose "VERSIONFILE=${VERSIONFILE}"
    log_verbose "VERSIONCUSTOM=${VERSIONCUSTOM}"
 
-   if ! [ "${OPTION_WRITE}" = 'YES' -o "${OPTION_WRITE_XCODE_VERSION}" = 'YES' ]
+   if [ "${OPTION_WRITE}" = 'YES' \
+        -o "${OPTION_WRITE_XCODE_VERSION}" = 'YES' \
+        -o "${OPTION_WRITE_EXTENSION_VERSIONS}" = 'YES' ]
    then
-      printf "%s\n" "${VERSION}"
-      return 0
+      write_version "$@" &&
+      verify_version "$@"
+      return $?
    fi
 
-   write_version "$@"
-   verify_version "$@"
+   printf "%s\n" "${VERSION}"
+   return 0
 }
 
 

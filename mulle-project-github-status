@@ -1,0 +1,406 @@
+#! /usr/bin/env bash
+
+[ "${TRACE}" = 'YES' -o "${MULLE_PROJECT_GITHUB_STATUS_TRACE}" = 'YES' ] && set -x && : "$0" "$@"
+
+
+MULLE_EXECUTABLE_VERSION="0.0.0"
+
+
+print_flags()
+{
+   echo "   -f    : force operation"
+
+   ##
+   ## ADD YOUR FLAGS DESCRIPTIONS HERE
+   ##
+
+   options_technical_flags_usage \
+                " : "
+}
+
+
+usage()
+{
+   [ $# -ne 0 ] && log_error "$*"
+
+
+   cat <<EOF >&2
+Usage:
+   mulle-project-github-status [flags]
+
+   Check remotes for a github remote. For each branch, get the last github 
+   action status. List failures only by default.
+
+   Github severely rate limits scripts without API token! If you get
+   curl: (22) The requested URL returned error: 403 
+   Then you hit the rate limit!
+
+Flags:
+EOF
+   print_flags | LC_ALL=C sort >&2
+
+   exit 1
+}
+
+#
+# local _scheme
+# local _userinfo
+# local _host
+# local _port
+# local _path
+# local _query
+# local _fragment
+#
+git_parse_fake_remote_url()
+{
+   log_entry git_parse_fake_remote_url "$@"
+
+   local url="$1"
+
+   case "${url}" in
+      # hacks for git@github.com:foo/x.zip
+      # which isn't a real URL
+      # TODO: move to different file and query separately
+      *@*:*:*)   
+         _scheme="git"
+         _userinfo="${url%@*}"
+         s="${url#*@}"
+         _host="${s%:*}"
+         s="${s#*:}"
+         _port="${s%:*}"
+         s="${s#*:}"
+         _path="${s}"
+         _query=
+         _fragment=
+         return 0
+      ;;
+
+      *@*:*)   
+         _scheme="git"
+         _userinfo="${url%@*}"
+         s="${url#*@}"
+         _host="${s%:*}"
+         s="${s#*:}"
+         _path="${s}"
+         _query=
+         _fragment=
+         return 0
+      ;;
+   esac
+
+   return 1
+}
+
+
+#
+# MEMO: only queries first 30 results in latest first fashion
+# need paging (like the tags code in mulle-domain or fetch to be correct)
+#
+github_get_action_runs()
+{
+   log_entry github_get_action_runs "$@"
+
+   local user="$1"
+   local repo="$2"
+
+   # now we have 
+   local api_url
+
+   api_url="https://api.github.com/repos/${user}/${repo}/actions/runs"
+
+   github_curl_json "${api_url}"
+}
+
+
+check_repo()
+{
+   log_entry check_repo "$@"
+   
+   local remote="$1"
+   local url="$2"
+
+   local _scheme
+   local _userinfo
+   local _host
+   local _port
+   local _path
+   local _query
+   local _fragment
+
+   local real_url
+
+   real_url="${url}"
+
+   if git_parse_fake_remote_url "${url}"
+   then
+      real_url="https://${_host}"
+      if [ ! -z "${_port}" ]
+      then
+         real_url="${real_url}:${_port}"
+      fi
+
+      real_url="${real_url}/${_path}"
+   fi
+
+   local scheme
+   local domain
+   local scm
+   local user
+   local repo
+   local branch
+   local tag
+
+   eval `rexekutor mulle-domain parse-url --domain github "${real_url}"`  || return 1
+
+   local result 
+
+   result="`github_get_action_runs "${user}" "${repo}" `" || return 1
+
+   if [ "${MULLE_FLAG_LOG_SETTINGS}" = 'YES' ]
+   then
+      log_trace2 "json: ${result}"
+   fi
+
+   count="`rexekutor jq '.total_count' <<< "${result}" `"
+   if [ ${count} -eq 0 ]
+   then
+      log_info "No actions defined in this github repository"
+      return 0
+   fi
+
+   filtered="`rexekutor jq '.workflow_runs[] | .head_branch, .conclusion' <<< "${result}" `"
+
+   local branch
+   local conclusion
+
+   local local_branches
+
+   local_branches="`rexekutor git branch --format '%(refname:short)' `" || return 1
+
+   if [ "${MULLE_FLAG_LOG_SETTINGS}" = 'YES' ]
+   then
+      log_trace2 "local branches: ${local_branches}"
+   fi
+
+   local done_branches 
+
+   (
+      local rval
+
+      rval=0
+      while :
+      do
+         if ! read -r branch 
+         then
+            break
+         fi
+
+         branch="${branch#\"}"
+         branch="${branch%\"}"
+         r_unescaped_doublequotes "${branch}"
+         branch="${RVAL}"
+
+         if ! read -r conclusion 
+         then
+            break
+         fi
+
+         conclusion="${conclusion#\"}"
+         conclusion="${conclusion%\"}"
+         r_unescaped_doublequotes "${conclusion}"
+         conclusion="${RVAL}"
+
+         if find_line "${done_branches}" "${branch}"
+         then
+            log_debug "Ignoring ${conclusion} for ${branch} as we have a more recent result"
+            continue
+         fi
+
+         if ! find_line "${local_branches}" "${branch}"
+         then
+            log_fluff "Ignoring ${branch}, not known locally"
+            continue
+         fi
+
+         r_add_line "${done_branches}" "${branch}"
+         done_branches="${RVAL}"
+
+         case "${conclusion}" in 
+            'success')
+               log_verbose "Success for ${branch}"
+            ;;
+
+            *)
+               log_warning "${branch} failed with ${conclusion}"
+               rval=2
+            ;;
+         esac
+      done 
+      exit $rval
+   ) <<< "${filtered}" 
+   return $?
+}
+
+main()
+{
+   local MULLE_FLAG_MAGNUM_FORCE='NO'
+
+   # technical flags
+   local MULLE_TRACE
+   local MULLE_FLAG_EXEKUTOR_DRY_RUN='NO'
+   local MULLE_FLAG_LOG_LOCAL='NO'
+   local MULLE_FLAG_LOG_DEBUG='NO'
+   local MULLE_FLAG_LOG_EXEKUTOR='NO'
+   local MULLE_FLAG_LOG_FLUFF='NO'
+   local MULLE_FLAG_LOG_SCRIPTS='NO'
+   local MULLE_FLAG_LOG_SETTINGS='NO'
+   local MULLE_FLAG_LOG_VERBOSE='NO'
+   local MULLE_FLAG_LOG_MERGE='NO'
+   local MULLE_TRACE_POSTPONE='NO'
+
+   #
+   # simple flag handling
+   #
+   while [ $# -ne 0 ]
+   do
+      if options_technical_flags "$1"
+      then
+         shift
+         continue
+      fi
+
+      case "$1" in
+         -f|--force)
+            MULLE_FLAG_MAGNUM_FORCE='YES'
+         ;;
+
+         -h*|--help|help)
+            usage
+         ;;
+
+         -d|--directory)
+            [ $# -eq 1 ] && usage "Missing argument to \"$1\""
+            shift
+
+            exekutor cd "$1" || exit 1
+         ;;
+            
+         --version)
+            printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
+            exit 0
+         ;;
+
+         -*)
+            usage "Unknown flag \"$1\""
+         ;;
+
+         *)
+            break
+         ;;
+      esac
+
+      shift
+   done
+
+   options_setup_trace "${MULLE_TRACE}"
+
+
+   #
+   # get mulle-domain github code
+   #
+   MULLE_DOMAIN_LIBEXEC_DIR="`mulle-domain libexec-dir`" || exit 1
+
+   . "${MULLE_DOMAIN_LIBEXEC_DIR}/mulle-domain-plugin.sh"
+
+   domain_plugin_load "github" || exit 1
+
+   local remote
+   local url 
+
+   for remote in `git remote`
+   do
+      url="`git remote get-url "${remote}" `"
+      case "${url}" in 
+         *github.com:*)
+            if check_repo "${remote}" "${url}"
+            then
+               log_info "No problems"
+               return 0
+            fi
+            return 1
+         ;;
+      esac
+   done 
+
+   fail "No github repository found"
+}
+
+
+########
+###
+### INIT - You usually won't edit code below
+###
+
+trap_fail()
+{
+   exit 1
+}
+
+
+_init()
+{
+   #
+   # minimal setup exit
+   #
+   if [ "$1" = "version" ]
+   then
+      printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
+      exit 0
+   fi
+
+   #
+   # leading backslash ? looks like we're getting called from
+   # mingw via a .BAT or so
+   #
+   case "$PATH" in
+      '\\'*)
+         PATH="${PATH//\\/\/}"
+      ;;
+   esac
+
+   if [ -z "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}" ]
+   then
+      MULLE_BASHFUNCTIONS_LIBEXEC_DIR="`mulle-bashfunctions-env libexec-dir 2> /dev/null`"
+      if [ -z "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}" ]
+      then
+         if [ -z "`command -v "${executablepath}"`" ]
+         then
+            echo "Fatal Error: Could not find mulle-bashfunctions-env in PATH ($PATH) - mulle-bashfunctions not installed ?" >&2
+         else
+            echo "Fatal Error: Could not find libexec of mulle-bashfunctions-env ($PWD)" >&2
+         fi
+         exit 1
+      fi
+   fi
+
+   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-bashfunctions.sh" "minimal" &&
+   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-path.sh" &&
+   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-file.sh" ||
+      fail "failed to load bashfunctions from ${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}"
+
+   #  set -e # more pain then gain in the end
+   #  set -u # doesn't work with my style
+
+   trap trap_fail INT
+   set -o pipefail
+
+   call_main "${MULLE_PROJECT_GITHUB_STATUS_FLAGS}" "$@"
+}
+
+
+_init "$@" # will call main indirectly via call_main
+
+###
+### INIT
+###
+########

@@ -1,0 +1,334 @@
+#! /usr/bin/env bash
+
+[ "${TRACE}" = 'YES' -o "${MULLE_PROJECT_SOURCETREE_DOCTOR_TRACE}" = 'YES' ] && set -x && : "$0" "$@"
+
+
+MULLE_EXECUTABLE_VERSION="0.0.0"
+
+
+print_flags()
+{
+   echo "   -f    : force operation"
+
+   ##
+   ## ADD YOUR FLAGS DESCRIPTIONS HERE
+   ##
+
+   options_technical_flags_usage \
+                " : "
+}
+
+
+usage()
+{
+   [ $# -ne 0 ] && log_error "$*"
+
+
+   cat <<EOF >&2
+Usage:
+   mulle-project-sourcetree-doctor [flags] <file>
+
+   Check that a sourcetree looks conventional.
+
+Flags:
+EOF
+   print_flags | LC_ALL=C sort >&2
+
+   exit 1
+}
+
+
+__doctor_repo_nodeline()
+{
+   log_entry "__doctor_repo_nodeline" "$@"
+
+   local upcaseid="$1"
+}
+
+
+__doctor_archive_nodeline()
+{
+   log_entry "__doctor_archive_nodeline" "$@"
+
+   local upcaseid="$1"
+
+   local expect
+
+   expect="\${${upcaseid}_TAG:-latest}"
+   if [ "${_tag}" != "${expect}" ]
+   then
+      log_warning "${_address}: tag is \"${_tag}\" not \"${expect}\""
+   fi
+
+   expect="\${${upcaseid}_BRANCH}"
+   if [ "${_branch}" != "${expect}" ]
+   then
+      log_warning "${_address}: branch is \"${_branch}\" not \"${expect}\""
+   fi
+
+   case "${_url}" in
+      *\${MULLE_TAG\}*)
+      ;;
+
+      *\${MULLE_*)
+         log_warning "${_address}: URL \"${_url}\" should use \"\${MULLE_TAG}\" without a default"
+      ;;
+
+      *)
+         log_warning "${_address}: URL \"${_url}\" should use \"\${MULLE_TAG}\" in URL"
+      ;;
+   esac
+
+   case "${_evaledurl}" in
+      "")
+         log_warning "${_address}: URL \"${_url}\" evaluates to empty"
+      ;;
+
+      */github.com/*)
+         (
+            eval `rexekutor mulle-domain parse-url --domain github "${_evaledurl}" `
+
+            if [ -z "${repo}" ]
+            then
+               log_warning "${_address}: URL \"${_url} specifies no github repository\""
+            fi
+
+            case "${user}" in
+               mulle-c|mulle-objc|mulle-core|mulle-concurrent|MulleWeb|MulleFoundation|MulleUI)
+               ;;
+
+               mulle-nat)
+                  case "${repo}" in
+                     libexpat)
+                     ;;
+
+                     *)
+                        log_warning "${_address}: URL \"${_url} references mulle-nat"
+                     ;;
+                  esac
+               ;;
+
+
+               ""|"."|"..")
+                  log_warning "${_address}: URL \"${_url} specifies no github user"
+               ;;
+
+               *)
+                  log_warning "${_address}: URL \"${_url} specifies non-mulle github user \"${user}\""
+               ;;
+            esac
+         )
+      ;;
+
+      *)
+         log_warning "${_address}: URL \"${_url} is not on github"
+      ;;
+   esac
+}
+
+
+doctor_nodeline()
+{
+   log_entry "doctor_nodeline" "$@"
+
+   local nodeline="$1"
+
+   local _branch
+   local _address
+   local _fetchoptions
+   local _nodetype
+   local _marks
+   local _raw_userinfo
+   local _userinfo
+   local _tag
+   local _url
+   local _uuid
+
+   nodeline_parse "${nodeline}"
+
+   local upcaseid
+
+   r_basename "${_address}"
+   r_de_camel_case_upcase_identifier "${RVAL}"
+   upcaseid="${RVAL}"
+
+   if find_line "${UPCASEIDS}" "${upcaseid}"
+   then
+      log_warning "${_address}: UPCASEID is a duplicate of another address"
+   else
+      r_add_line "${UPCASEIDS}" "${upcaseid}"
+      UPCASEIDS="${RVAL}"
+   fi
+
+   local _evaledurl
+   local _evalednodetype
+   local _evaledbranch
+   local _evaledtag
+   local _evaledfetchoptions
+
+   node_evaluate_values
+
+   case "${_evalednodetype}" in
+      'git'|'svn')
+         __doctor_repo_nodeline "${upcaseid}"
+      ;;
+
+      'tar'|'zip')
+         __doctor_archive_nodeline "${upcaseid}"
+      ;;
+   esac
+}
+
+
+main()
+{
+   local MULLE_FLAG_MAGNUM_FORCE='NO'
+
+   # technical flags
+   local MULLE_TRACE
+   local MULLE_FLAG_EXEKUTOR_DRY_RUN='NO'
+   local MULLE_FLAG_LOG_LOCAL='NO'
+   local MULLE_FLAG_LOG_DEBUG='NO'
+   local MULLE_FLAG_LOG_EXEKUTOR='NO'
+   local MULLE_FLAG_LOG_FLUFF='NO'
+   local MULLE_FLAG_LOG_SCRIPTS='NO'
+   local MULLE_FLAG_LOG_SETTINGS='NO'
+   local MULLE_FLAG_LOG_VERBOSE='NO'
+   local MULLE_FLAG_LOG_MERGE='NO'
+   local MULLE_TRACE_POSTPONE='NO'
+
+   #
+   # simple flag handling
+   #
+   while [ $# -ne 0 ]
+   do
+      if options_technical_flags "$1"
+      then
+         shift
+         continue
+      fi
+
+      case "$1" in
+         -f|--force)
+            MULLE_FLAG_MAGNUM_FORCE='YES'
+         ;;
+
+         -h*|--help|help)
+            usage
+         ;;
+
+         --version)
+            printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
+            exit 0
+         ;;
+
+         -*)
+            usage "Unknown flag \"$1\""
+         ;;
+
+         *)
+            break
+         ;;
+      esac
+
+      shift
+   done
+
+   options_setup_trace "${MULLE_TRACE}"
+
+   MULLE_SOURCETREE_LIBEXEC_DIR="`mulle-sourcetree libexec-dir`" || return 1
+
+   . "${MULLE_SOURCETREE_LIBEXEC_DIR}/mulle-sourcetree-environment.sh" || return 1
+   . "${MULLE_SOURCETREE_LIBEXEC_DIR}/mulle-sourcetree-cfg.sh" || return 1
+   . "${MULLE_SOURCETREE_LIBEXEC_DIR}/mulle-sourcetree-nodeline.sh" || return 1
+   if [ -z "${MULLE_CASE_SH}" ]
+   then
+      # shellcheck source=mulle-case.sh
+      . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-case.sh"  || return 1
+   fi
+
+   sourcetree_environment
+
+   local nodelines
+   local nodeline
+
+   nodelines="`cfg_read "${1:-/}" `" || exit 1
+   set -o noglob ; IFS=$'\n'
+   for nodeline in ${nodelines}
+   do
+      IFS="${DEFAULT_IFS}" ; set +o noglob
+
+      doctor_nodeline "${nodeline}"
+   done
+   IFS="${DEFAULT_IFS}" ; set +o noglob
+}
+
+
+########
+###
+### INIT - You usually won't edit code below
+###
+
+trap_fail()
+{
+   exit 1
+}
+
+
+_init()
+{
+   #
+   # minimal setup exit
+   #
+   if [ "$1" = "version" ]
+   then
+      printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
+      exit 0
+   fi
+
+   #
+   # leading backslash ? looks like we're getting called from
+   # mingw via a .BAT or so
+   #
+   case "$PATH" in
+      '\\'*)
+         PATH="${PATH//\\/\/}"
+      ;;
+   esac
+
+   if [ -z "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}" ]
+   then
+      MULLE_BASHFUNCTIONS_LIBEXEC_DIR="`mulle-bashfunctions-env libexec-dir 2> /dev/null`"
+      if [ -z "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}" ]
+      then
+         if [ -z "`command -v "${executablepath}"`" ]
+         then
+            echo "Fatal Error: Could not find mulle-bashfunctions-env in PATH ($PATH) - mulle-bashfunctions not installed ?" >&2
+         else
+            echo "Fatal Error: Could not find libexec of mulle-bashfunctions-env ($PWD)" >&2
+         fi
+         exit 1
+      fi
+   fi
+
+   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-bashfunctions.sh" "minimal" &&
+   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-path.sh" &&
+   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-file.sh" ||
+      fail "failed to load bashfunctions from ${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}"
+
+   #  set -e # more pain then gain in the end
+   #  set -u # doesn't work with my style
+
+   trap trap_fail INT
+   set -o pipefail
+
+   call_main "${MULLE_PROJECT_SOURCETREE_DOCTOR_FLAGS}" "$@"
+}
+
+
+_init "$@" # will call main indirectly via call_main
+
+###
+### INIT
+###
+########
