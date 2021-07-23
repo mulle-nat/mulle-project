@@ -21,7 +21,7 @@ src/mulle-version.sh
 set( SCRIPTS
 mulle-project-add-missing-branch-identifier
 mulle-project-all
-mulle-project-ci-prerelease
+mulle-project-ci-settings
 mulle-project-cmake-graphviz
 mulle-project-debian
 mulle-project-distcheck
