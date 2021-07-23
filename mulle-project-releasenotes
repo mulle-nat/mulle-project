@@ -44,9 +44,15 @@ Usage:
    Emit markup releasenotes for the current version. If no version is given,
    mulle-project-version is used to determine the current version.
 
-
    All comments from the last tag till HEAD will be collected.
    All comment lines starting with a '*' are included in the release notes.
+
+   mulle-project-releasenotes has been written for incremental updates, that
+   do not destroy edits. To recreate everything from scratch, use the
+   --scratch option.
+
+   mulle-project-releasenotes only recognizes tags in major.minor.[patch]
+   format, without any prefix or suffix.
 
 Examples:
    Create initial RELEASENOTES.md with:
@@ -56,7 +62,7 @@ Examples:
 Flags:
    -a                       : prepend notes to first releasenote
    -f                       : overwrite existing releasenotes for version
-   --all                    : dump all releasenotes from the beginning
+   --all                    : dump all releasenotes from the beginning in one
    --commit                 : git commit --amend --no-edit releasenotes
    --default-message <text> : text to use,if there are no suitable git comments
    --filter <executable>    : use something else than egrep to filter comments
@@ -67,6 +73,7 @@ Flags:
    --missing                : emit all missing comments, not just from last tag
    --output <file>          : where to output the releasenotes (- for stdout)
    --print-latest-version   : prints latest version in releasenotes then exits
+   --scratch                : dump all releasenotes from the beginning in many
    --tag <tag>              : git tag where to collect comments from
    --unfiltered             : don't filter git commit comments
    --version <version>      : specify version for releasenotes
@@ -75,35 +82,36 @@ EOF
 }
 
 
-compute_markers()
+r_compute_markers()
 {
-   log_entry "compute_markers" "$@"
+   log_entry "r_compute_markers" "$@"
 
    local version="$1"
 
    local major
    local minor
    local patch
-   local custom
 
-   get_major_minor_patch_custom "${version}"
+   major="`cut -d'.' -f 1 <<< "${version}"`"
+   minor="`cut -d'.' -f 2 <<< "${version}"`"
+   patch="`cut -d'.' -f 3 <<< "${version}"`"
 
-   if [ "${patch}" -eq "${OPTION_FIRST_PATCH}" ]
+   if [ "${patch:-0}" -eq "${OPTION_FIRST_PATCH}" ]
    then
-      if [ "${minor}" -eq 0 ]
+      if [ "${minor:-0}" -eq 0 ]
       then
-         echo "#"
+         RVAL="#"
       else
-         echo "##"
+         RVAL="##"
       fi
    else
       case "${version}" in
          *\.*\.*\.*\.*)
-            echo "####"
+            RVAL="####"
          ;;
 
          *)
-            echo "###"
+            RVAL="###"
          ;;
       esac
    fi
@@ -115,6 +123,17 @@ filter_releasenotes()
    log_entry "filter_releasenotes" "$@"
 
    sed -n 's/'${RELEASENOTE_GREP}'\(.*\)/\1/p'
+}
+
+
+# emits most recent one first
+git_version_tags()
+{
+   log_entry "git_version_tags" "$@"
+
+   rexekutor git tag --sort=committerdate \
+   | egrep -v '[a-zA-Z/!"$%&()=#;,-]' \
+   | sed -n '1!G;h;$p'
 }
 
 
@@ -150,7 +169,8 @@ get_releasenote_commits()
 
    if [ -z "${start}" ]
    then
-      start="`git_last_tag`"
+      start="`git_version_tags | head -1`"
+
       log_debug "last tag is \"${start}\""
       if [ -z "${start}" ]
       then
@@ -389,7 +409,7 @@ merged_releasenotes()
          then
             rm "${tmpfile}"
             log_info "Releasenotes already contain a leading entry for \"${version}\""
-            return 0
+            return 2
          fi
 
          if [ "${OPTION_INPUT}" = "-" ]
@@ -414,12 +434,160 @@ merged_releasenotes()
 }
 
 
+git_log_get_tags_and_message()
+{
+   log_entry "git_log_get_tags_and_message" "$@"
+
+   rexekutor git log --pretty='format:##%d
+%B' "$@"
+}
+
+
+parse_git_tags_in_line()
+{
+   log_entry "parse_git_tags_in_line" "$@"
+
+   local line="$1"
+
+   local s
+
+   r_trim_whitespace "${line}"
+   s="${RVAL}"
+
+   # get past ( if any
+   if [ "${s:0:1}" != '(' ]
+   then
+      return 0
+   fi
+   s="${s:1}"
+
+   while [ ! -z "${s}" ]
+   do
+      # remove front whitespace
+      s="${s#"${s%%[![:space:]]*}"}"
+      case "${s}" in
+         # problem: tags can contain ','
+         # we can't solve this easily
+         'tag:'*)
+            s="${s#tag:}"
+            s="${s#"${s%%[![:space:]]*}"}"
+            echo "${s%%[,)]*}"
+            s="${s%*[,)]}" ## will consume final ')'
+         ;;
+
+         *,*)
+            s="${s#*,}"
+         ;;
+
+         *)
+            return 0
+         ;;
+      esac
+   done
+}
+
+
+scratch_dump_stdin()
+{
+   log_entry "scratch_dump_stdin" "$@"
+
+   local state
+   local line
+   local marks
+
+   local collect
+
+   IFS=$'\n'
+   while :
+   do
+      if ! read -r line
+      then
+         IFS="${DEFAULT_IFS}"
+         if [ ! -z "${collect}" ]
+         then
+            echo "${collect}"
+         fi
+         return
+      fi
+
+      case "${line}" in
+         \#\#*)
+         ;;
+
+         \**)
+            if [ "${OPTION_MD_ESCAPE}" = 'YES' ]
+            then
+               markdown_escape_message <<< "${line}"
+            else
+               echo "${line}"
+            fi
+            continue
+         ;;
+
+         ""|*)
+            continue
+         ;;
+      esac
+
+      local found
+      local tags
+      local tag
+
+      found=
+      tags="`parse_git_tags_in_line "${line:2}" `" || return 1
+      for tag in ${tags}
+      do
+         case ${tag} in
+            *-prerelease|*-latest)
+            ;;
+
+            [0-9]*)
+               found="${tag}"
+               break
+            ;;
+         esac
+      done
+
+      if [ -z "${state}" -a -z "${found}" ]
+      then
+         found="${version}"
+      fi
+
+      local markers
+
+      if [ ! -z "${found}" ]
+      then
+         r_compute_markers "${found}"
+         markers="${RVAL}"
+
+         if [ ! -z "${state}" ]
+         then
+            echo
+         fi
+         echo "${markers} ${found}"
+         echo
+         state="${found}"
+      fi
+   done
+}
+
+
+scratch_dump()
+{
+   log_entry "scratch_dump" "$@"
+
+   local version="$1"
+
+   local text
+
+   text="`git_log_get_tags_and_message `"
+
+   scratch_dump_stdin <<< "${text}"
+}
+
+
 main()
 {
-   local start
-
-   local directory
-
    local OPTION_APPEND='NO'
    local OPTION_DEFAULT_MESSAGE="Various small improvements"
    local OPTION_FIRST_PATCH="0"
@@ -434,6 +602,7 @@ main()
    local OPTION_TAG=""
    local OPTION_COMMITFLAGS="--amend --no-edit"
    local OPTION_ALL
+   local OPTION_SCRATCH
    local OPTION_MD_ESCAPE='YES'
    local OPTION_PRINT_LATEST_VERSION='NO'
 
@@ -491,6 +660,10 @@ main()
 
          --all)
             OPTION_ALL='YES'
+         ;;
+
+         --scratch)
+            OPTION_SCRATCH='YES'
          ;;
 
          -c|--commit)
@@ -633,7 +806,7 @@ main()
 
    if [ -z "${OPTION_OUTPUT}" ]
    then
-      fail "output must not be empty, use - for stdout"
+      fail "Output must not be empty, use - for stdout"
    fi
 
    if [ -z "${VERSION}" ]
@@ -659,17 +832,24 @@ main()
    fi
 
    local notes
-   local markers
 
-   log_fluff "Version: ${VERSION}"
-   markers="`compute_markers "${VERSION}"`"
+   if [ ! -z "${OPTION_SCRATCH}" ]
+   then
+      notes="`scratch_dump "${VERSION}"`" || return 1
+   else
+      local markers
 
-   log_fluff "Markers: ${markers}"
-   notes="`emit_releasenotes "${VERSION}" \
-                             "${markers}" \
-                             "${OPTION_PREFIX}" \
-                             "${OPTION_MESSAGE}" \
-                             "${OPTION_DEFAULT_MESSAGE}" `"
+      log_fluff "Version: ${VERSION}"
+      r_compute_markers "${VERSION}"
+      markers="${RVAL}"
+
+      log_fluff "Markers: ${markers}"
+      notes="`emit_releasenotes "${VERSION}" \
+                                "${markers}" \
+                                "${OPTION_PREFIX}" \
+                                "${OPTION_MESSAGE}" \
+                                "${OPTION_DEFAULT_MESSAGE}" `" || return 1
+   fi
 
    case "${OPTION_INPUT}" in
       ''|'-')
@@ -692,24 +872,40 @@ main()
       then
          exekutor printf "%s\n" "${notes}"
       else
-         redirect_exekutor "${OPTION_OUTPUT}" printf "%s\n" "${notes}"  || exit 1
+         redirect_exekutor "${OPTION_OUTPUT}" \
+            printf "%s\n" "${notes}"  || return 1
       fi
    else
       local result
+      local rval
 
-      result="`merged_releasenotes "${markers}" "${notes}" "${VERSION}"`" || exit 1
+      result="`merged_releasenotes "${markers}" "${notes}" "${VERSION}"`"
+      rval=$?
+      case $rval in
+         0)
+         ;;
+
+         1)
+            exit 1 # failure
+         ;;
+
+         2)
+            return 0 # nothing new to write
+         ;;
+      esac
 
       if [ "${OPTION_OUTPUT}" = "-" ]
       then
          exekutor printf "%s\n" "${result}"
       else
-         redirect_exekutor "${OPTION_OUTPUT}" printf "%s\n" "${result}" || exit 1
+         redirect_exekutor "${OPTION_OUTPUT}" \
+            printf "%s\n" "${result}" || return 1
       fi
    fi
 
    if [ "${OPTION_COMMIT}" = 'YES' ]
    then
-      changed="`git ls-files -m "${OPTION_OUTPUT}"`"
+      changed="`rexekutor git ls-files -m "${OPTION_OUTPUT}"`"
       if [ ! -z "${changed}" ]
       then
          if [ "${OPTION_ADD_U}" = 'YES' ] # second OPTION_ADD_U stage

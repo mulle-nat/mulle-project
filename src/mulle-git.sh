@@ -70,7 +70,7 @@ git_last_tag()
 {
    log_entry "git_last_tag" "$@"
 
-   rexekutor git describe --tags --abbrev=0 2> /dev/null
+   rexekutor git tag --sort=-v:committerdate | head -1
 }
 
 

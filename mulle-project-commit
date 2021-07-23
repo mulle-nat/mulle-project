@@ -209,8 +209,11 @@ ${C_RESET}${bad_changes# }"
          MULLE_LOG_FAIL_ERROR_PREFIX=""
          MULLE_EXECUTABLE_FAIL_PREFIX=""
       fi
-      fail "There are possibly interesting changes that may need a commit message:
+      if [ "${MULLE_FLAG_MAGNUM_FORCE}" != 'YES' ]
+      then
+         fail "There are possibly interesting changes that may need a commit message:
 ${C_RESET}${interesting_changes# }"
+      fi
    fi
 
    if [ "${OPTION_STATUS}" != 'YES' ]
