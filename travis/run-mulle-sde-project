@@ -174,14 +174,14 @@ upgrade_sde()
    r_dirname "${RVAL}"     # remove bin
    prefix="${RVAL}"
 
-   IFS=$'\n'; set -f
+   IFS=$'\n'; shell_disable_glob
    for i in `egrep -v '^#' /mnt/sde/REPOS`
    do
       (
          rexekutor cd "/mnt/sde/$i" && exekutor sudo ./bin/installer "${prefix}"
       ) || exit 1
    done
-   IFS="${DEFAULT_IFS}"; set +f
+   IFS="${DEFAULT_IFS}"; shell_enable_glob
 }
 
 
@@ -322,7 +322,7 @@ main()
       shift
    done
 
-   options_setup_trace "${MULLE_TRACE}"
+   options_setup_trace "${MULLE_TRACE}" && set -x
 
    #
    # determine project name from source environment otherwise use
@@ -385,13 +385,13 @@ main()
    #
    if [ -z "${MULLE_FETCH_SEARCH_PATH}" ]
    then
-      shopt -s nullglob
+      shell_enable_nullglob
       for searchpath in "/mnt/search"/*
       do
          r_colon_concat "${MULLE_FETCH_SEARCH_PATH}" "${searchpath}"
          MULLE_FETCH_SEARCH_PATH="${RVAL}"
       done
-      shopt -u nullglob
+      shell_disable_nullglob
 
       export MULLE_FETCH_SEARCH_PATH
    fi
@@ -420,12 +420,6 @@ main()
 ###
 ### INIT - You usually won't edit code below
 ###
-
-trap_fail()
-{
-   exit 1
-}
-
 
 _init()
 {
@@ -471,8 +465,8 @@ _init()
    #  set -e # more pain then gain in the end
    #  set -u # doesn't work with my style
 
-   trap trap_fail INT
-   set -o pipefail
+   shell_enable_pipefail
+   shell_enable_extglob
 
    call_main "${RUN_MULLE_SDE_PROJECT_FLAGS}" "$@"
 }

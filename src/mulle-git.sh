@@ -196,14 +196,30 @@ git_remote_branch_is_synced()
 # 1 no-remote
 # 2 remote there but no ref like name
 #
+# TODO: same code as in mulle-fetch git_is_valid_remote_url
+#       consolidate into mulle-git or so
+#
 _git_check_remote()
 {
    log_entry "_git_check_remote" "$@"
 
    local name="$1"
 
+   [ -z "${name}" ] && internal_fail "empty parameter"
+
    log_info "Check if remote \"${name}\" is present"
-   rexekutor git ls-remote -q --exit-code "${name}" > /dev/null
+
+   #
+   # memo -q --exit-code are basically useless, stuff still gets printed
+   # e.g. GIT_ASKPASS=true git ls-remote -q --exit-code 'https://github.com/craftinfo/zlib-crafthelp.git'
+   #
+   if [ "${MULLE_FLAG_LOG_VERBOSE}" = 'YES' ]
+   then
+      GIT_ASKPASS=true rexekutor git ls-remote -q --exit-code "$1" > /dev/null
+      return $?
+   fi
+
+   GIT_ASKPASS=true rexekutor git ls-remote -q --exit-code "$1" > /dev/null 2>&1
 }
 
 
@@ -221,7 +237,7 @@ git_untag_all()
 
    # remotes are only present after a fetch, otherwise just in config
    (
-      shopt -s nullglob
+      shell_enable_nullglob
 
       for i in ".git/refs/remotes"/*
       do
@@ -433,12 +449,29 @@ _git_commit_main()
    fi
 
    log_info "Push \"${dstbranch}\" with tags to \"${origin}\""
-   exekutor git push "${origin}" "${dstbranch}" --tags || ${return_or_continue_if_dry_run} 1
+   exekutor git push "${origin}" "${dstbranch}" || ${return_or_continue_if_dry_run} 1
+   if [ ! -z "${tag}" ]
+   then
+      exekutor git push "${origin}" "${tag}" || ${return_or_continue_if_dry_run} 1
+   fi
+   if [ ! -z "${latesttag}" ]
+   then
+      exekutor git push "${origin}" "${latesttag}" || ${return_or_continue_if_dry_run} 1
+   fi
 
    if [ "${have_github}" = 'YES' ]
    then
       log_info "Push \"${dstbranch}\" with tags to \"${github}\""
-      exekutor git push "${github}" "${dstbranch}" --tags || ${return_or_continue_if_dry_run} 1
+      exekutor git push "${github}" "${dstbranch}" || ${return_or_continue_if_dry_run} 1
+
+      if [ ! -z "${tag}" ]
+      then
+         exekutor git push "${github}" "${tag}" || ${return_or_continue_if_dry_run} 1
+      fi
+      if [ ! -z "${latesttag}" ]
+      then
+         exekutor git push "${github}" "${latesttag}" || ${return_or_continue_if_dry_run} 1
+      fi
    fi
 }
 

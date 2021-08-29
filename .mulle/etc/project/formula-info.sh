@@ -11,4 +11,4 @@ DEPENDENCIES='${MULLE_NAT_TAP}mulle-bashfunctions
 ${MULLE_SDE_TAP}mulle-make'
 
 
-DEBIAN_DEPENDENCIES="mulle-bashfunctions, mulle-make"
+DEBIAN_DEPENDENCIES="mulle-bashfunctions (>= 4.0.0), mulle-make"

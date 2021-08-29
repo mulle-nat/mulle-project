@@ -48,8 +48,6 @@ EOF
 }
 
 
-
-
 search_and_replace()
 {
    log_entry "search_and_replace" "$@"
@@ -65,10 +63,10 @@ search_and_replace()
    #
    lines="`get_dependency_address_nodetype_branch_tag_url`"
 
-   set -o noglob; IFS=$'\n'
+   shell_disable_glob; IFS=$'\n'
    for line in ${lines}
    do
-      set +o noglob; IFS="${DEFAULT_IFS}"
+      shell_enable_glob; IFS="${DEFAULT_IFS}"
 
       local _address
       local _nodetype
@@ -186,7 +184,7 @@ search_and_replace()
       fi
    done
 
-   set +o noglob; IFS="${DEFAULT_IFS}"
+   shell_enable_glob; IFS="${DEFAULT_IFS}"
 }
 
 
@@ -270,7 +268,7 @@ main()
       shift
    done
 
-   options_setup_trace "${MULLE_TRACE}"
+   options_setup_trace "${MULLE_TRACE}" && set -x
 
    search_and_replace "${OPTION_USERS}" "${OPTION_REPOS}"
 }
@@ -280,13 +278,6 @@ main()
 ###
 ### INIT - You usually won't edit code below
 ###
-
-trap_fail()
-{
-   exit 1
-}
-
-
 _init()
 {
    #
@@ -317,7 +308,7 @@ _init()
          then
             echo "Fatal Error: Could not find mulle-bashfunctions-env in PATH ($PATH) - mulle-bashfunctions not installed ?" >&2
          else
-            echo "Fatal Error: Could not find libexec of mulle-bashfunctions-env ($PWD)" >&2
+            echo "Fatal Error: Could not find libexec of mulle-bashfunctions-env (${PWD}})" >&2
          fi
          exit 1
       fi
@@ -337,8 +328,8 @@ _init()
    #  set -e # more pain then gain in the end
    #  set -u # doesn't work with my style
 
-   trap trap_fail INT
-   set -o pipefail
+   shell_enable_pipefail
+   shell_enable_extglob
 
    call_main "${MULLE_PROJECT_ADD_MISSING_BRANCH_IDENTIFIER_FLAGS}" "$@"
 }

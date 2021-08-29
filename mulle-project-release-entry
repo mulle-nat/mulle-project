@@ -1,47 +1,414 @@
-#! /usr/bin/env bash
+#! /bin/sh
+
+[ "${TRACE}" = 'YES' -o "${MULLE_PROJECT_RELEASEENTRY_TRACE}" = 'YES' ] && set -x && : "$0" "$@"
+
+####
+#
+# Prelude to be placed at top of each script. Rerun this script either in
+# bash or zsh, if not already running in either (which can happen!)
+# Allows script to run on systems that either have bash (linux) or
+# zsh (macOS) only by default.
+
+if [ "$1" != --no-auto-shell ]
+then
+   if [ -z "${BASH_VERSION}" -a -z "${ZSH_VERSION}" ]
+   then
+      exe_shell="`command -v "bash" `"
+      exe_shell="${exe_shell:-`command -v "zsh" `}"
+
+      script="$0"
+
+      #
+      # Quote incoming arguments for shell expansion
+      #
+      args=""
+      for arg in "$@"
+      do
+         # True bourne sh doesn't know ${a//b/c} and <<<
+         case "${arg}" in
+            *\'*)
+               # Use cat instead of echo to avoid possible echo -n
+               # problems. Escape single quotes in string.
+               arg="`cat <<EOF | sed -e s/\'/\'\\\"\'\\\"\'/g
+${arg}
+EOF
+`"
+            ;;
+         esac
+         if [ -z "${args}" ]
+         then
+            args="'${arg}'"
+         else
+            args="${args} '${arg}'"
+         fi
+      done
+
+      #
+      # bash/zsh will use arg after -c <arg> as $0, convenient!
+      #
+
+      exec "${exe_shell:-bash}" -c ". ${script} --no-auto-shell ${args}" "${script}"
+   fi
+   if [ ! -z "${BASH_VERSION}" ]
+   then
+      set +o posix
+   fi
+else
+   shift    # get rid of --no-auto-shell
+fi
 
 
-# get latest release
+#
+# Main script to follow, runs now either in zsh or bash
+#
+####
 
-main()
+MULLE_EXECUTABLE_VERSION="0.0.0"
+
+
+print_flags()
 {
-   local commit
+   echo "   -f    : force operation"
+
+   ##
+   ## ADD YOUR FLAGS DESCRIPTIONS HERE
+   ##
+
+   options_technical_flags_usage \
+                " : "
+}
+
+
+usage()
+{
+   [ $# -ne 0 ] && log_error "$*"
+
+
+   cat <<EOF >&2
+Usage:
+   mulle-project-releaseentry [flags]
+
+   Emit a markdown line with a hyperlink to the RELEASENOTES.md
+
+Flags:
+EOF
+   print_flags | LC_ALL=C sort >&2
+
+   exit 1
+}
+
+convert_datestring_to_timestamp()
+{
+   date -d"$(sed -r 's#(.{4})(.{2})(.{2})(.{2})(.{2})#\1/\2/\3 \4:\5:#' <<< "${datestring}")" "+%s"
+}
+
+
+convert_date_to_timestamp()
+{
+   local year="$1"
+   local month="$2"
+   local day="$3"
+   local hour="$4"
+   local minute="$5"
+   local second="$6"
+
+   local datestring
+
+   # this gets a timestamp of 0 with default values if on UTC, but
+   # will change with timezone!
+   printf -v datestring "%04d%02d%02d%02d%02d%02d" "${year:-1970}" \
+                                                   "${month:-1}" \
+                                                   "${day:-1}" \
+                                                   "${hour:-0}" \
+                                                   "${minute:-0}" \
+                                                   "${second:-0}"
+
+   date -d"$(sed -r 's#(.{4})(.{2})(.{2})(.{2})(.{2})#\1/\2/\3 \4:\5:#' <<< "${datestring}")" "+%s"
+}
+
+
+emit_line()
+{
+   local version="$1"
+   local tag="$2"
+
+   local repo
+   local user
+   local dir
+
+   dir="${PWD}"
+
+   repo="`mulle-sde env get PROJECT_NAME 2> /dev/null`"
+   if [ -z "${repo}" ]
+   then
+      repo="`basename -- "${dir}" `"
+   fi
+   dir="`dirname -- "${dir}" `"
+   user="`basename -- "${dir}" `"
+
+   case "${user}" in
+      srcS)
+         user="mulle-sde"
+      ;;
+   esac
+
+   echo "[${repo}](//github.com/${user}/${repo}/RELEASENOTES.md) | ${version} | ${tag:--}"
+}
+
+
+git_numeric_tags_sorted_by_time()
+{
+   log_entry git_numeric_tags_sorted_by_time "$@"
+
+   rexekutor git tag --sort=committerdate \
+   | egrep '^[0-9]*\.[0-9]*\.[0-9]*$'
+}
+
+
+git_numeric_tags_in_timerange()
+{
+   log_entry git_numeric_tags_in_timerange "$@"
+
+   local timestamp1="$1"
+   local timestamp2="$2"
+
+   local tags
+
+   tags="`git_numeric_tags_sorted_by_time`"
+   if [ -z "${timestamp1}" -a -z "${timestamp2}" ]
+   then
+      if [ ! -z "${tags}" ]
+      then
+         printf '%s\n' "${tags}"
+      fi
+      return
+   fi
+
    local tag
+   local timestamp
+
+   while :
+   do
+      if ! read -r tag
+      then
+         break
+      fi
+
+      timestamp="`rexekutor git log -1 --format="%at" "${tag}"`"
+      if [ ! -z "${timestamp1}" ] && [ "${timestamp}" -lt "${timestamp1}" ]
+      then
+         log_debug "tag \"${tag}\" with timestamp ${timestamp} is out of range ${timestamp1}-${timestamp2}"
+         continue
+      fi
+
+      if [ ! -z "${timestamp2}" ] && [ "${timestamp}" -ge "${timestamp2}" ]
+      then
+         log_debug "tag \"${tag}\" with timestamp ${timestamp} is out of range ${timestamp1}-${timestamp2}"
+         continue
+      fi
+      echo "${tag}"
+   done <<< "${tags}"
+}
+
+
+run()
+{
+   log_entry run "$@"
+
+   local timestamp1="$1"
+   local timestamp2="$2"
+
    local version
+
+   version="`mulle-project-version -s`"
+   if [ -z "${version}" ]
+   then
+      fail "No project version found in \"${PWD}\""
+   fi
+
    #
    # get commit tagged as "latest" (assume its the old version and latest
    # has not been tagged yet)
    #
-   commit="`git rev-list -n 1 latest`"
-   if [ ! -z "${commit}" ]
+   local latest_commit
+
+   latest_commit="`rexekutor git rev-list -n 1 latest --`"
+   if [ -z "${latest_commit}" ]
    then
-      tag="`git tag -l --points-at "${commit}" \
-            | sort -r -n \
-            | egrep '[0-9]*\.[0-9]*\.[0-9]*' | head -1`"
+      emit_line "${version}"
+      return
    fi
 
-   version="`mulle-project-version -s`"
+   local tag
+   local version_commit
 
-   if [ ! -z "${version}" ]
+   #
+   # if there is a commit for the version already, latest is probably boring
+   # and version as well as its the latest. Guess last one from timestamp
+   #
+   version_commit="`rexekutor git rev-list -n 1 "${version}" -- 2> /dev/null`"
+   if [ ! -z "${version_commit}" ]
    then
-      local repo
-      local user
-      local dir
+      tag="`git_numeric_tags_in_timerange "${timestamp1}" "${timestamp2}" \
+            | tail -1 `"
+      tag="${tag:-???}"
+   else
+      tag="`rexekutor git tag -l --points-at "${latest_commit}" \
+            | sort -r -n \
+            | egrep '^[0-9]*\.[0-9]*\.[0-9]*$' | head -1`"
+   fi
 
-      dir="${PWD}"
+   emit_line "${version}" "${tag}"
+}
 
-      repo="`basename -- "${dir}" `"
-      dir="`dirname -- "${dir}" `"
-      user="`basename -- "${dir}" `"
 
-      case "${user}" in
-         srcS)
-            user="mulle-sde"
+main()
+{
+   local MULLE_FLAG_MAGNUM_FORCE='NO'
+
+   # technical flags
+   local MULLE_TRACE
+   local MULLE_FLAG_EXEKUTOR_DRY_RUN='NO'
+   local MULLE_FLAG_LOG_LOCAL='NO'
+   local MULLE_FLAG_LOG_DEBUG='NO'
+   local MULLE_FLAG_LOG_EXEKUTOR='NO'
+   local MULLE_FLAG_LOG_FLUFF='NO'
+   local MULLE_FLAG_LOG_SCRIPTS='NO'
+   local MULLE_FLAG_LOG_SETTINGS='NO'
+   local MULLE_FLAG_LOG_VERBOSE='NO'
+   local MULLE_FLAG_LOG_MERGE='NO'
+   local MULLE_TRACE_POSTPONE='NO'
+
+   local OPTION_PREVIOUS_RELEASE_DATE
+
+   #
+   # simple flag handling
+   #
+   while [ $# -ne 0 ]
+   do
+      if options_technical_flags "$1"
+      then
+         shift
+         continue
+      fi
+
+      case "$1" in
+         -f|--force)
+            MULLE_FLAG_MAGNUM_FORCE='YES'
+         ;;
+
+         -h*|--help|help)
+            usage
+         ;;
+
+
+         --version)
+            printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
+            exit 0
+         ;;
+
+         -p|--previous-release-date)
+            [ $# -eq 1 ] && fail "missing argument to $1"
+            shift
+
+            OPTION_PREVIOUS_RELEASE_DATE="$1"
+         ;;
+
+         -*)
+            usage "Unknown flag \"$1\""
+         ;;
+
+         *)
+            break
          ;;
       esac
 
-      echo "[${repo}](//github.com/${user}/${repo}/RELEASENOTES.md) | ${version} | ${tag:--} |"
+      shift
+   done
+
+   options_setup_trace "${MULLE_TRACE}" && set -x
+
+   if [ -z "${OPTION_PREVIOUS_RELEASE_DATE}" ]
+   then
+      run
+      return $?
    fi
+
+   local timestamp1
+   local timestamp2
+
+   # remove timezone, date can't parse it
+   OPTION_PREVIOUS_RELEASE_DATE="${OPTION_PREVIOUS_RELEASE_DATE%[+-][0-9][0-9][0-9][0-9]}"
+
+   datestring="`date -d "${OPTION_PREVIOUS_RELEASE_DATE}" +'%Y%m%d%H%M%S' `"
+   timestamp1="`convert_datestring_to_timestamp "${datestring}" `" || return 1
+
+   # give it + 2days
+   timestamp2=$(( timestamp1 + 7200 * 7 ))
+
+   # we want to ignore commits after this timestamp
+   run "" "${timestamp2}"
 }
 
-main "$@" | sort
+
+########
+###
+### INIT - You usually won't edit code below
+###
+_init()
+{
+   #
+   # minimal setup exit
+   #
+   if [ "$1" = "version" ]
+   then
+      printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
+      exit 0
+   fi
+
+   #
+   # leading backslash ? looks like we're getting called from
+   # mingw via a .BAT or so
+   #
+   case "$PATH" in
+      '\\'*)
+         PATH="${PATH//\\/\/}"
+      ;;
+   esac
+
+   if [ -z "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}" ]
+   then
+      MULLE_BASHFUNCTIONS_LIBEXEC_DIR="`mulle-bashfunctions-env libexec-dir 2> /dev/null`"
+      if [ -z "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}" ]
+      then
+         if [ -z "`command -v "${executablepath}"`" ]
+         then
+            echo "Fatal Error: Could not find mulle-bashfunctions-env in PATH ($PATH) - mulle-bashfunctions not installed ?" >&2
+         else
+            echo "Fatal Error: Could not find libexec of mulle-bashfunctions-env (${PWD}})" >&2
+         fi
+         exit 1
+      fi
+   fi
+
+   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-bashfunctions.sh" "minimal" &&
+   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-path.sh" &&
+   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-file.sh" ||
+      fail "failed to load bashfunctions from ${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}"
+
+   #  set -e # more pain then gain in the end
+   #  set -u # doesn't work with my style
+
+   shell_enable_pipefail
+   shell_enable_extglob
+
+   call_main "${MULLE_PROJECT_RELEASEENTRY_FLAGS}" "$@"
+}
+
+
+_init "$@" # will call main indirectly via call_main
+
+###
+### INIT
+###
+########

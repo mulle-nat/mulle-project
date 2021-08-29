@@ -1,6 +1,67 @@
-#! /usr/bin/env bash
+#! /bin/sh
 
 [ "${TRACE}" = 'YES' -o "${SHELL_ALL_TRACE}" = 'YES' ] && set -x && : "$0" "$@"
+
+####
+#
+# Prelude to be placed at top of each script. Rerun this script either in
+# bash or zsh, if not already running in either (which can happen!)
+# Allows script to run on systems that either have bash (linux) or
+# zsh (macOS) only by default.
+
+if [ "$1" != --no-auto-shell ]
+then
+   if [ -z "${BASH_VERSION}" -a -z "${ZSH_VERSION}" ]
+   then
+      exe_shell="`command -v "bash" `"
+      exe_shell="${exe_shell:-`command -v "zsh" `}"
+
+      script="$0"
+
+      #
+      # Quote incoming arguments for shell expansion
+      #
+      args=""
+      for arg in "$@"
+      do
+         # True bourne sh doesn't know ${a//b/c} and <<<
+         case "${arg}" in
+            *\'*)
+               # Use cat instead of echo to avoid possible echo -n
+               # problems. Escape single quotes in string.
+               arg="`cat <<EOF | sed -e s/\'/\'\\\"\'\\\"\'/g
+${arg}
+EOF
+`"
+            ;;
+         esac
+         if [ -z "${args}" ]
+         then
+            args="'${arg}'"
+         else
+            args="${args} '${arg}'"
+         fi
+      done
+
+      #
+      # bash/zsh will use arg after -c <arg> as $0, convenient!
+      #
+
+      exec "${exe_shell:-bash}" -c ". ${script} --no-auto-shell ${args}" "${script}"
+   fi
+   if [ ! -z "${BASH_VERSION}" ]
+   then
+      set +o posix
+   fi
+else
+   shift    # get rid of --no-auto-shell
+fi
+
+
+#
+# Main script to follow, runs now either in zsh or bash
+#
+####
 
 
 print_flags()
@@ -35,9 +96,11 @@ Usage:
    mulle-project-all [flags] ...
 
    Execute a command in all projects that are defined by the file "REPOS"
-   in the current directory. Can also traverse tests and subprojects.
+   in the current directory. Can also traverse tests and subprojects. If there
+   is no "REPOS" file, mulle-project-all will look for mulle-sde projects
+   that reside in (but exluding) the current working directory.
 
-   Can execute commands in parallel on all input repositories.
+   Can execute commands in parallel on all repositories.
 
 Example:
    mulle-project-all -p --output-no-header pwd
@@ -236,7 +299,7 @@ parallel_execute_argument_first()
 
    local argument
 
-   set -o noglob;  IFS=$'\n'
+   shell_disable_glob;  IFS=$'\n'
    for argument in ${arguments}
    do
       if [ ! -z "${argument}" ]
@@ -246,7 +309,7 @@ parallel_execute_argument_first()
             continue
          fi
 
-         set +o noglob; IFS="${DEFAULT_IFS}"
+         shell_enable_glob; IFS="${DEFAULT_IFS}"
 
          wait_for_available_job "${_parallel_maxjobs}"
          _parallel_jobs=$(($_parallel_jobs + 1))
@@ -259,7 +322,7 @@ parallel_execute_argument_first()
       fi
    done
 
-   set +o noglob; IFS="${DEFAULT_IFS}"
+   shell_enable_glob; IFS="${DEFAULT_IFS}"
 
    _parallel_end
 }
@@ -326,11 +389,11 @@ main()
          ;;
 
          --tests|--tests-only)
-            OPTION_MODE='no-main,no-subprojects'
+            OPTION_MODE='no-main,no-subprojects,no-others'
          ;;
 
          -m|--main-project-only|--project-only)
-            OPTION_MODE='no-tests,no-subprojects'
+            OPTION_MODE='no-tests,no-subprojects,no-others'
          ;;
 
          --no-project|--no-main-project)
@@ -380,16 +443,19 @@ main()
       shift
    done
 
-   options_setup_trace "${MULLE_TRACE}"
+   options_setup_trace "${MULLE_TRACE}" && set -x
 
    local reposfile 
    local repos 
 
    reposfile="${OPTION_REPOSFILE:-REPOS}"
-   repos="`rexekutor egrep -v '^#' "${reposfile}"`"
-   if [ -z "${repos}" ]
+   if [ -f "${reposfile}" ]
    then
-      fail "No \"${reposfile}\" file found (${PWD})" 
+      repos="`rexekutor egrep -v '^#' "${reposfile}"`"
+   else
+      shell_enable_nullglob
+      repos="`ls -1d */.mulle/share/sde | sed -e "s/\/\.mulle\/share\/sde$//" `"
+      shell_disable_nullglob
    fi
 
    if [ "${OPTION_PARALLEL}" = 'YES' ]
@@ -421,13 +487,6 @@ main()
 ###
 ### INIT - You usually won't edit code below
 ###
-
-trap_fail()
-{
-   exit 1
-}
-
-
 _init()
 {
    #
@@ -458,7 +517,7 @@ _init()
          then
             echo "Fatal Error: Could not find mulle-bashfunctions-env in PATH ($PATH) - mulle-bashfunctions not installed ?" >&2
          else
-            echo "Fatal Error: Could not find libexec of mulle-bashfunctions-env ($PWD)" >&2
+            echo "Fatal Error: Could not find libexec of mulle-bashfunctions-env (${PWD}})" >&2
          fi
          exit 1
       fi
@@ -473,8 +532,8 @@ _init()
    #  set -e # more pain then gain in the end
    #  set -u # doesn't work with my style
 
-   trap trap_fail INT
-   set -o pipefail
+   shell_enable_pipefail
+   shell_enable_extglob
 
    call_main "${MULLE_REPLACE_FLAGS}" "$@"
 }

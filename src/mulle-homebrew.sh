@@ -120,7 +120,6 @@ generate_brew_formula_header()
 
    local hash
 
-   set -o pipefail
    hash="`exekutor shasum -a 256 "${tmparchive}" | exekutor awk '{ print $1 }'`" || exit 1
    log_verbose "Calculated shasum256 \"${hash}\" for \"${tmparchive}\"."
 
@@ -164,10 +163,10 @@ _print_dependencies()
    local lines
    local line
 
-   set -o noglob; IFS=$'\n'
+   shell_disable_glob; IFS=$'\n'
    for dependency in ${dependencies}
    do
-      set +o noglob; IFS="${DEFAULT_IFS}"
+      shell_enable_glob; IFS="${DEFAULT_IFS}"
       dependency="`eval "echo \"${dependency}\"" `"
 
       line="${INDENTATION}depends_on \"${dependency}\"${epilog}"
@@ -177,7 +176,7 @@ _print_dependencies()
 ${line}"
    done
 
-   set +o noglob; IFS="${DEFAULT_IFS}"
+   shell_enable_glob; IFS="${DEFAULT_IFS}"
 
    if [ ! -z "${lines}" ]
    then
@@ -346,7 +345,7 @@ _generate_brew_formula()
    local generator
 
    generator=_generate_brew_formula_build
-   if [ "`type -t generate_brew_formula_build`" = "function" ]
+   if shell_is_function "generate_brew_formula_build"
    then
       generator="generate_brew_formula_build"
    fi
@@ -467,7 +466,7 @@ homebrew_generate()
    local generator
 
    generator=_generate_brew_formula
-   if [ "`type -t generate_brew_formula`" = "function" ]
+   if shell_is_function "generate_brew_formula"
    then
       generator="generate_brew_formula"
    fi

@@ -71,11 +71,11 @@ is_matching_wildcards()
    local match
    local rval
 
-   set -o noglob ; IFS=$':'
+   shell_disable_glob ; IFS=$':'
    for match in ${match_strings}
    do
       # need noglob here for match
-      set -o noglob ; IFS="${DEFAULT_IFS}"
+      shell_disable_glob ; IFS="${DEFAULT_IFS}"
 
       rval=0
       if [ "${match:0:1}" = '!' ]
@@ -90,7 +90,7 @@ is_matching_wildcards()
          ;;
       esac
    done
-   set +o noglob; IFS="${DEFAULT_IFS}"
+   shell_enable_glob; IFS="${DEFAULT_IFS}"
 
    return 1
 }

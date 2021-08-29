@@ -1,7 +1,67 @@
-#! /usr/bin/env bash
+#! /bin/sh
 
 [ "${TRACE}" = 'YES' -o "${MULLE_PROJECT_SOURCETREE_DOCTOR_TRACE}" = 'YES' ] && set -x && : "$0" "$@"
 
+####
+#
+# Prelude to be placed at top of each script. Rerun this script either in
+# bash or zsh, if not already running in either (which can happen!)
+# Allows script to run on systems that either have bash (linux) or
+# zsh (macOS) only by default.
+
+if [ "$1" != --no-auto-shell ]
+then
+   if [ -z "${BASH_VERSION}" -a -z "${ZSH_VERSION}" ]
+   then
+      exe_shell="`command -v "bash" `"
+      exe_shell="${exe_shell:-`command -v "zsh" `}"
+
+      script="$0"
+
+      #
+      # Quote incoming arguments for shell expansion
+      #
+      args=""
+      for arg in "$@"
+      do
+         # True bourne sh doesn't know ${a//b/c} and <<<
+         case "${arg}" in
+            *\'*)
+               # Use cat instead of echo to avoid possible echo -n
+               # problems. Escape single quotes in string.
+               arg="`cat <<EOF | sed -e s/\'/\'\\\"\'\\\"\'/g
+${arg}
+EOF
+`"
+            ;;
+         esac
+         if [ -z "${args}" ]
+         then
+            args="'${arg}'"
+         else
+            args="${args} '${arg}'"
+         fi
+      done
+
+      #
+      # bash/zsh will use arg after -c <arg> as $0, convenient!
+      #
+
+      exec "${exe_shell:-bash}" -c ". ${script} --no-auto-shell ${args}" "${script}"
+   fi
+   if [ ! -z "${BASH_VERSION}" ]
+   then
+      set +o posix
+   fi
+else
+   shift    # get rid of --no-auto-shell
+fi
+
+
+#
+# Main script to follow, runs now either in zsh or bash
+#
+####
 
 MULLE_EXECUTABLE_VERSION="0.0.0"
 
@@ -94,7 +154,7 @@ __doctor_archive_nodeline()
             fi
 
             case "${user}" in
-               mulle-c|mulle-objc|mulle-core|mulle-concurrent|MulleWeb|MulleFoundation|MulleUI)
+               codeon-gmbh|mulle-c|mulle-objc|mulle-core|mulle-concurrent|MulleEOF|MulleWeb|MulleFoundation|MulleUI)
                ;;
 
                mulle-nat)
@@ -127,6 +187,34 @@ __doctor_archive_nodeline()
 }
 
 
+r_count_character()
+{
+   local s="$1"
+   local c="$2"
+
+   RVAL="${s//[^${c}]/}"
+   RVAL="${#RVAL}"
+}
+
+
+is_balanced_character_pair()
+{
+   local s="$1"
+   local pair="$2"
+
+   local n
+   local m
+
+   r_count_character "${s}" "${pair:0:1}"
+   n="${RVAL}"
+
+   r_count_character "${s}" "${pair:1:1}"
+   m="${RVAL}"
+
+   [ $n -eq $m ]
+}
+
+
 doctor_nodeline()
 {
    log_entry "doctor_nodeline" "$@"
@@ -146,6 +234,23 @@ doctor_nodeline()
 
    nodeline_parse "${nodeline}"
 
+   if ! is_balanced_character_pair "${_branch}" "{}"
+   then
+      log_warning "${_address}: branch ${branch} has unbalanced {} characters"
+   fi
+   if ! is_balanced_character_pair "${_tag}" "{}"
+   then
+      log_warning "${_address}: tag ${_tag} has unbalanced {} characters"
+   fi
+   if ! is_balanced_character_pair "${_nodetype}" "{}"
+   then
+      log_warning "${_address}: nodetype ${_nodetype} has unbalanced {} characters"
+   fi
+   if ! is_balanced_character_pair "${_url}" "{}"
+   then
+      log_warning "${_address}: nodetype ${_url} has unbalanced {} characters"
+   fi
+
    local upcaseid
 
    r_basename "${_address}"
@@ -154,7 +259,7 @@ doctor_nodeline()
 
    if find_line "${UPCASEIDS}" "${upcaseid}"
    then
-      log_warning "${_address}: UPCASEID is a duplicate of another address"
+      log_warning "${_address}: ${upcaseid} is a duplicate of another address"
    else
       r_add_line "${UPCASEIDS}" "${upcaseid}"
       UPCASEIDS="${RVAL}"
@@ -234,7 +339,7 @@ main()
       shift
    done
 
-   options_setup_trace "${MULLE_TRACE}"
+   options_setup_trace "${MULLE_TRACE}" && set -x
 
    MULLE_SOURCETREE_LIBEXEC_DIR="`mulle-sourcetree libexec-dir`" || return 1
 
@@ -253,14 +358,14 @@ main()
    local nodeline
 
    nodelines="`cfg_read "${1:-/}" `" || exit 1
-   set -o noglob ; IFS=$'\n'
+   shell_disable_glob ; IFS=$'\n'
    for nodeline in ${nodelines}
    do
-      IFS="${DEFAULT_IFS}" ; set +o noglob
+      IFS="${DEFAULT_IFS}" ; shell_enable_glob
 
       doctor_nodeline "${nodeline}"
    done
-   IFS="${DEFAULT_IFS}" ; set +o noglob
+   IFS="${DEFAULT_IFS}" ; shell_enable_glob
 }
 
 
@@ -268,13 +373,6 @@ main()
 ###
 ### INIT - You usually won't edit code below
 ###
-
-trap_fail()
-{
-   exit 1
-}
-
-
 _init()
 {
    #
@@ -305,7 +403,7 @@ _init()
          then
             echo "Fatal Error: Could not find mulle-bashfunctions-env in PATH ($PATH) - mulle-bashfunctions not installed ?" >&2
          else
-            echo "Fatal Error: Could not find libexec of mulle-bashfunctions-env ($PWD)" >&2
+            echo "Fatal Error: Could not find libexec of mulle-bashfunctions-env (${PWD}})" >&2
          fi
          exit 1
       fi
@@ -319,8 +417,8 @@ _init()
    #  set -e # more pain then gain in the end
    #  set -u # doesn't work with my style
 
-   trap trap_fail INT
-   set -o pipefail
+   shell_enable_pipefail
+   shell_enable_extglob
 
    call_main "${MULLE_PROJECT_SOURCETREE_DOCTOR_FLAGS}" "$@"
 }
