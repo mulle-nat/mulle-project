@@ -153,7 +153,6 @@ EOF
 }
 
 
-
 get_xcodeproj_version()
 {
    log_entry "get_xcodeproj_version" "$@"
@@ -279,7 +278,6 @@ get_latest_releasenote_version()
 
    return 0
 }
-
 
 
 info_version()

@@ -66,18 +66,21 @@ fi
 
 print_flags()
 {
-   echo "   --eval             : evaluate command line"
-   echo "   --lenient          : lenient operation, errors don't preempt"
-   echo "   --parallel         : execute operations in parallel"
-   echo "   --repos-file <f>   : REPOS file to use"
-   echo "   --only-tests       : only execute in test directories"
-   echo "   --no-tests         : don't execute in test directories"
-   echo "   --no-others        : don't execute in other (demo) directories"
-   echo "   --no-subprojects   : don't execute in subproject directories"
-   echo "   --output-no-header : don't visually separate command output"
-   echo "   --project          : only execute in main project"
 
    ##
+   cat <<EOF
+   --all              : execute in all projects
+   --eval             : evaluate command line
+   --lenient          : lenient operation, errors don't preempt
+   --no-project       : don't execute in main project
+   --others           : execute in test directories
+   --output-no-header : don't visually separate command output
+   --parallel         : execute operations in parallel
+   --project          : execute in main project (default)
+   --repos-file <f>   : REPOS file to use
+   --subprojects      : execute in subprojects
+   --tests            : execute in other (demo) directories
+EOF
    ## ADD YOUR FLAG DESCRIPTION HERE
    ##
 
@@ -176,10 +179,7 @@ project_it()
    local mode="$1" ; shift 
 
    case ",${mode}," in
-      *,no-main,*)
-      ;;
-
-      *)
+      *,project,*)
          if [ -z "${PROJECT_NAME}" ]
          then
             PROJECT_NAME="$1" ; export PROJECT_NAME
@@ -195,10 +195,7 @@ project_it()
    esac
 
    case ",${mode}," in
-      *,no-subprojects,*)
-      ;;
-
-      *)
+      *,subprojects,*)
          local subprojects
          local subproject 
 
@@ -226,10 +223,7 @@ project_it()
    esac
 
    case ",${mode}," in
-      *,no-tests,*)
-      ;;
-
-      *)
+      *,tests,*)
          local tests 
          local test 
 
@@ -255,10 +249,7 @@ project_it()
    esac        
 
    case ",${mode}," in
-      *,no-others,*)
-      ;;
-
-      *)
+      *,others,*)
          local others
          local other
 
@@ -348,7 +339,7 @@ main()
 
    local OPTION_ADORN
    local OPTION_LENIENT
-   local OPTION_MODE
+   local OPTION_MODE="project"
    local OPTION_REPOSFILE
    local OPTION_PARALLEL
    local OPTION_EVAL
@@ -388,30 +379,27 @@ main()
             OPTION_EXISTS_FILE="$1"
          ;;
 
-         --tests|--tests-only)
-            OPTION_MODE='no-main,no-subprojects,no-others'
+         -a|--all)
+            OPTION_MODE="project,subprojects,tests,others"
          ;;
 
-         -m|--main-project-only|--project-only)
-            OPTION_MODE='no-tests,no-subprojects,no-others'
-         ;;
-
-         --no-project|--no-main-project)
-            r_comma_concat "${OPTION_MODE}" "no-main"
+         --others)
+            r_comma_concat "${OPTION_MODE}" "others"
             OPTION_MODE="${RVAL}"
          ;;
 
-         --no-tests)
-            OPTION_MODE='no-tests'
-         ;;
-
-         --no-others)
-            r_comma_concat "${OPTION_MODE}" "no-others"
+         -m|--project)
+            r_comma_concat "${OPTION_MODE}" "project"
             OPTION_MODE="${RVAL}"
          ;;
 
-         --no-subprojects)
-            r_comma_concat "${OPTION_MODE}" "no-subprojects"
+         --tests)
+            r_comma_concat "${OPTION_MODE}" "tests"
+            OPTION_MODE="${RVAL}"
+         ;;
+
+         --subprojects)
+            r_comma_concat "${OPTION_MODE}" "subprojects"
             OPTION_MODE="${RVAL}"
          ;;
 
@@ -523,9 +511,7 @@ _init()
       fi
    fi
 
-   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-bashfunctions.sh" "minimal" &&
-   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-path.sh" &&
-   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-file.sh" &&
+   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-bashfunctions-minimal.sh" &&
    . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-parallel.sh" ||
       fail "failed to load bashfunctions from ${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}"
 
