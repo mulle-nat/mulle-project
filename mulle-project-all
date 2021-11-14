@@ -388,9 +388,18 @@ main()
             OPTION_MODE="${RVAL}"
          ;;
 
+         --others-only|--only-others)
+            OPTION_MODE="others"
+         ;;
+
          -m|--project)
             r_comma_concat "${OPTION_MODE}" "project"
             OPTION_MODE="${RVAL}"
+         ;;
+
+
+         --project-only|--only-project)
+            OPTION_MODE="project"
          ;;
 
          --tests)
@@ -398,9 +407,17 @@ main()
             OPTION_MODE="${RVAL}"
          ;;
 
+         --tests-only|--only-tests)
+            OPTION_MODE="tests"
+         ;;
+
          --subprojects)
             r_comma_concat "${OPTION_MODE}" "subprojects"
             OPTION_MODE="${RVAL}"
+         ;;
+
+         --subprojects-only|--only-subprojects)
+            OPTION_MODE="subprojects"
          ;;
 
          -r|--repos-file)
