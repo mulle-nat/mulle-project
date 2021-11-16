@@ -71,7 +71,7 @@ print_flags()
    cat <<EOF
    --all              : execute in all projects
    --eval             : evaluate command line
-   --lenient          : lenient operation, errors don't preempt
+   --lenient          : lenient operation, errors don't preempt (default)
    --no-project       : don't execute in main project
    --others           : execute in test directories
    --output-no-header : don't visually separate command output
@@ -79,6 +79,7 @@ print_flags()
    --project          : execute in main project (default)
    --repos-file <f>   : REPOS file to use
    --subprojects      : execute in subprojects
+   --strict           : errors preempt
    --tests            : execute in other (demo) directories
 EOF
    ## ADD YOUR FLAG DESCRIPTION HERE
@@ -185,7 +186,7 @@ project_it()
             PROJECT_NAME="$1" ; export PROJECT_NAME
          fi
 
-         if ! shell_it "${project}" "$@" && [ -z "${OPTION_LENIENT}" ]
+         if ! shell_it "${project}" "$@" && [ "${OPTION_LENIENT}" = 'NO' ]
          then
             exit 1
          fi
@@ -238,7 +239,7 @@ project_it()
             then
                TEST_NAME="$1" ; export TEST_NAME
 
-               if ! shell_it "${project}/${test}" "$@" && [ -z "${OPTION_LENIENT}" ]
+               if ! shell_it "${project}/${test}" "$@" && [ "${OPTION_LENIENT}" = 'NO' ]
                then
                   exit 1
                fi
@@ -338,7 +339,7 @@ main()
    local MULLE_TRACE_POSTPONE='NO'
 
    local OPTION_ADORN
-   local OPTION_LENIENT
+   local OPTION_LENIENT='YES'
    local OPTION_MODE="project"
    local OPTION_REPOSFILE
    local OPTION_PARALLEL
@@ -370,6 +371,10 @@ main()
 
          -p|--parallel)
             OPTION_PARALLEL='YES'
+         ;;
+
+         --strict)
+            OPTION_LENIENT='NO'
          ;;
 
          --if-exists-file)
