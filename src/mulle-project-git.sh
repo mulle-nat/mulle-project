@@ -29,10 +29,12 @@
 #   ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 #   POSSIBILITY OF SUCH DAMAGE.
 #
+MULLE_PROJECT_GIT_SH="included"
 
-git_tag_exists()
+
+project::git::tag_exists()
 {
-   log_entry "git_tag_exists" "$@"
+   log_entry "project::git::tag_exists" "$@"
 
    local tag="$1"
 
@@ -40,9 +42,9 @@ git_tag_exists()
 }
 
 
-git_branch_exists()
+project::git::branch_exists()
 {
-   log_entry "git_branch_exists" "$@"
+   log_entry "project::git::branch_exists" "$@"
 
    local branch="$1"
 
@@ -50,60 +52,60 @@ git_branch_exists()
 }
 
 
-git_ref_for_tag()
+project::git::ref_for_tag()
 {
-   log_entry "git_ref_for_tag" "$@"
+   log_entry "project::git::ref_for_tag" "$@"
 
    rexekutor git show-ref --tags $1 | awk '{ print$1 }'
 }
 
 
-git_any_first_commit()
+project::git::any_first_commit()
 {
-   log_entry "git_any_first_commit" "$@"
+   log_entry "project::git::any_first_commit" "$@"
 
    rexekutor git rev-list HEAD | tail -n 1
 }
 
 
-git_last_tag()
+project::git::last_tag()
 {
-   log_entry "git_last_tag" "$@"
+   log_entry "project::git::last_tag" "$@"
 
    rexekutor git tag --sort=-v:committerdate | head -1
 }
 
 
-git_commits_from_start()
+project::git::commits_from_start()
 {
-   log_entry "git_commits_from_start" "$@"
+   log_entry "project::git::commits_from_start" "$@"
 
    rexekutor git log --format=%B
 }
 
 
-git_commits_from_ref()
+project::git::commits_from_ref()
 {
-   log_entry "git_commits_from_ref" "$@"
+   log_entry "project::git::commits_from_ref" "$@"
 
    rexekutor git log --format=%B "$1..HEAD"
 }
 
 
-git_commits_from_tag()
+project::git::commits_from_tag()
 {
-   log_entry "git_commits_from_tag" "$@"
+   log_entry "project::git::commits_from_tag" "$@"
 
    local ref
 
-   ref="`git_ref_for_tag "$1"`"
-   git_commits_from_ref "$ref"
+   ref="`project::git::ref_for_tag "$1"`"
+   project::git::commits_from_ref "$ref"
 }
 
 
-git_is_clean()
+project::git::is_clean()
 {
-   log_entry "git_is_clean" "$@"
+   log_entry "project::git::is_clean" "$@"
 
    local name
 
@@ -125,21 +127,40 @@ git_is_clean()
 #
 # branch can be empty, and usually is by default
 #
-git_can_amend()
+project::git::can_amend()
 {
-   log_entry "git_can_amend" "$@"
+   log_entry "project::git::can_amend" "$@"
 
    local branch="$1"
 
    # if 0 then egrep matched and this means that HEAD has no tags or
    # has been pushed to any remotes
+
+   # branch can be empty!!
    git log -1 --decorate -q ${branch} | egrep '\(HEAD -> [^,)]*\)' > /dev/null
+   if [ $? -ne 0 ]
+   then
+      log_debug "Last commit has been pushed already or is tagged already"
+      return 1
+   fi
+
+   #
+   # check that last commit wasn't a merge, don't want to amend those
+   #
+   git log -1 --pretty="%B" | head -1 | egrep '^Merge branch' > /dev/null
+   if [ $? -eq 0 ]
+   then
+      log_debug "Last commit is a merge from another branch"
+      return 1
+   fi
+
+   return 0
 }
 
 # more convenient if not exekutored!
-git_repo_can_push()
+project::git::can_push()
 {
-   log_entry "git_repo_can_push" "$@"
+   log_entry "project::git::can_push" "$@"
 
    local remote="${1:-origin}"
    local branch="${2:-release}"
@@ -162,9 +183,9 @@ git_repo_can_push()
 }
 
 
-git_remote_branch_is_synced()
+project::git::remote_branch_is_synced()
 {
-   log_entry "git_remote_branch_is_synced" "$@"
+   log_entry "project::git::remote_branch_is_synced" "$@"
 
    local remote="${1:-origin}"
    local branch="${2:-release}"
@@ -196,12 +217,12 @@ git_remote_branch_is_synced()
 # 1 no-remote
 # 2 remote there but no ref like name
 #
-# TODO: same code as in mulle-fetch git_is_valid_remote_url
+# TODO: same code as in mulle-fetch fetch::git::is_valid_remote_url
 #       consolidate into mulle-git or so
 #
-_git_check_remote()
+project::git::_check_remote()
 {
-   log_entry "_git_check_remote" "$@"
+   log_entry "project::git::_check_remote" "$@"
 
    local name="$1"
 
@@ -223,9 +244,9 @@ _git_check_remote()
 }
 
 
-git_untag_all()
+project::git::untag_all()
 {
-   log_entry "git_untag_all" "$@"
+   log_entry "project::git::untag_all" "$@"
 
    local tag="$1"
 
@@ -250,7 +271,7 @@ git_untag_all()
 }
 
 
-_git_parse_params()
+project::git::_parse_params()
 {
    branch="${1:-${GIT_DEFAULT_BRANCH:-master}}"
    [ $# -ne 0 ] && shift
@@ -293,9 +314,9 @@ _git_parse_params()
 }
 
 
-_git_verify_main()
+project::git::_verify_main()
 {
-   log_entry "_git_verify_main" "$@"
+   log_entry "project::git::_verify_main" "$@"
 
    local branch
    local dstbranch
@@ -305,7 +326,7 @@ _git_verify_main()
    local latesttag
    local forcepush
 
-   _git_parse_params "$@"
+   project::git::_parse_params "$@"
 
    local have_github
    local return_or_continue_if_dry_run
@@ -318,7 +339,7 @@ _git_verify_main()
 
    log_verbose "Verify repository \"`pwd -P`\""
 
-   if _git_check_remote "${github}"
+   if project::git::_check_remote "${github}"
    then
       have_github='YES'
    else
@@ -326,7 +347,7 @@ _git_verify_main()
    fi
 
    log_verbose "Check clean state of project"
-   if ! rexekutor git_is_clean
+   if ! rexekutor project::git::is_clean
    then
       log_error "repository is tainted"
       ${return_or_continue_if_dry_run} 1
@@ -334,13 +355,13 @@ _git_verify_main()
 
    if [ ! -z "${tag}" ]
    then
-      if git_tag_exists "${tag}"
+      if project::git::tag_exists "${tag}"
       then
          log_warning "Tag \"${tag}\" already exists"
       fi
    fi
 
-   if ! _git_check_remote "${origin}"
+   if ! project::git::_check_remote "${origin}"
    then
       log_error "\"${origin}\" not accessible (If present, maybe needs an initial push ?)"
       ${return_or_continue_if_dry_run} 1
@@ -352,13 +373,13 @@ _git_verify_main()
       # check that we can push
       #
       log_verbose "Check if remotes need merge"
-      if ! git_repo_can_push "${origin}" "${branch}"
+      if ! project::git::can_push "${origin}" "${branch}"
       then
          log_error "You need to merge \"${origin}/${branch}\" first"
          ${return_or_continue_if_dry_run} 1
       fi
 
-      if ! git_repo_can_push "${origin}" "${dstbranch}"
+      if ! project::git::can_push "${origin}" "${dstbranch}"
       then
          log_error "You need to merge \"${origin}/${dstbranch}\" first"
          ${return_or_continue_if_dry_run} 1
@@ -366,7 +387,7 @@ _git_verify_main()
 
       if [ "${have_github}" = 'YES' ]
       then
-         if ! git_repo_can_push "${github}" "${dstbranch}"
+         if ! project::git::can_push "${github}" "${dstbranch}"
          then
             log_error "You need to merge \"${github}/${dstbranch}\" first"
             ${return_or_continue_if_dry_run} 1
@@ -382,9 +403,9 @@ _git_verify_main()
 # ORIGIN
 # TAG
 #
-_git_commit_main()
+project::git::_commit_main()
 {
-   log_entry "_git_commit_main" "$@"
+   log_entry "project::git::_commit_main" "$@"
 
    local branch
    local dstbranch
@@ -394,11 +415,11 @@ _git_commit_main()
    local latesttag
    local forcepush
 
-   _git_parse_params "$@"
+   project::git::_parse_params "$@"
 
    local have_github
 
-   if _git_check_remote "${github}"
+   if project::git::_check_remote "${github}"
    then
       have_github='YES'
    fi
@@ -414,7 +435,7 @@ _git_commit_main()
    if [ ! -z "${tag}" ]
    then
       log_verbose "Check that the tag \"${tag}\" does not exist yet"
-      if rexekutor git_tag_exists "${tag}"
+      if rexekutor project::git::tag_exists "${tag}"
       then
          log_error "Tag \"${tag}\" already exists"
          ${return_or_continue_if_dry_run} 4
@@ -442,7 +463,7 @@ _git_commit_main()
    if [ ! -z "${latesttag}" ]
    then
       log_info "Untag \"${dstbranch}\" with \"${latesttag}\""
-      git_untag_all "${latesttag}"
+      project::git::untag_all "${latesttag}"
 
       log_info "Tag \"${dstbranch}\" with \"${latesttag}\""
       exekutor git tag "${latesttag}"         || ${return_or_continue_if_dry_run} 1
@@ -476,22 +497,22 @@ _git_commit_main()
 }
 
 
-git_verify_main()
+project::git::verify_main()
 {
-   log_entry "git_verify_main" "$@"
+   log_entry "project::git::verify_main" "$@"
 
    local branch
 
    branch="`rexekutor git rev-parse --abbrev-ref HEAD`"
    branch="${branch:-${GIT_DEFAULT_BRANCH:-master}}" # for dry run
 
-   _git_verify_main "${branch}" "$@"
+   project::git::_verify_main "${branch}" "$@"
 
    return $?
 }
 
 
-git_assert_not_on_release_branch()
+project::git::assert_not_on_release_branch()
 {
    local branch
 
@@ -504,18 +525,19 @@ git_assert_not_on_release_branch()
 }
 
 
-r_git_commit_options()
+project::git::r_commit_options()
 {
-   log_entry r_git_commit_options "$@"
+   log_entry project::git::r_commit_options "$@"
 
    local amend="$1"
    local message="$2"
 
    case "${amend}" in
       'YES')
-         if git_can_amend
+         if project::git::can_amend
          then
-            log_warning "Last commit was tagged or pushed. You may need to force push to remotes now."
+            log_warning "Last commit was tagged or merged or pushed. You may \
+need to force push to remotes now."
          fi
          RVAL="--amend --no-edit"
       ;;
@@ -526,9 +548,10 @@ r_git_commit_options()
       ;;
 
       'DEFAULT'|'SAFE')
-         if ! git_can_amend
+         if ! project::git::can_amend
          then
-            log_verbose "Will create a new commit as the last commat has been tagged or pushed"
+            log_verbose "Will create a new commit as the last commit has been \
+tagged or merged or pushed"
 
             r_escaped_singlequotes "${message}"
             RVAL="-m '${RVAL}'"
@@ -538,9 +561,9 @@ r_git_commit_options()
       ;;
 
       'ONLY')
-         if ! git_can_amend
+         if ! project::git::can_amend
          then
-            fail "Can not amend last commit as its been tagged or pushed"
+            fail "Can not amend last commit as its been tagged or merged or pushed"
          fi
          RVAL="--amend --no-edit"
       ;;
@@ -552,9 +575,9 @@ r_git_commit_options()
 }
 
 
-git_commit_main()
+project::git::main()
 {
-   log_entry "git_commit_main" "$@"
+   log_entry "project::git::main" "$@"
 
    local branch
    local rval
@@ -566,7 +589,7 @@ git_commit_main()
       fail "Don't call it from release branch"
    fi
 
-   _git_commit_main "${branch}" "$@"
+   project::git::_commit_main "${branch}" "$@"
    rval=$?
 
    # not sure why I didn't do this always before

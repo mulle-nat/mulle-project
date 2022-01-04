@@ -30,9 +30,9 @@
 #   POSSIBILITY OF SUCH DAMAGE.
 #
 
-get_class_from_name()
+project::homebrew::get_class_from_name()
 {
-   log_entry "get_class_from_name" "$@"
+   log_entry "project::homebrew::get_class_from_name" "$@"
 
    local name="$1"
 
@@ -63,9 +63,9 @@ get_class_from_name()
 }
 
 
-generate_brew_formula_header()
+project::homebrew::generate_formula_header()
 {
-   log_entry "generate_brew_formula_header" "$@"
+   log_entry "project::homebrew::generate_formula_header" "$@"
 
    local project="$1"
    local name="$2"
@@ -125,7 +125,7 @@ generate_brew_formula_header()
 
    local formula
 
-   formula="`get_class_from_name "${name}"`"
+   formula="`project::homebrew::get_class_from_name "${name}"`"
 
    ##
    ##
@@ -153,9 +153,9 @@ ${INDENTATION}${line}"
 }
 
 
-_print_dependencies()
+project::homebrew::_print_dependencies()
 {
-   log_entry "_print_dependencies" "$@"
+   log_entry "project::homebrew::_print_dependencies" "$@"
 
    local dependencies="$1"
    local epilog="$2"
@@ -185,28 +185,28 @@ ${line}"
 }
 
 
-generate_brew_formula_dependencies()
+project::homebrew::generate_formula_dependencies()
 {
-   log_entry "generate_brew_formula_dependencies" "$@"
+   log_entry "project::homebrew::generate_formula_dependencies" "$@"
 
    local dependencies="$1"
    local builddependencies="$2"
 
    if [ ! -z "${dependencies}" ]
    then
-      _print_dependencies "${dependencies}"
+      project::homebrew::_print_dependencies "${dependencies}"
    fi
 
    if [ ! -z "${builddependencies}" ]
    then
-      _print_dependencies "${builddependencies}" " => :build"
+      project::homebrew::_print_dependencies "${builddependencies}" " => :build"
    fi
 }
 
 
-generate_brew_formula_xcodebuild()
+project::homebrew::generate_formula_xcodebuild()
 {
-   log_entry "generate_brew_formula_xcodebuild" "$@"
+   log_entry "project::homebrew::generate_formula_xcodebuild" "$@"
 
    local project="$1"; shift
    local name="$1" ; shift
@@ -238,9 +238,9 @@ EOF
 }
 
 
-generate_brew_formula_mulle_build()
+project::homebrew::generate_formula_mulle_build()
 {
-   log_entry "generate_brew_formula_mulle_build" "$@"
+   log_entry "project::homebrew::generate_formula_mulle_build" "$@"
 
    local project="$1"; shift
    local name="$1" ; shift
@@ -267,9 +267,9 @@ EOF
 }
 
 
-generate_brew_formula_mulle_test()
+project::homebrew::generate_formula_mulle_test()
 {
-   log_entry "generate_brew_formula_mulle_test" "$@"
+   log_entry "project::homebrew::generate_formula_mulle_test" "$@"
 
    local project="$1"; shift
    local name="$1" ; shift
@@ -298,9 +298,9 @@ EOF
 }
 
 
-generate_brew_formula_footer()
+project::homebrew::generate_formula_footer()
 {
-   log_entry "generate_brew_formula_footer" "$@"
+   log_entry "project::homebrew::generate_formula_footer" "$@"
 
    local name="$1"
 
@@ -315,22 +315,22 @@ EOF
 }
 
 
-_generate_brew_formula_build()
+project::homebrew::_generate_formula_build()
 {
-   log_entry "_generate_brew_formula_build" "$@"
+   log_entry "project::homebrew::_generate_formula_build" "$@"
 
    local project="$1"
    local name="$2"
    local version="$3"
 
-   generate_brew_formula_mulle_build "${project}" "${name}" "${version}"
-   generate_brew_formula_mulle_test  "${project}" "${name}" "${version}"
+   project::homebrew::generate_formula_mulle_build "${project}" "${name}" "${version}"
+   project::homebrew::generate_formula_mulle_test  "${project}" "${name}" "${version}"
 }
 
 
-_generate_brew_formula()
+project::homebrew::_generate_formula()
 {
-   log_entry "_generate_brew_formula" "$@"
+   log_entry "project::homebrew::_generate_formula" "$@"
 
    local project="$1"
    local name="$2"
@@ -344,24 +344,24 @@ _generate_brew_formula()
 
    local generator
 
-   generator=_generate_brew_formula_build
+   generator=project::homebrew::_generate_formula_build
    if shell_is_function "generate_brew_formula_build"
    then
       generator="generate_brew_formula_build"
    fi
 
 
-   generate_brew_formula_header "${project}" "${name}" "${version}" \
+   project::homebrew::generate_formula_header "${project}" "${name}" "${version}" \
                                 "${homepage}" "${desc}" "${archiveurl}" "${tag}" &&
-   generate_brew_formula_dependencies "${dependencies}" "${builddependencies}" &&
+   project::homebrew::generate_formula_dependencies "${dependencies}" "${builddependencies}" &&
    ${generator} "${project}" "${name}" "${version}" "${dependencies}" &&
-   generate_brew_formula_footer "${name}"
+   project::homebrew::generate_formula_footer "${name}"
 }
 
 
-formula_push()
+project::homebrew::formula_push()
 {
-   log_entry "formula_push" "$@"
+   log_entry "project::homebrew::formula_push" "$@"
 
    local rbfile="$1" ; shift
    local version="$1" ; shift
@@ -393,9 +393,9 @@ formula_push()
 }
 
 
-homebrew_push()
+project::homebrew::push()
 {
-   log_entry "homebrew_push" "$@"
+   log_entry "project::homebrew::push" "$@"
 
    local name="$1"; shift
    local version="$1"; shift
@@ -415,13 +415,13 @@ homebrew_push()
 
    log_info "Push brew formula \"${homebrewtap}/${rbfile}\""
 
-   formula_push "${rbfile}" "${version}" "${name}" "${homebrewtap}" "${tag}"
+   project::homebrew::formula_push "${rbfile}" "${version}" "${name}" "${homebrewtap}" "${tag}"
 }
 
 
-homebrew_generate()
+project::homebrew::generate()
 {
-   log_entry "homebrew_generate" "$@"
+   log_entry "project::homebrew::generate" "$@"
 
    local project="$1" ; shift
    local name="$1"; shift
@@ -465,7 +465,7 @@ homebrew_generate()
 
    local generator
 
-   generator=_generate_brew_formula
+   generator=project::homebrew::_generate_formula
    if shell_is_function "generate_brew_formula"
    then
       generator="generate_brew_formula"

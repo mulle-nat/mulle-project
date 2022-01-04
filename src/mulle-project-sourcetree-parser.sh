@@ -32,9 +32,9 @@
 MULLE_PROJECT_SOURCETREE_PARSER_SH="included"
 
 
-get_dependency_address_nodetype_branch_tag_url()
+project::sourcetree-parser::get_dependency_address_nodetype_branch_tag_url()
 {
-   log_entry "get_dependency_address_nodetype_branch_tag_url" "$@"
+   log_entry "project::sourcetree-parser::get_dependency_address_nodetype_branch_tag_url" "$@"
 
    #
    # TODO: be more clever with deduping
@@ -59,9 +59,9 @@ get_dependency_address_nodetype_branch_tag_url()
 }
 
 
-is_matching_wildcards()
+project::sourcetree-parser::is_matching_wildcards()
 {
-   log_entry "is_matching_wildcards" "$@"
+   log_entry "project::sourcetree-parser::is_matching_wildcards" "$@"
 
    local match_strings="$1"
    local string="$2"
@@ -114,9 +114,9 @@ is_matching_wildcards()
 #   local _tag_identifier
 #   local _tag_fallback
 
-parse_sourcetree_nodetype_branch_tag_url()
+project::sourcetree-parser::parse_nodetype_branch_tag_url()
 {
-   log_entry "parse_sourcetree_nodetype_branch_tag_url" "$@"
+   log_entry "project::sourcetree-parser::parse_nodetype_branch_tag_url" "$@"
 
    local line="$1"
 

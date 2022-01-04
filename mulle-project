@@ -40,7 +40,7 @@ usage()
    [ "$#" -ne 0 ] && log_error "$1"
 
    cat <<EOF >&2
-Usage: mulle-project-env [command]
+Usage: mulle-project [command]
 
    Prints the configuration of various mulle-project related values.
 

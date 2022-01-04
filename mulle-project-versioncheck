@@ -1,82 +1,72 @@
 #! /bin/sh
 
-[ "${TRACE}" = 'YES' -o "${MULLE_PROJECT_DEPENDENCY_VERSIONS_TRACE}" = 'YES' ] && set -x && : "$0" "$@"
+[ "${TRACE}" = 'YES' -o "${MULLE_PROJECT_VERSIONCHECK_TRACE}" = 'YES' ] && set -x && : "$0" "$@"
 
 
-####
+MULLE_EXECUTABLE_VERSION="0.0.0"
+
+##########################################################################
+###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###
+###########################################################################
+# #
+# # PRELUDE - Standard startup code for loading mulle-bashfunctions
+# #
+###
+
 #
-# Prelude to be placed at top of each script. Rerun this script either in
-# bash or zsh, if not already running in either (which can happen!)
-# Allows script to run on systems that either have bash (linux) or
-# zsh (macOS) only by default.
+# Figure out MULLE_BASHFUNCTIONS_LIBEXEC_DIR on this machine if needed.
+#
+if [ -z "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}" ]
+then
+   MULLE_BASHFUNCTIONS_LIBEXEC_DIR="`mulle-bashfunctions libexec-dir`" || exit 1
+   export MULLE_BASHFUNCTIONS_LIBEXEC_DIR
+fi
 
+#
+# The booter reruns the executable either with bash or zsh, whatever the
+# system provides. On the second run --no-auto-shell will be set first.
+#
 if [ "$1" != --no-auto-shell ]
 then
-   if [ -z "${BASH_VERSION}" -a -z "${ZSH_VERSION}" ]
-   then
-      exe_shell="`command -v "bash" `"
-      exe_shell="${exe_shell:-`command -v "zsh" `}"
-
-      script="$0"
-
-      #
-      # Quote incoming arguments for shell expansion
-      #
-      args=""
-      for arg in "$@"
-      do
-         # True bourne sh doesn't know ${a//b/c} and <<<
-         case "${arg}" in
-            *\'*)
-               # Use cat instead of echo to avoid possible echo -n
-               # problems. Escape single quotes in string.
-               arg="`cat <<EOF | sed -e s/\'/\'\\\"\'\\\"\'/g
-${arg}
-EOF
-`"
-            ;;
-         esac
-         if [ -z "${args}" ]
-         then
-            args="'${arg}'"
-         else
-            args="${args} '${arg}'"
-         fi
-      done
-
-      #
-      # bash/zsh will use arg after -c <arg> as $0, convenient!
-      #
-
-      exec "${exe_shell:-bash}" -c ". ${script} --no-auto-shell ${args}" "${script}"
-   fi
-   if [ ! -z "${BASH_VERSION}" ]
-   then
-      set +o posix
-   fi
+   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-boot.sh" || exit 1
 else
    shift    # get rid of --no-auto-shell
 fi
 
 
 #
-# Main script to follow, runs now either in zsh or bash
+# Include mulle-bashfunctions.sh         : default functions
+#         mulle-bashfunctions-none.sh    : almost no functions
+#         mulle-bashfunctions-minimal.sh : few functions for basic scripts
+#         mulle-bashfunctions-all.sh     : everything, even obscure functions
 #
-####
+# Do this first to get aliases
+#
+MULLE_EXECUTABLE="${BASH_SOURCE[0]:-${(%):-%x}}"
 
-MULLE_EXECUTABLE_VERSION="0.0.0"
+. "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-bashfunctions-all.sh" || exit 1
+
+###
+# # Now we are in bash or zsh with mulle-bashfunctions loaded
+# #
+###########################################################################
+###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###
+###########################################################################
+
+if [ -z "${MULLE_PROJECT_LIBEXEC_DIR}" ]
+then
+   r_get_libexec_dir "${MULLE_EXECUTABLE}" "mulle-project" "mulle-project-git.sh"
+   MULLE_PROJECT_LIBEXEC_DIR="${RVAL}"
+fi
 
 
 print_flags()
 {
-   echo "   -f          : force operation"
-   echo "   --reflect   : write into ${PROJECT_SOURCE_DIR:-src}/reflect"
+   echo "   -f            : force operation"
+   echo "   --reflect     : write into ${PROJECT_SOURCE_DIR:-src}/reflect"
+   echo "   --update-only : only write if file exists"
 
-   ##
-   ## ADD YOUR FLAGS HERE
-   ##
-
-   options_technical_flags_usage "       : "
+   options_technical_flags_usage "         : "
 }
 
 
@@ -89,8 +79,16 @@ usage()
 Usage:
    mulle-project-versioncheck [flags]
 
-   Produces version checks of dependencies for C headers.
+   Produces version checks of dependencies for C headers in the form of
 
+   #if defined( FOO_VERSION)
+   # if FOO_VERSION < ((1 << 20) | (2 << 8) | 3)"
+   #  error "foo is too old"
+   # endif
+   # if FOO_VERSION >= ((1 << 20) | (2 << 8) | 0)"
+   #  error "foo is too new"
+   # endif
+   #endif
 
 Flags:
 EOF
@@ -117,7 +115,7 @@ emit_version_check()
    local minor
    local patch
 
-   . "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-version.sh" || exit 1
+   . "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-project-version.sh" || exit 1
 
    r_get_version_major "${version}"
    major="${RVAL}"
@@ -223,6 +221,7 @@ main()
    local MULLE_TRACE_POSTPONE='NO'
 
    local OPTION_REFLECT
+   local OPTION_UPDATE
 
    #
    # simple flag handling
@@ -246,6 +245,10 @@ main()
 
          --reflect)
             OPTION_REFLECT='YES'
+         ;;
+
+         --update-only)
+            OPTION_UPDATE='ONLY'
          ;;
 
          --version)
@@ -273,10 +276,10 @@ main()
 
 
    local main_identifier
-   local name
 
-   name="`rexekutor mulle-sde environment get PROJECT_NAME`" || exit 1
-   r_identifier "${name}"
+   PROJECT_NAME="`rexekutor mulle-sde environment get PROJECT_NAME`" || fail "failed to get project name"
+
+   r_identifier "${PROJECT_NAME}"
    PROJECT_IDENTIFIER="${identifier}"
 
    r_uppercase "${RVAL}"
@@ -289,86 +292,49 @@ ${C_INFO}Run mulle-sde fetch if this is unexpected."
       return 0
    fi
 
-   if [ "${OPTION_REFLECT}" = 'YES' ]
+   if [ "${OPTION_REFLECT}" != 'YES' ]
    then
-      local name
-
-      dstfile="${PROJECT_SOURCE_DIR:-src}/reflect/_${name}-versioncheck.h"
-      r_mkdir_parent_if_missing "${dstfile}"
-
-      log_info "${PROJECT_NAME}: ${dstfile}"
-
-      text="`emit_include_file "${PROJECT_UPCASE_IDENTIFIER}" `"
-      redirect_exekutor "${dstfile}" echo "${text}"
-   else
       emit_include_file "${PROJECT_UPCASE_IDENTIFIER}"
-   fi
-}
-
-
-########
-###
-### INIT - You usually won't edit code below
-###
-
-_init()
-{
-   #
-   # minimal setup exit
-   #
-   if [ "$1" = "version" ]
-   then
-      printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
-      exit 0
+      return
    fi
 
-   #
-   # leading backslash ? looks like we're getting called from
-   # mingw via a .BAT or so
-   #
-   case "$PATH" in
-      '\\'*)
-         PATH="${PATH//\\/\/}"
-      ;;
-   esac
+   local folder
 
-   if [ -z "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}" ]
+   folder="${PROJECT_SOURCE_DIR:-src}/reflect"
+   if [ ! -d "${folder}" ]
    then
-      MULLE_BASHFUNCTIONS_LIBEXEC_DIR="`mulle-bashfunctions-env libexec-dir 2> /dev/null`"
-      if [ -z "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}" ]
+      if [ "${MULLE_FLAG_MAGNUM_FORCE}" != 'YES' ]
       then
-         if [ -z "`command -v "${executablepath}"`" ]
-         then
-            echo "Fatal Error: Could not find mulle-bashfunctions-env in PATH ($PATH) - mulle-bashfunctions not installed ?" >&2
-         else
-            echo "Fatal Error: Could not find libexec of mulle-bashfunctions-env (${PWD}})" >&2
-         fi
-         exit 1
+         log_warning "No reflect ${folder#${MULLE_USER_PWD}/} here"
+         return
       fi
    fi
 
-   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-bashfunctions.sh" "minimal" &&
-   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-path.sh" &&
-   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-case.sh" &&
-   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-version.sh" &&
-   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-file.sh" ||
-      fail "failed to load bashfunctions from ${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}"
+   local dstfile
+   local verb
 
-   #  set -e # more pain then gain in the end
-   #  set -u # doesn't work with my style
+   dstfile="${PROJECT_SOURCE_DIR:-src}/reflect/_${PROJECT_NAME}-versioncheck.h"
 
-   shell_enable_pipefail
-   shell_enable_extglob
+   verb="created"
+   if [ ! -f "${dstfile}" ]
+   then
+      if [ "${OPTION_UPDATE}" = 'ONLY' ]
+      then
+         log_warning "No update as ${dstfile#${MULLE_USER_PWD}/} is missing"
+         return
+      fi
 
-   MULLE_PROJECT_LIBEXEC_DIR="`mulle-project-env libexec-dir`" || exit 1
+      verb="created"
+      r_mkdir_parent_if_missing "${dstfile}"
+   fi
 
-   call_main "${MULLE_PROJECT_DEPENDENCY_VERSIONS_FLAGS}" "$@"
+   log_info "${PROJECT_NAME} ${verb} ${dstfile#${MULLE_USER_PWD}/}"
+
+   local text
+
+   text="`emit_include_file "${PROJECT_UPCASE_IDENTIFIER}" `"
+   redirect_exekutor "${dstfile}" echo "${text}"
 }
 
 
-_init "$@" # will call main indirectly via call_main
-
-###
-### INIT
-###
-########
+call_with_flags "main" "${MULLE_PROJECT_VERSIONCHECK_FLAGS}" "$@"

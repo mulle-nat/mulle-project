@@ -34,7 +34,7 @@
 # convert VfLBochum -> VfL Bochum
 # HugoFiege -> Hugo Fiege
 #
-split_camelcase_string()
+project::version::split_camelcase_string()
 {
    # unsightly hacks to a couple of hard to split cases
    sed -e 's/ObjC/Objc/'        | \
@@ -47,33 +47,33 @@ split_camelcase_string()
 
 # convert all to uppercase, spaces and minus to '_'
 # does not work well for camel case
-make_cpp_string()
+project::version::make_cpp_string()
 {
    tr '[a-z]' '[A-Z]' | tr ' ' '_' | tr '-' '_'
 }
 
 
-make_directory_string()
+project::version::make_directory_string()
 {
    tr '[A-Z]' '[a-z]' | tr ' ' '-' | tr '_' '-'
 }
 
 
-make_file_string_no_hyphen()
+project::version::make_file_string_no_hyphen()
 {
    tr '[A-Z]' '[a-z]' | tr ' ' '_' | tr '-' '_'
 }
 
 
-make_file_string()
+project::version::make_file_string()
 {
    tr '[A-Z]' '[a-z]' | tr ' ' '_'
 }
 
 
-get_project_version()
+project::version::get_project_version()
 {
-   log_entry "get_project_version" "$@"
+   log_entry "project::version::get_project_version" "$@"
 
    local filename="$1"
    local versionname="$2"
@@ -161,17 +161,17 @@ get_project_version()
 
 
 # legacy name
-get_header_version()
+project::version::get_header_version()
 {
-   log_entry "get_header_version" "$@"
+   log_entry "project::version::get_header_version" "$@"
 
-   get_project_version "$@"
+   project::version::get_project_version "$@"
 }
 
 
-get_language_from_directoryname()
+project::version::get_language_from_directoryname()
 {
-   log_entry "get_language_from_directoryname" "$@"
+   log_entry "project::version::get_language_from_directoryname" "$@"
 
    local directory="$1"
 
@@ -187,9 +187,9 @@ get_language_from_directoryname()
 }
 
 
-get_header_from_project()
+project::version::get_header_from_project()
 {
-   log_entry "get_header_from_project" "$@"
+   log_entry "project::version::get_header_from_project" "$@"
 
    local project="$1"
    local language="$2"
@@ -198,7 +198,7 @@ get_header_from_project()
 
    case "${language}" in
       c)
-         project="`printf "%s\n" "${project}" | split_camelcase_string`"
+         project="`printf "%s\n" "${project}" | project::version::split_camelcase_string`"
 
          filename="${filename}-version"
          if [ -f "${filename}.h" ]
@@ -214,14 +214,14 @@ get_header_from_project()
             return
          fi
 
-         filename="`make_file_string_no_hyphen <<< "src/${project}"`"
+         filename="`project::version::make_file_string_no_hyphen <<< "src/${project}"`"
          if [ -f "${filename}.h" ]
          then
             printf "%s\n" "${filename}.h"
             return
          fi
 
-         make_file_string <<< "src/${project}.h"
+         project::version::make_file_string <<< "src/${project}.h"
       ;;
 
       *|"")
@@ -231,9 +231,9 @@ get_header_from_project()
 }
 
 
-get_formula_name_from_project()
+project::version::get_formula_name_from_project()
 {
-   log_entry "get_formula_name_from_project" "$@"
+   log_entry "project::version::get_formula_name_from_project" "$@"
 
    local project="$1"
    local language="$2"
@@ -241,7 +241,9 @@ get_formula_name_from_project()
    language="`tr '[A-Z]' '[a-z]' <<< "${language}"`"
    case "${language}" in
       c|sh|bash)
-         printf "%s\n" "${project}" | split_camelcase_string | make_directory_string
+         printf "%s\n" "${project}" \
+         | project::version::split_camelcase_string \
+         | project::version::make_directory_string
       ;;
 
       *|"")
@@ -251,9 +253,9 @@ get_formula_name_from_project()
 }
 
 
-project_version_add()
+project::version::add()
 {
-   log_entry "project_version_add" "$@"
+   log_entry "project::version::add" "$@"
 
    local version="$1"
    local add_major="$2"
@@ -349,9 +351,9 @@ project_version_add()
 #
 #   get_major_minor_patch "${version}"
 #
-get_major_minor_patch_custom()
+project::version::get_major_minor_patch_custom()
 {
-   log_entry "get_major_minor_patch_custom" "$@"
+   log_entry "project::version::get_major_minor_patch_custom" "$@"
 
    local version="$1"
 
@@ -365,9 +367,9 @@ get_major_minor_patch_custom()
 }
 
 
-set_project_version()
+project::version::set()
 {
-   log_entry "set_project_version" "$@"
+   log_entry "project::version::set" "$@"
 
    local version="$1"
    local versionfile="$2"
@@ -385,7 +387,7 @@ set_project_version()
    local patch
    local custom
 
-   get_major_minor_patch_custom "${version}"
+   project::version::get_major_minor_patch_custom "${version}"
 
    # not lenient for setting at all!
    # // ((0 << 20) | (4 << 8) | 9)
@@ -394,7 +396,7 @@ set_project_version()
    local value
    local scheme
 
-   scheme="`get_project_version "${versionfile}" "${versionname}" "${versioncustom}" 'YES'`"
+   scheme="`project::version::get_project_version "${versionfile}" "${versionname}" "${versioncustom}" 'YES'`"
 
    local escaped_versionname_pattern
    local escaped_versionname_value

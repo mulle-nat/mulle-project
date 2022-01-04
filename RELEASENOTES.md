@@ -125,7 +125,7 @@
 
 # 5.0.0
 
-* move the install part of mulle-project-env into mulle-project-init
+* move the install part of mulle-project into mulle-project-init
 * improved VERSION checking for mulle-homebrew
 * release-info.sh is now called version-info.sh
 
@@ -157,7 +157,7 @@ dependencies (`.buildtools/repositories` instead of
 #### Other changes
 
 * simplified release.sh
-* use two (three) .sh files release-info.sh and formula-info.sh for customization. This allows (in many cases) to upgrade the release script with mulle-project-env install w/o having to re-edit the release.sh file
+* use two (three) .sh files release-info.sh and formula-info.sh for customization. This allows (in many cases) to upgrade the release script with mulle-project install w/o having to re-edit the release.sh file
 * new exposed version functionality via mulle-project-get-version
 * you can choose to not generate a formula if so desired, simply remove formula-info.sh
 * now checks if remotes require merging before tagging

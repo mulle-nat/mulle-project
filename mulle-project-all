@@ -2,66 +2,63 @@
 
 [ "${TRACE}" = 'YES' -o "${SHELL_ALL_TRACE}" = 'YES' ] && set -x && : "$0" "$@"
 
-####
-#
-# Prelude to be placed at top of each script. Rerun this script either in
-# bash or zsh, if not already running in either (which can happen!)
-# Allows script to run on systems that either have bash (linux) or
-# zsh (macOS) only by default.
 
+MULLE_EXECUTABLE_VERSION="0.0.0"
+
+##########################################################################
+###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###
+###########################################################################
+# #
+# # PRELUDE - Standard startup code for loading mulle-bashfunctions
+# #
+###
+
+#
+# Figure out MULLE_BASHFUNCTIONS_LIBEXEC_DIR on this machine if needed.
+#
+if [ -z "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}" ]
+then
+   MULLE_BASHFUNCTIONS_LIBEXEC_DIR="`mulle-bashfunctions libexec-dir`" || exit 1
+   export MULLE_BASHFUNCTIONS_LIBEXEC_DIR
+fi
+
+#
+# The booter reruns the executable either with bash or zsh, whatever the
+# system provides. On the second run --no-auto-shell will be set first.
+#
 if [ "$1" != --no-auto-shell ]
 then
-   if [ -z "${BASH_VERSION}" -a -z "${ZSH_VERSION}" ]
-   then
-      exe_shell="`command -v "bash" `"
-      exe_shell="${exe_shell:-`command -v "zsh" `}"
-
-      script="$0"
-
-      #
-      # Quote incoming arguments for shell expansion
-      #
-      args=""
-      for arg in "$@"
-      do
-         # True bourne sh doesn't know ${a//b/c} and <<<
-         case "${arg}" in
-            *\'*)
-               # Use cat instead of echo to avoid possible echo -n
-               # problems. Escape single quotes in string.
-               arg="`cat <<EOF | sed -e s/\'/\'\\\"\'\\\"\'/g
-${arg}
-EOF
-`"
-            ;;
-         esac
-         if [ -z "${args}" ]
-         then
-            args="'${arg}'"
-         else
-            args="${args} '${arg}'"
-         fi
-      done
-
-      #
-      # bash/zsh will use arg after -c <arg> as $0, convenient!
-      #
-
-      exec "${exe_shell:-bash}" -c ". ${script} --no-auto-shell ${args}" "${script}"
-   fi
-   if [ ! -z "${BASH_VERSION}" ]
-   then
-      set +o posix
-   fi
+   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-boot.sh" || exit 1
 else
    shift    # get rid of --no-auto-shell
 fi
 
 
 #
-# Main script to follow, runs now either in zsh or bash
+# Include mulle-bashfunctions.sh         : default functions
+#         mulle-bashfunctions-none.sh    : almost no functions
+#         mulle-bashfunctions-minimal.sh : few functions for basic scripts
+#         mulle-bashfunctions-all.sh     : everything, even obscure functions
 #
-####
+# Do this first to get aliases
+#
+. "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-bashfunctions.sh" || exit 1
+
+###
+# # Now we are in bash or zsh with mulle-bashfunctions loaded
+# #
+###########################################################################
+###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###
+###########################################################################
+
+MULLE_EXECUTABLE="${BASH_SOURCE[0]:-${(%):-%x}}"
+
+
+if [ -z "${MULLE_PROJECT_LIBEXEC_DIR}" ]
+then
+   r_get_libexec_dir "${MULLE_EXECUTABLE}" "mulle-project" "mulle-project-git.sh"
+   MULLE_PROJECT_LIBEXEC_DIR="${RVAL}"
+fi
 
 
 print_flags()
@@ -69,24 +66,35 @@ print_flags()
 
    ##
    cat <<EOF
-   --all              : execute in all projects
-   --eval             : evaluate command line
-   --lenient          : lenient operation, errors don't preempt (default)
-   --no-project       : don't execute in main project
-   --others           : execute in test directories
-   --output-no-header : don't visually separate command output
-   --parallel         : execute operations in parallel
-   --project          : execute in main project (default)
-   --repos-file <f>   : REPOS file to use
-   --subprojects      : execute in subprojects
-   --strict           : errors preempt
-   --tests            : execute in other (demo) directories
+   --all               : execute in all projects,subprojects,tests
+   --eval              : evaluate command line, requires tricky quoting though
+   --ignore <name>     : ignore a project from REPOS, multiples are possible
+   --others            : also execute in other projects, like demo
+   --sde               : skip repositories that are mulle-sde projects
+   --output-no-header  : don't visually separate command output
+   --parallel          : execute operations in parallel
+   --repos-file <f>    : REPOS file to use
+   --strict            : errors preempt
+   --tests             : also execute in test directories
 EOF
+   if [ ! -z "${MULLE_TRACE}" ]
+   then
+      cat <<EOF
+   --lenient           : lenient operation, errors don't preempt (default)
+   --main-project      : also execute in main project
+   --subprojects       : also execute in subprojects
+   --only-others       : only execute in other projects, like demo
+   --only-main-project : only execute in main project (default)
+   --only-tests        : only execute in tests directories
+   --only-subprojects  : only execute in subprojects project
+EOF
+   fi
+
    ## ADD YOUR FLAG DESCRIPTION HERE
    ##
 
    options_technical_flags_usage \
-                "              : "
+                "               : "
 }
 
 
@@ -100,18 +108,51 @@ Usage:
    mulle-project-all [flags] ...
 
    Execute a command in all projects that are defined by the file "REPOS"
-   in the current directory. Can also traverse tests and subprojects. If there
-   is no "REPOS" file, mulle-project-all will look for mulle-sde projects
-   that reside in (but exluding) the current working directory.
+   in the current directory. If there is no "REPOS" file, mulle-project-all
+   will look for mulle-sde projects that reside in the current working
+   directory (excluding the working directory itself) . Specialities like
+   --tests, --subprojects, --others will only work with mulle-sde projects.
+   With a REPOS file, mulle-project-all will work with non-mulle-sde projects
+   as well.
 
-   Can execute commands in parallel on all repositories.
+   mulle-project-all can execute commands in parallel on all repositories with
+   the --parallel option.
 
-Example:
-   mulle-project-all -p --output-no-header pwd
+   mulle-project-all in --eval mode, will define a couple of environment
+   variables for evaluation use:
+
+      NAME            : basename of the directory
+      PROJECT_NAME    : name of the main project
+
+      SUBPROJECT_NAME : set if its a subproject
+      OTHER_NAME      : set if its an other project test
+      TEST_NAME       : set if its a test
+
+Examples:
+   List git status of all projects:
+      mulle-project-all --parallel --output-no-header git status -s
+
+   Generate hacky include statements for all projects:
+      mulle-project-all -s --eval printf '%s\\\\n' '\#include\ \<\${NAME}.h\>'
 
 Flags:
 EOF
    print_flags | LC_ALL=C sort >&2
+
+   if [ -z "${MULLE_TRACE}" ]
+   then
+   cat <<EOF >&2
+      (use -v flag to see more options)
+EOF
+   fi
+   echo "" >&2
+
+   cat <<EOF >&2
+Tip:
+   It's convenient and conventional to put an \`alias mpa=mulle-project-all\`
+   into your .bash_profile.
+
+EOF
 
    exit 1
 }
@@ -125,7 +166,10 @@ shell_it()
    [ -z "$1" ] && return
 
    (
-      rexekutor cd "$1"
+      rexekutor cd "$1" || exit 1
+
+      r_basename "$1"
+      NAME="$RVAL"
 
       case ",${OPTION_ADORN}," in
          *,no-bar,*|*,no-top-bar,*|*,none,*)
@@ -163,7 +207,12 @@ shell_it()
 
       if [ "${OPTION_EVAL}" = 'YES' ]
       then
-         eval_exekutor "$@"
+         eval_exekutor NAME="'${RVAL}'" \
+                       PROJECT_NAME="'${PROJECT_NAME}'" \
+                       SUBPROJECT_NAME="'${SUBPROJECT_NAME}'" \
+                       OTHER_NAME="'${OTHER_NAME}'" \
+                       TEST_NAME="'${TEST_NAME}'" \
+                       "$@"
          return $?
       fi
 
@@ -176,14 +225,27 @@ project_it()
 {
    log_entry "project_it" "$1" "$2" ...
 
-   local project="$1"; shift
-   local mode="$1" ; shift 
+   local project="$1"
+   local mode="$2"
+
+   shift 2
+
+   local old
 
    case ",${mode}," in
-      *,project,*)
+      *,main-project,*)
          if [ -z "${PROJECT_NAME}" ]
          then
-            PROJECT_NAME="$1" ; export PROJECT_NAME
+            PROJECT_NAME="$1"
+         fi
+
+         if [ "${OPTION_SDE_TEST}" = 'YES' ]
+         then
+            if [ ! -d "${project}/.mulle/share/sde" ]
+            then
+               log_warning "No sde project in ${C_RESET_BOLD}${project}"
+               return
+            fi
          fi
 
          if ! shell_it "${project}" "$@" && [ "${OPTION_LENIENT}" = 'NO' ]
@@ -201,8 +263,11 @@ project_it()
          local subproject 
 
          subprojects="`( cd "${project}"  ; 
-                         mulle-sde -N subproject list --format '%a\n' --output-no-header 2> /dev/null 
+                         mulle-sde -N subproject list --format '%a\n' \
+                                                      --output-no-header 2> /dev/null
                         ) `"
+
+         old="${SUBPROJECT_NAME}"
          for subproject in ${subprojects}
          do
             case "${subproject}" in
@@ -213,13 +278,15 @@ project_it()
                *)
                   if [ -d "${project}/${subproject}" ]
                   then
-                     SUBPROJECT_NAME="$1" ; export SUBPROJECT_NAME
+                     SUBPROJECT_NAME="${subproject}" ; export SUBPROJECT_NAME
 
                      project_it "${project}/${subproject}" "${mode}" "$@"
                   fi
                ;;
             esac
          done
+
+         SUBPROJECT_NAME="${old}"
       ;;
    esac
 
@@ -228,16 +295,18 @@ project_it()
          local tests 
          local test 
 
-         tests="`( cd "${project}" ; mulle-env --search-here environment get MULLE_SDE_TEST_PATH 2> /dev/null )`"
+         tests="`( cd "${project}" ; mulle-env --search-here environment \
+                                       get MULLE_SDE_TEST_PATH 2> /dev/null )`"
          tests="${tests:-test}"
 
+         old="${TEST_NAME}"
          IFS=':'
          for test in ${tests}
          do
             IFS="${DEFAULT_IFS}"
             if [ -d "${project}/${test}" ]
             then
-               TEST_NAME="$1" ; export TEST_NAME
+               TEST_NAME="${test}"
 
                if ! shell_it "${project}/${test}" "$@" && [ "${OPTION_LENIENT}" = 'NO' ]
                then
@@ -246,6 +315,8 @@ project_it()
             fi
          done
          IFS="${DEFAULT_IFS}"
+
+         TEST_NAME="${old}"
       ;;
    esac        
 
@@ -254,19 +325,25 @@ project_it()
          local others
          local other
 
-         others="`( cd "${project}" ; mulle-env --search-here environment get MULLE_SDE_OTHER_PROJECTS_PATH 2> /dev/null )`"
+         others="`( cd "${project}" ; mulle-env --search-here environment \
+                           get MULLE_SDE_OTHER_PROJECTS_PATH 2> /dev/null )`"
          others="${others:-demo}"
 
+         old="${OTHER_NAME}"
          IFS=':'
          for other in ${others}
          do
             IFS="${DEFAULT_IFS}"
             if [ -d "${project}/${other}" ]
             then
+               OTHER_NAME="${other}"
+
                project_it "${project}/${other}" "${mode}" "$@"
             fi
          done
          IFS="${DEFAULT_IFS}"
+
+         OTHER_NAME="${old}"
       ;;
    esac
 }
@@ -276,9 +353,11 @@ parallel_execute_argument_first()
 {
    log_entry "parallel_execute_argument_first" "$@"
 
-   local arguments="$1"; shift
-   local mode="$1"; shift
-   local exists_file="$1"; shift
+   local arguments="$1"
+   local mode="$2"
+   local exists_file="$3"
+
+   shift 3
 
    local _parallel_statusfile
    local _parallel_maxjobs
@@ -291,17 +370,14 @@ parallel_execute_argument_first()
 
    local argument
 
-   shell_disable_glob;  IFS=$'\n'
-   for argument in ${arguments}
-   do
+   .foreachline argument in ${arguments}
+   .do
       if [ ! -z "${argument}" ]
       then
          if [ ! -z "${exists_file}" ] && [ ! -e "${argument}/${exists_file}" ]
          then
-            continue
+            .continue
          fi
-
-         shell_enable_glob; IFS="${DEFAULT_IFS}"
 
          wait_for_available_job "${_parallel_maxjobs}"
          _parallel_jobs=$(($_parallel_jobs + 1))
@@ -312,9 +388,7 @@ parallel_execute_argument_first()
             project_it "${argument}" "${mode}" "$@"
          ) &
       fi
-   done
-
-   shell_enable_glob; IFS="${DEFAULT_IFS}"
+   .done
 
    _parallel_end
 }
@@ -340,16 +414,20 @@ main()
 
    local OPTION_ADORN
    local OPTION_LENIENT='YES'
-   local OPTION_MODE="project"
+   local OPTION_MODE="main-project"
    local OPTION_REPOSFILE
    local OPTION_PARALLEL
+   local OPTION_SDE_TEST='NO'
    local OPTION_EVAL
+
+   local OPTION_IGNORE
 
    #
    # simple flag handling
    #
    while [ $# -ne 0 ]
    do
+      # this grabs -n -s -v
       if options_technical_flags "$1"
       then
          shift
@@ -361,20 +439,47 @@ main()
             usage
          ;;
 
+         -a|--all)
+            OPTION_MODE="main-project,subprojects,tests,others"
+         ;;
+
          -e|--eval)
             OPTION_EVAL='YES'
+         ;;
+
+         -i|--ignore)
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
+            shift
+
+            r_add_line "${OPTION_IGNORE}" "$1"
+            OPTION_IGNORE="${RVAL}"
          ;;
 
          -l|--lenient)
             OPTION_LENIENT='YES'
          ;;
 
+         -m|--main-project-only|--only-main-project)
+            OPTION_MODE="main-project"
+         ;;
+
          -p|--parallel)
             OPTION_PARALLEL='YES'
          ;;
 
-         --strict)
-            OPTION_LENIENT='NO'
+         -o|--others-only|--only-others)
+            OPTION_MODE="others"
+         ;;
+
+         -r|--repos-file)
+            [ $# -eq 1 ] && usage "missing argument to $1"
+            shift
+
+            OPTION_REPOSFILE="$1"
+         ;;
+
+         -t|--tests-only|--only-tests)
+            OPTION_MODE="tests"
          ;;
 
          --if-exists-file)
@@ -384,8 +489,8 @@ main()
             OPTION_EXISTS_FILE="$1"
          ;;
 
-         -a|--all)
-            OPTION_MODE="project,subprojects,tests,others"
+         --subprojects-only|--only-subprojects)
+            OPTION_MODE="subprojects"
          ;;
 
          --others)
@@ -393,27 +498,17 @@ main()
             OPTION_MODE="${RVAL}"
          ;;
 
-         --others-only|--only-others)
-            OPTION_MODE="others"
-         ;;
-
-         -m|--project)
-            r_comma_concat "${OPTION_MODE}" "project"
+         --main-project|--project)
+            r_comma_concat "${OPTION_MODE}" "main-project"
             OPTION_MODE="${RVAL}"
          ;;
 
-
-         --project-only|--only-project)
-            OPTION_MODE="project"
+         --sde|--sde-test)
+            OPTION_SDE_TEST='YES'
          ;;
 
-         --tests)
-            r_comma_concat "${OPTION_MODE}" "tests"
-            OPTION_MODE="${RVAL}"
-         ;;
-
-         --tests-only|--only-tests)
-            OPTION_MODE="tests"
+         --strict)
+            OPTION_LENIENT='NO'
          ;;
 
          --subprojects)
@@ -421,19 +516,13 @@ main()
             OPTION_MODE="${RVAL}"
          ;;
 
-         --subprojects-only|--only-subprojects)
-            OPTION_MODE="subprojects"
-         ;;
-
-         -r|--repos-file)
-            [ $# -eq 1 ] && usage "missing argument to $1"
-            shift
-
-            OPTION_REPOSFILE="$1"
-         ;;         
-
          --output-no-header)
             OPTION_ADORN="none"
+         ;;
+
+         --tests|--test)
+            r_comma_concat "${OPTION_MODE}" "tests"
+            OPTION_MODE="${RVAL}"
          ;;
 
          --version)
@@ -470,6 +559,8 @@ main()
 
    if [ "${OPTION_PARALLEL}" = 'YES' ]
    then
+      include "parallel"
+
       parallel_execute_argument_first "${repos}" \
                                       "${OPTION_MODE}" \
                                       "${OPTION_EXISTS_FILE}" \
@@ -479,78 +570,23 @@ main()
 
    local i
 
-   for i in ${repos}
-   do
+   .foreachline i in ${repos}
+   .do
+      if find_line "${OPTION_IGNORE}" "${i}"
+      then
+         .continue
+      fi
+
       if [ ! -z "${i}" ]
       then
          if [ ! -z "${OPTION_EXISTS_FILE}" ] && [ ! -e "${i}/${OPTION_EXISTS_FILE}" ]
          then
-            continue
+            .continue
          fi
          project_it "$i" "${OPTION_MODE}" "$@"
       fi
-   done
+   .done
 }
 
 
-########
-###
-### INIT - You usually won't edit code below
-###
-_init()
-{
-   #
-   # minimal setup exit
-   #
-   if [ "$1" = "version" ]
-   then
-      printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
-      exit 0
-   fi
-
-   #
-   # leading backslash ? looks like we're getting called from
-   # mingw via a .BAT or so
-   #
-   case "$PATH" in
-      '\\'*)
-         PATH="${PATH//\\/\/}"
-      ;;
-   esac
-
-   if [ -z "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}" ]
-   then
-      MULLE_BASHFUNCTIONS_LIBEXEC_DIR="`mulle-bashfunctions-env libexec-dir 2> /dev/null`"
-      if [ -z "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}" ]
-      then
-         if [ -z "`command -v "${executablepath}"`" ]
-         then
-            echo "Fatal Error: Could not find mulle-bashfunctions-env in PATH ($PATH) - mulle-bashfunctions not installed ?" >&2
-         else
-            echo "Fatal Error: Could not find libexec of mulle-bashfunctions-env (${PWD}})" >&2
-         fi
-         exit 1
-      fi
-   fi
-
-   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-bashfunctions-minimal.sh" &&
-   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-parallel.sh" ||
-      fail "failed to load bashfunctions from ${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}"
-
-   #  set -e # more pain then gain in the end
-   #  set -u # doesn't work with my style
-
-   shell_enable_pipefail
-   shell_enable_extglob
-
-   call_main "${MULLE_REPLACE_FLAGS}" "$@"
-}
-
-
-_init "$@" # will call main indirectly via call_main
-
-###
-### INIT
-###
-########
-
+call_with_flags "main" "${MULLE_REPLACE_FLAGS}" "$@"

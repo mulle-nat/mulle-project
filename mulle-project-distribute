@@ -36,68 +36,64 @@
 # Run this somewhat like this (for real: remove -n):
 #    mulle-project-distribute -v -n --publisher mulle-nat --publisher-tap mulle-kybernetik/software/
 #
-[ "${TRACE}" = 'YES' ] && set -x && : "$0" "$@"
+[ "${TRACE}" = 'YES' -o "${MULLE_PROJECT_DISTRIBUTE_TRACE}" = 'YES' ] && set -x && : "$0" "$@"
 
-####
+MULLE_EXECUTABLE_VERSION="0.0.0"
+
+
+##########################################################################
+###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###
+###########################################################################
+# #
+# # PRELUDE - Standard startup code for loading mulle-bashfunctions
+# #
+###
+
 #
-# Prelude to be placed at top of each script. Rerun this script either in
-# bash or zsh, if not already running in either (which can happen!)
-# Allows script to run on systems that either have bash (linux) or
-# zsh (macOS) only by default.
+# Figure out MULLE_BASHFUNCTIONS_LIBEXEC_DIR on this machine if needed.
+#
+if [ -z "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}" ]
+then
+   MULLE_BASHFUNCTIONS_LIBEXEC_DIR="`mulle-bashfunctions libexec-dir`" || exit 1
+   export MULLE_BASHFUNCTIONS_LIBEXEC_DIR
+fi
 
+#
+# The booter reruns the executable either with bash or zsh, whatever the
+# system provides. On the second run --no-auto-shell will be set first.
+#
 if [ "$1" != --no-auto-shell ]
 then
-   if [ -z "${BASH_VERSION}" -a -z "${ZSH_VERSION}" ]
-   then
-      exe_shell="`command -v "bash" `"
-      exe_shell="${exe_shell:-`command -v "zsh" `}"
-
-      script="$0"
-
-      #
-      # Quote incoming arguments for shell expansion
-      #
-      args=""
-      for arg in "$@"
-      do
-         # True bourne sh doesn't know ${a//b/c} and <<<
-         case "${arg}" in
-            *\'*)
-               # Use cat instead of echo to avoid possible echo -n
-               # problems. Escape single quotes in string.
-               arg="`cat <<EOF | sed -e s/\'/\'\\\"\'\\\"\'/g
-${arg}
-EOF
-`"
-            ;;
-         esac
-         if [ -z "${args}" ]
-         then
-            args="'${arg}'"
-         else
-            args="${args} '${arg}'"
-         fi
-      done
-
-      #
-      # bash/zsh will use arg after -c <arg> as $0, convenient!
-      #
-
-      exec "${exe_shell:-bash}" -c ". ${script} --no-auto-shell ${args}" "${script}"
-   fi
-   if [ ! -z "${BASH_VERSION}" ]
-   then
-      set +o posix
-   fi
+   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-boot.sh" || exit 1
 else
    shift    # get rid of --no-auto-shell
 fi
 
 
 #
-# Main script to follow, runs now either in zsh or bash
+# Include mulle-bashfunctions.sh         : default functions
+#         mulle-bashfunctions-none.sh    : almost no functions
+#         mulle-bashfunctions-minimal.sh : few functions for basic scripts
+#         mulle-bashfunctions-all.sh     : everything, even obscure functions
 #
-####
+# Do this first to get aliases
+#
+. "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-bashfunctions.sh" || exit 1
+
+###
+# # Now we are in bash or zsh with mulle-bashfunctions loaded
+# #
+###########################################################################
+###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###
+###########################################################################
+
+MULLE_EXECUTABLE="${BASH_SOURCE[0]:-${(%):-%x}}"
+
+if [ -z "${MULLE_PROJECT_LIBEXEC_DIR}" ]
+then
+   r_get_libexec_dir "${MULLE_EXECUTABLE}" "mulle-project" "mulle-project-git.sh"
+   MULLE_PROJECT_LIBEXEC_DIR="${RVAL}"
+fi
 
 usage()
 {
@@ -180,7 +176,7 @@ __environment_main()
    #
    if [ -z "${NAME}" ]
    then
-      NAME="`get_formula_name_from_project "${PROJECT}" "${LANGUAGE}"`" || exit 1
+      NAME="`project::version::get_formula_name_from_project "${PROJECT}" "${LANGUAGE}"`" || exit 1
    fi
 
    #
@@ -427,7 +423,7 @@ main()
    local OPTION_VERSION_TAG="YES"
    local OPTION_FORCE_PUSH="NO"
 
-   source_file "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-user-files-settings.sh" "$@"   || exit 1
+   source_file "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-project-user-files-settings.sh" "$@"   || exit 1
 
    while [ $# -ne 0 ]
    do
@@ -690,18 +686,22 @@ main()
    then
       log_warning "No .mulle/etc/project folder found."
    fi
+
+   . "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-project-git.sh" || exit 1
+   . "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-version.sh" || exit 1
+
    #
    # order of includes is important its a bit weird coded, due to being
    # old. We slurp in user values before the parameters, so that these
    # can be overridden by the parameters to the script
    #
-   source_file "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-user-files.sh" "$@" || exit 1
-   source_file "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-version.sh" "$@"    || exit 1
+   source_file "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-project-user-files.sh" "$@" || exit 1
+   source_file "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-project-version.sh" "$@"    || exit 1
 
   __environment_main
 
-   source_file "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-homebrew.sh" "$@"   || exit 1
-   source_file "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-git.sh" "$@"        || exit 1
+   source_file "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-project-homebrew.sh" "$@"   || exit 1
+   source_file "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-project-git.sh" "$@"        || exit 1
 
    #
    # override values read from user files
@@ -769,7 +769,7 @@ main()
    if [ "${DO_GIT_RELEASE}" = 'YES' ]
    then
       # do the release
-      git_verify_main "${BRANCH}" \
+      project::git::verify_main "${BRANCH}" \
                       "${ORIGIN}" \
                       "${TAG}" \
                       "${GITHUB}" \
@@ -780,7 +780,7 @@ main()
       then
          log_info "Git release..."
 
-         git_commit_main "${BRANCH}" \
+         project::git::main "${BRANCH}" \
                          "${ORIGIN}" \
                          "${TAG}" \
                          "${GITHUB}" \
@@ -808,7 +808,7 @@ main()
          log_info "Homebrew formula..."
 
          # generate the formula and push it
-         if ! homebrew_generate "${PROJECT}" \
+         if ! project::homebrew::generate "${PROJECT}" \
                                 "${NAME}" \
                                 "${VERSION}" \
                                 "${DEPENDENCIES}" \
@@ -831,7 +831,7 @@ main()
 
    if [ "${DO_PUSH_FORMULA}" = 'YES' ]
    then
-      if ! homebrew_push "${NAME}" \
+      if ! project::homebrew::push "${NAME}" \
                          "${VERSION}" \
                          "${HOMEBREW_TAP}" \
                          "${RBFILE}" \
@@ -874,45 +874,5 @@ main()
    fi
 }
 
-
-########
-###
-### INIT
-###
-_init()
-{
-   if [ -z "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}" ]
-   then
-      MULLE_BASHFUNCTIONS_LIBEXEC_DIR="`mulle-bashfunctions-env libexec-dir 2> /dev/null`"
-      [ -z "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}" ] && \
-         echo "mulle-bashfunctions are not installed" >&2 && \
-      exit 1
-   fi
-
-   # shellcheck source=../mulle-bashfunctions/src/mulle-bashfunctions.sh
-   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-bashfunctions.sh"
-
-   MULLE_PROJECT_LIBEXEC_DIR="`mulle-project-env libexec-dir`" || exit 1
-
-   . "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-git.sh" || exit 1
-   . "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-version.sh" || exit 1
-
-   #  set -e # more pain then gain in the end
-   #  set -u # doesn't work with my style
-
-   shell_enable_pipefail
-   shell_enable_extglob
-}
-
-
-###
-### INIT
-###
-########
-
-
-MULLE_EXECUTABLE="${MULLE_EXECUTABLE:-${BASH_SOURCE[0]:-${(%):-%x}}}"
-
-_init "$@" # needs params
 
 main "$@"

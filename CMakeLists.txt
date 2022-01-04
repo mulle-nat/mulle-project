@@ -26,7 +26,7 @@ mulle-project-cmake-graphviz
 mulle-project-debian
 mulle-project-distcheck
 mulle-project-distribute
-mulle-project-env
+mulle-project
 mulle-project-extension-versions
 mulle-project-git-prerelease
 mulle-project-git-submodules

@@ -3,7 +3,8 @@
 [ "${TRACE}" = 'YES' -o "${MULLE_REPLACE_TRACE}" = 'YES' ] && set -x && : "$0" "$@"
 
 
-MULLE_EXECUTABLE_VERSION="0.0.0"
+MULLE_EXECUTABLE_VERSION='0.0.2'
+
 
 ##########################################################################
 ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###
@@ -53,7 +54,11 @@ fi
 
 MULLE_EXECUTABLE="${BASH_SOURCE[0]:-${(%):-%x}}"
 
-
+if [ -z "${MULLE_PROJECT_LIBEXEC_DIR}" ]
+then
+   r_get_libexec_dir "${MULLE_EXECUTABLE}" "mulle-project" "mulle-project-git.sh"
+   MULLE_PROJECT_LIBEXEC_DIR="${RVAL}"
+fi
 
 
 print_flags()
@@ -76,10 +81,10 @@ usage()
 
    cat <<EOF >&2
 Usage:
-   mulle-replace [flags] <find> <replace> <file>
+   mulle-find-symbol [flags] <symbol>
 
-   Replace a string with another string in a file.
-   Use -f flag for protect files.
+   Search through libraries to find which defines a symbol.
+   Will prefer static over shared libraries.
    
 Flags:
 EOF
@@ -128,10 +133,6 @@ main()
             usage
          ;;
 
-         -g|--global)
-            OPTION_SED="g"
-         ;;
-
          --version)
             printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
             exit 0
@@ -160,71 +161,72 @@ main()
 
    options_setup_trace "${MULLE_TRACE}" && set -x
 
-   [ $# -lt 3 ] && usage "missing argument" 
+   [ $# -lt 1 ] && usage "missing argument"
 
-   local find="$1"
-   local replace="$2"
-   local filename="$3"
+   local symbol="$1"
 
-   shift 3
+   shift 1
 
    [ $# -ne 0 ] && usage "superflous arguments \"$*\"" 
 
-   [ -f "${filename}" ] || fail "File not found"
+   local escaped_symbol
 
-   local escaped_find 
-   local escaped_replace 
+   r_escaped_sed_pattern "${symbol}"
+   escaped_symbol="${RVAL}"
 
-   r_escaped_sed_pattern "${find}"
-   escaped_find="${RVAL}"
-
-   r_escaped_sed_replacement "${replace}"
-   escaped_replace="${RVAL}"
-
-   local before
-   local after
-
-   if [ "${MULLE_FLAG_LOG_VERBOSE}" = 'YES' ]
+   if [ -z "${escaped_symbol}" ]
    then
-      before="`rexekutor cat "${filename}"`"
+      usage "Unusable symbol \"${symbol}\""
    fi
 
-   if [ "${MULLE_FLAG_EXEKUTOR_DRY_RUN}" = 'YES' -a "${MULLE_FLAG_LOG_VERBOSE}" = 'YES' ]
+   LD_SEARCHPATH="${LD_SEARCHPATH:-dependency/lib:addiction/lib}"
+
+   shell_disable_pipefail
+
+   local i
+   local j
+   local match
+
+   # quickly hacked together so far
+   match='NO'
+   IFS=":" ; shell_disable_glob
+   for i in ${LD_SEARCHPATH}
+   do
+      IFS=$'\n'
+      for j in `rexekutor find "$i" -type f -name "lib*.a" -print | sort -f`
+      do
+         IFS="${DEFAULT_IFS}"
+         if rexekutor nm "$j" | egrep -q "[A-T] ${escaped_symbol}\$"
+         then
+            printf "%s\n" "$j: $symbol"
+            match="YES"
+            [ "${OPTION_ALL}" != 'YES' ] && return
+         fi
+      done
+      IFS=":"
+      [ "${match}" = 'YES' -a "${OPTION_ALL}" != 'YES' ] && retun
+   done
+
+   if [ "${match}" = 'NO' -o "${OPTION_ALL}" = 'YES' ]
    then
-      after="`rexekutor sed "s/${escaped_find}/${escaped_replace}/${OPTION_SED}" "${filename}" `" || return 1
-      log_verbose "Changes"
-      rexekutor diff -b <( echo "${before}") <( echo "${after}" ) >&2
-      return $?
-   fi
-
-   local unprotect
-
-   if [ "${MULLE_FLAG_MAGNUM_FORCE}" = 'YES' -a ! -w "${filename}" ]
-   then
-      unprotect='YES'
-   fi
-
-   local permissions
-
-   if [ "${unprotect}" = 'YES' ]
-   then
-      permissions="`lso "${filename}"`"
-      rexekutor chmod +w "${filename}"
-   fi
-
-   inplace_sed "s/${escaped_find}/${escaped_replace}/${OPTION_SED}" "${filename}" || return 1
-
-   if [ "${unprotect}" = 'YES' ]
-   then
-      rexekutor chmod "${permissions}" "${filename}"
-   fi
-
-   if [ "${MULLE_FLAG_LOG_VERBOSE}" = 'YES' ]
-   then
-      log_verbose "Changes"
-      rexekutor diff -b <( echo "${before}") "${filename}" >&2
+      IFS=":" ; shell_disable_glob
+      for i in ${LD_SEARCHPATH}
+      do
+         IFS=$'\n'
+         for j in `rexekutor find "$i" -type f -name "lib*.so.*" -print | sort -f`
+         do
+            IFS="${DEFAULT_IFS}"
+            if rexekutor nm "$j" | egrep -q "[A-T] ${escaped_symbol}\$"
+            then
+               printf "%s\n" "$j: $symbol"
+               match="YES"
+               [ "${OPTION_ALL}" != 'YES' ] && break
+            fi
+         done
+         IFS=":"
+         [ "${match}" = 'YES' -a "${OPTION_ALL}" != 'YES' ] && break
+      done
    fi
 }
-
 
 call_with_flags "main" "${MULLE_REPLACE_FLAGS}" "$@"
