@@ -687,8 +687,8 @@ main()
       log_warning "No .mulle/etc/project folder found."
    fi
 
-   . "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-project-git.sh" || exit 1
-   . "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-version.sh" || exit 1
+#   . "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-project-git.sh" || exit 1
+#   . "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-project-version.sh" || exit 1
 
    #
    # order of includes is important its a bit weird coded, due to being

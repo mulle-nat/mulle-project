@@ -39,6 +39,7 @@ Command                            | Description
 `mulle-project-prerelease`         | Create a debian/git prerelease
 `mulle-project-redistribute`       | Hack
 `mulle-project-releasenotes`       | Create releasenotes from git logs
+`mulle-project-reposfile`          | Combine multiple REPOS files into one
 `mulle-project-sloppy-distribute`  | Commit current changes, up the version count and distribute with releasenotes given on commandline
 `mulle-project-sourcetree-doctor`  | Basic checks that dependencies are set up correctly
 `mulle-project-squash-prerelease`  | Squash multiple prerelease commits for beauty

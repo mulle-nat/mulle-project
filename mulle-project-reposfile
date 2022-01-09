@@ -1,0 +1,299 @@
+#! /bin/sh
+
+[ "${TRACE}" = 'YES' -o "${SHELL_ALL_TRACE}" = 'YES' ] && set -x && : "$0" "$@"
+
+
+MULLE_EXECUTABLE_VERSION="0.0.0"
+
+##########################################################################
+###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###
+###########################################################################
+# #
+# # PRELUDE - Standard startup code for loading mulle-bashfunctions
+# #
+###
+
+#
+# Figure out MULLE_BASHFUNCTIONS_LIBEXEC_DIR on this machine if needed.
+#
+if [ -z "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}" ]
+then
+   MULLE_BASHFUNCTIONS_LIBEXEC_DIR="`mulle-bashfunctions libexec-dir`" || exit 1
+   export MULLE_BASHFUNCTIONS_LIBEXEC_DIR
+fi
+
+#
+# The booter reruns the executable either with bash or zsh, whatever the
+# system provides. On the second run --no-auto-shell will be set first.
+#
+if [ "$1" != --no-auto-shell ]
+then
+   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-boot.sh" || exit 1
+else
+   shift    # get rid of --no-auto-shell
+fi
+
+
+#
+# Include mulle-bashfunctions.sh         : default functions
+#         mulle-bashfunctions-none.sh    : almost no functions
+#         mulle-bashfunctions-minimal.sh : few functions for basic scripts
+#         mulle-bashfunctions-all.sh     : everything, even obscure functions
+#
+# Do this first to get aliases
+#
+MULLE_EXECUTABLE="${BASH_SOURCE[0]:-${(%):-%x}}"
+
+. "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-bashfunctions.sh" || exit 1
+
+###
+# # Now we are in bash or zsh with mulle-bashfunctions loaded
+# #
+###########################################################################
+###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###
+###########################################################################
+
+
+
+if [ -z "${MULLE_PROJECT_LIBEXEC_DIR}" ]
+then
+   r_get_libexec_dir "${MULLE_EXECUTABLE}" "mulle-project" "mulle-project-git.sh"
+   MULLE_PROJECT_LIBEXEC_DIR="${RVAL}"
+fi
+
+
+print_flags()
+{
+
+   ##
+   cat <<EOF
+   --repos-filename <s>   : name of the file to use for reading (REPOS)
+   --dirs-file <f>        : use file in addition to args (REPOS.dirs)
+   --no-default-dirs-file : don't use REPOS.dirs if exists
+EOF
+
+   options_technical_flags_usage \
+                "                  : "
+}
+
+
+usage()
+{
+   [ $# -ne 0 ] && log_error "$*"
+
+
+   cat <<EOF >&2
+Usage:
+   mulle-project-reposfile [flags] [<directory>] ...
+
+   A glorified "cat" of REPOS files in a list of directories. The contents of
+   each REPOS file is prefixed with the relative path.
+
+   A list of directories is read from a default file (REPOS.dirs), if it
+   exists. This way you can predefine the list of directories and occasionally
+   refresh your master REPOS list.
+
+Examples:
+      mulle-project-reposfile --repos-filename PUBLIC_REPOS
+
+Flags:
+EOF
+   print_flags | LC_ALL=C sort >&2
+
+   if [ -z "${MULLE_TRACE}" ]
+   then
+   cat <<EOF >&2
+      (use -v flag to see more options)
+EOF
+   fi
+   echo "" >&2
+
+   exit 1
+}
+
+
+remove_comments_and_prepend_string()
+{
+   log_entry "remove_comments_and_prepend_string" "$@"
+
+   local file="$1"
+   local path="$2"
+
+   local escaped
+
+   r_escaped_sed_replacement "${path}"
+   escaped="${RVAL}"
+
+   rexekutor sed -e '/^#/d' \
+                 -e '/^[[:space:]]*$/d' \
+                 -e "s/\\(.*\\)/${escaped}\/\\1/" "${file}"
+}
+
+
+handle_reposfile()
+{
+   log_entry "handle_reposfile" "$@"
+
+   local directory="$1"
+   local reposfilename="$2"
+
+   local reposfilename
+   local reposfile
+
+   local absfile
+
+   r_absolutepath "${directory}"
+   absfile="${RVAL}"
+
+   local relfile
+
+   r_relative_path_between "${absfile}" "${PWD}"
+   relfile="${RVAL}"
+
+
+   r_filepath_concat "${absfile}" "${reposfilename}"
+   reposfile="${RVAL}"
+
+   if [ "${MULLE_FLAG_LOG_SETTINGS}" = 'YES' ]
+   then
+      log_trace2 "PWD       : ${PWD}"
+      log_trace2 "absfile   : ${absfile}"
+      log_trace2 "relfile   : ${relfile}"
+      log_trace2 "reposfile : ${reposfile}"
+   fi
+
+   if [ -f "${reposfile}" ]
+   then
+      echo "# $reposfile"
+      remove_comments_and_prepend_string "${reposfile}" "${relfile}"
+   else
+      fail "No \"${reposfilename}\" file in \"${absfile#${MULLE_USER_PWD}/}\""
+   fi
+}
+
+
+main()
+{
+   local MULLE_FLAG_MAGNUM_FORCE='NO'
+
+   # technical flags
+   local MULLE_TRACE
+   local MULLE_FLAG_EXEKUTOR_DRY_RUN='NO'
+   local MULLE_FLAG_LOG_LOCAL='NO'
+   local MULLE_FLAG_LOG_DEBUG='NO'
+   local MULLE_FLAG_LOG_EXEKUTOR='NO'
+   local MULLE_FLAG_LOG_FLUFF='NO'
+   local MULLE_FLAG_LOG_SCRIPTS='NO'
+   local MULLE_FLAG_LOG_SETTINGS='NO'
+   local MULLE_FLAG_LOG_VERBOSE='NO'
+   local MULLE_FLAG_LOG_MERGE='NO'
+   local MULLE_TRACE_POSTPONE='NO'
+
+   local OPTION_DIRFILE
+   local OPTION_REPOSFILENAME
+
+   OPTION_DIRFILE="\${reposfilename}.dirs"
+
+   #
+   # simple flag handling
+   #
+   while [ $# -ne 0 ]
+   do
+      if options_technical_flags "$1"
+      then
+         shift
+         continue
+      fi
+
+      case "$1" in
+         -h*|--help|help)
+            usage
+         ;;
+
+         -r|--repos-filename)
+            [ $# -eq 1 ] && usage "missing argument to $1"
+            shift
+
+            OPTION_REPOSFILENAME="$1"
+         ;;
+
+         --no-default-dirs-file)
+            OPTION_DIRFILE=""
+         ;;
+
+         -d|--dirs-file)
+            [ $# -eq 1 ] && usage "missing argument to $1"
+            shift
+
+            OPTION_DIRFILE="$1"
+         ;;
+
+         --version)
+            printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
+            exit 0
+         ;;
+
+         -*)
+            usage "Unknown flag \"$1\""
+         ;;
+
+         *)
+            break
+         ;;
+      esac
+
+      shift
+   done
+
+   options_setup_trace "${MULLE_TRACE}" && set -x
+
+   local reposfilename
+
+   reposfilename="${OPTION_REPOSFILENAME:-REPOS}"
+
+   local dirsfile
+
+   r_expanded_string "${OPTION_DIRFILE}"
+   dirsfile="${RVAL}"
+
+   local dirs
+
+   if [ -f "${dirsfile}" ]
+   then
+      dirs="`rexekutor egrep -v '^#' "${dirsfile}"`"
+
+      if [ -z "${dirs}" ]
+      then
+         log_warning "${dirsfile#${MULLE_USER_PWD}/} is empty"
+      fi
+
+
+      local i
+      local reposfile
+
+      log_fluff "Directories from file ($dirsfile)"
+
+      .foreachline i in ${dirs}
+      .do
+         handle_reposfile "${i}" "${reposfilename}"
+      .done
+   else
+      if [ $# -eq 0 ]
+      then
+         usage "No directories specified and no file \"${dirsfile}\" found"
+      fi
+   fi
+
+   if [ $# -ne 0 ]
+   then
+      log_fluff "Directories from arguments"
+
+      for i in "$@"
+      do
+         handle_reposfile "${i}" "${reposfilename}"
+      done
+   fi
+}
+
+
+call_with_flags "main" "${MULLE_REPLACE_FLAGS}" "$@"

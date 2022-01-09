@@ -1,3 +1,12 @@
+# 3.0.0
+
+* new executable mulle-project-reposfile to compose a REPOS file from many REPOS files
+* big function rename to `<tool>`::`<file>`::`<function>` to make it easier to read hopefully
+* add --only-test and relatives
+* mulle-project-all has changed a lot. To hit all projects use -a, the default is now main only
+* moved to mulle-bashfunction 4.0
+
+
 ## 2.4.0
 
 * new commands **mulle-project-commit, mulle-project-extension-versions, mulle-project-github-status**

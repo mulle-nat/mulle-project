@@ -33,7 +33,7 @@
 
 
 
-MULLE_PROJECT_VERSION="2.4.0"
+MULLE_PROJECT_VERSION="3.0.0"
 
 usage()
 {
