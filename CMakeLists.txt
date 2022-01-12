@@ -8,13 +8,14 @@ formula-info.sh.template
 generate-formula.sh.template
 version-info.sh.template)
 
+
 set( LIBRARY_SCRIPTS
-src/mulle-git.sh
-src/mulle-homebrew.sh
-src/mulle-sourcetree-parser.sh
-src/mulle-user-files-settings.sh
-src/mulle-user-files.sh
-src/mulle-version.sh
+src/mulle-project-git.sh
+src/mulle-project-homebrew.sh
+src/mulle-project-sourcetree-parser.sh
+src/mulle-project-user-files-settings.sh
+src/mulle-project-user-files.sh
+src/mulle-project-version.sh
 )
 
 
@@ -23,11 +24,12 @@ mulle-project-add-missing-branch-identifier
 mulle-project-all
 mulle-project-ci-settings
 mulle-project-cmake-graphviz
+mulle-project-commit
 mulle-project-debian
 mulle-project-distcheck
 mulle-project-distribute
-mulle-project
 mulle-project-extension-versions
+mulle-project-github-status
 mulle-project-git-prerelease
 mulle-project-git-submodules
 mulle-project-init
@@ -37,8 +39,11 @@ mulle-project-prerelease
 mulle-project-redistribute
 mulle-project-release-entry
 mulle-project-releasenotes
+mulle-project-reposfile
 mulle-project-sloppy-distribute
+mulle-project-sourcetree-doctor
 mulle-project-sourcetree-update-tags
+mulle-project-squash-prerelease
 mulle-project-tag
 mulle-project-travis-ci-prerelease
 mulle-project-untag
