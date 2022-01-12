@@ -32,8 +32,7 @@
 [ "${TRACE}" = 'YES' -o "${MULLE_PROJECT_REDISTRIBUTE_TRACE}" = 'YES' ] && set -x && : "$0" "$@"
 
 
-MULLE_EXECUTABLE="${BASH_SOURCE[0]:-${(%):-%x}}"
-
+MULLE_EXECUTABLE_VERSION="0.0.0"
 
 ##########################################################################
 ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###
@@ -72,6 +71,7 @@ fi
 #
 # Do this first to get aliases
 #
+MULLE_EXECUTABLE="${BASH_SOURCE[0]:-${(%):-%x}}"
 . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-bashfunctions.sh" || exit 1
 
 ###

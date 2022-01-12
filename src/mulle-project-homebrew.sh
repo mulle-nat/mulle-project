@@ -358,6 +358,12 @@ project::homebrew::_generate_formula()
    project::homebrew::generate_formula_footer "${name}"
 }
 
+# backwards compatibility
+_generate_brew_formula()
+{
+   project::homebrew::_generate_formula "$@"
+}
+
 
 project::homebrew::formula_push()
 {

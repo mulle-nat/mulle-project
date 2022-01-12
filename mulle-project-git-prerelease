@@ -77,6 +77,8 @@ fi
 #
 # Do this first to get aliases
 #
+MULLE_EXECUTABLE="${BASH_SOURCE[0]:-${(%):-%x}}"
+
 . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-bashfunctions.sh" || exit 1
 
 ###
@@ -85,8 +87,6 @@ fi
 ###########################################################################
 ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###
 ###########################################################################
-
-MULLE_EXECUTABLE="${BASH_SOURCE[0]:-${(%):-%x}}"
 
 if [ -z "${MULLE_PROJECT_LIBEXEC_DIR}" ]
 then
@@ -271,11 +271,6 @@ main()
             exit 0
          ;;
 
-
-         ##
-         ## ADD YOUR FLAGS HERE
-         ##
-
          -*)
             usage "Unknown flag \"$1\""
          ;;
@@ -306,6 +301,8 @@ main()
    then
       exit_or_continue_if_dry_run=':'
    fi
+
+   include "project::git"
 
    #
    # Go to master, we only push from master (for now)

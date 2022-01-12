@@ -1,4 +1,4 @@
-#! /usr/bin/env bash
+#! /bin/sh
 #
 #   Copyright (c) 2020 Nat! - Mulle kybernetiK
 #   All rights reserved.
@@ -29,30 +29,109 @@
 #   ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 #   POSSIBILITY OF SUCH DAMAGE.
 #
+[ "${TRACE}" = 'YES' -o "${MULLE_PROJECT_CMAKE_GRAPHVIZ_TRACE}" = 'YES' ] && set -x && : "$0" "$@"
+
+
+MULLE_EXECUTABLE_VERSION="0.0.0"
+
+##########################################################################
+###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###
+###########################################################################
+# #
+# # PRELUDE - Standard startup code for loading mulle-bashfunctions
+# #
+###
+
+#
+# Figure out MULLE_BASHFUNCTIONS_LIBEXEC_DIR on this machine if needed.
+#
+if [ -z "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}" ]
+then
+   MULLE_BASHFUNCTIONS_LIBEXEC_DIR="`mulle-bashfunctions libexec-dir`" || exit 1
+   export MULLE_BASHFUNCTIONS_LIBEXEC_DIR
+fi
+
+#
+# The booter reruns the executable either with bash or zsh, whatever the
+# system provides. On the second run --no-auto-shell will be set first.
+#
+if [ "$1" != --no-auto-shell ]
+then
+   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-boot.sh" || exit 1
+else
+   shift    # get rid of --no-auto-shell
+fi
+
+
+#
+# Include mulle-bashfunctions.sh         : default functions
+#         mulle-bashfunctions-none.sh    : almost no functions
+#         mulle-bashfunctions-minimal.sh : few functions for basic scripts
+#         mulle-bashfunctions-all.sh     : everything, even obscure functions
+#
+# Do this first to get aliases
+#
+MULLE_EXECUTABLE="${BASH_SOURCE[0]:-${(%):-%x}}"
+. "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-bashfunctions.sh" || exit 1
+
+###
+# # Now we are in bash or zsh with mulle-bashfunctions loaded
+# #
+###########################################################################
+###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###
+###########################################################################
+
+
+
+usage()
+{
+   cat <<EOF >&2
+Usage:
+   mulle-project-cmake-graphviz
+
+   If there is a mulle-sde CMakeLists.txt, this will print a graphical
+   representation of the local include tree in graphviz dot format.
+
+   Just feed it into graphviz or look at it in an editor like VSCode with a
+   graphviz preview. (Give the file a \`.dot\` extension)
+EOF
+   exit 1
+}
+
 
 # places to search for cmake files
-CMAKE_INCLUDE_PATH=cmake
+CMAKE_INCLUDE_PATH="cmake:cmake/reflect:cmake/share"
 
 # run it in a mulle-sde project to get a graphviz file, showing the way
 # files are included
 
 get_include_filenames()
 {
+   log_entry "get_include_filenames" "$@"
+
    local filename="$1"
 
-   sed -n -e '/^#/d' \
-          -e "s/.*include( *\\([A-Za-z0-9_]*\\).*/\\1.cmake/p" \
-          "${filename}"
+   rexekutor sed -n -e '/^#/d' \
+                    -e "s/.*include( *\\([A-Za-z0-9_]*\\).*/\\1.cmake/p" \
+                    "${filename}"
 }
 
 
 dump_includes()
 {
+   log_entry "dump_includes" "$@"
+
    local filename="$1"
+   local color="$2"
 
    local name
 
    name="`basename -- "${filename}"`"
+
+   if [ ! -z "${color}" ]
+   then
+      printf "\"%s\" [ bgcolor=\"%s\" ]\n" "${name}" "${color}"
+   fi
 
    #
    # these are evaluated at cmake runtime and can't be dumped
@@ -61,28 +140,49 @@ dump_includes()
    then
       echo "   \"${name}\" -> \"dependency/include/*/cmake/DependenciesAndLibraries.cmake\""
    else
-      sed -n -e '/^#/d' \
-             -e "s/.*include( *\\([A-Za-z0-9_]*\\).*/   \"${name}\" -> \"\\1.cmake\"/p" \
-             "${filename}"
+      if [ "${name}" = "_Libraries.cmake" ]
+      then
+         echo "   \"${name}\" -> \"dependency/include/*/cmake/DependenciesAndLibraries.cmake\""
+      else
+         rexekutor sed -n -e '/^#/d' \
+                          -e "s/.*include( *\\([A-Za-z0-9_]*\\).*/   \"${name}\" -> \"\\1.cmake\"/p" \
+                          "${filename}"
+      fi
    fi
 }
 
 
-find_include()
+r_find_include()
 {
+   log_entry "r_find_include" "$@"
+
    local name="$1"
 
-   find ${CMAKE_INCLUDE_PATH} -name "${name}" -print
+   local i
+
+   .foreachpath i in ${CMAKE_INCLUDE_PATH}
+   .do
+      r_filepath_concat "${i}" "${name}"
+      if [ -f "${RVAL}" ]
+      then
+         log_debug "${RVAL} found"
+         return 0
+      fi
+   .done
+
+   RVAL=
+   return 1
 }
 
 
 dump_file()
 {
-   local filename="$1"
+   log_entry "dump_file" "$@"
 
-   local includes
+   local filename="$1"
+   local color="$2"
+
    local name
-   local includepath
 
    if fgrep -x -q "${filename}" <<< "${DUMPED}"
    then
@@ -91,27 +191,53 @@ dump_file()
    DUMPED="${filename}
 ${DUMPED}"
 
-   dump_includes "${filename}"
-   includes="`get_include_filenames "${filename}"`"
+   local includes
 
-   for name in ${includes}
-   do
-      includepath="`find_include "${name}"`"
-      if [ ! -z "${includepath}" ]
+   dump_includes "${filename}" "${color}"
+   includes="`get_include_filenames "${filename}"`" || exit 1
+
+   .foreachline name in ${includes}
+   .do
+      if r_find_include "${name}"
       then
-         dump_file "${includepath}"
+         dump_file "${RVAL}"
       else
          :
          # doesn't really matter if optional though
          # echo "*** cmake file \"${name}\" not found" >&2
       fi
-   done
+   .done
 }
 
 
 
 main()
 {
+   while [ $# -ne 0 ]
+   do
+      if options_technical_flags "$1"
+      then
+         shift
+         continue
+      fi
+
+      case "$1" in
+         -h|--help|help)
+            usage
+         ;;
+         -*)
+            usage "Unknown option \"$1\""
+         ;;
+
+         *)
+            break
+         ;;
+      esac
+      shift
+   done
+
+   options_setup_trace "${MULLE_TRACE}" && set -x
+
    cat <<EOF
 digraph cmake
 {
@@ -121,7 +247,8 @@ digraph cmake
 
 EOF
 
-   IFS=$'\n'
+   local DUMPED
+
    dump_file "CMakeLists.txt"
 
    cat <<EOF

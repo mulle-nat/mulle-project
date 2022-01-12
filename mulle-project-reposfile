@@ -67,6 +67,8 @@ print_flags()
 
    ##
    cat <<EOF
+   --init                 : create REPOS file
+   --init-if-missing      : create REPOS file if missing
    --repos-filename <s>   : name of the file to use for reading (REPOS)
    --dirs-file <f>        : use file in addition to args (REPOS.dirs)
    --no-default-dirs-file : don't use REPOS.dirs if exists
@@ -136,9 +138,9 @@ handle_reposfile()
 
    local directory="$1"
    local reposfilename="$2"
+   local init="$3"
 
    local reposfilename
-   local reposfile
 
    local absfile
 
@@ -150,6 +152,7 @@ handle_reposfile()
    r_relative_path_between "${absfile}" "${PWD}"
    relfile="${RVAL}"
 
+   local reposfile
 
    r_filepath_concat "${absfile}" "${reposfilename}"
    reposfile="${RVAL}"
@@ -162,12 +165,33 @@ handle_reposfile()
       log_trace2 "reposfile : ${reposfile}"
    fi
 
-   if [ -f "${reposfile}" ]
+   if [ "${init}" != 'NO' ]
    then
-      echo "# $reposfile"
-      remove_comments_and_prepend_string "${reposfile}" "${relfile}"
+      if [ "${init}" = 'MAYBE' -a -f "${reposfile}" ]
+      then
+         log_verbose "${reposfile} already existz"
+         exit 0
+      fi
+
+      (
+         cd "${directory}"
+
+         shell_enable_nullglob
+         text="`ls -1d */.mulle | sed -n 's/\(.*\)\/\.mulle/\1/p'`"
+         if [ -z "${text}" ]
+         then
+            log_fail "No mulle-sde projects found in ${PWD#${MULLE_USER_PWD}/}"
+         fi
+         redirect_exekutor "${reposfilename}" printf "%s\n" "${text}"
+      ) || exit 1
    else
-      fail "No \"${reposfilename}\" file in \"${absfile#${MULLE_USER_PWD}/}\""
+      if [ -f "${reposfile}" ]
+      then
+         echo "# $reposfile"
+         remove_comments_and_prepend_string "${reposfile}" "${relfile}"
+      else
+         fail "No \"${reposfilename}\" file in \"${absfile#${MULLE_USER_PWD}/}\""
+      fi
    fi
 }
 
@@ -191,6 +215,7 @@ main()
 
    local OPTION_DIRFILE
    local OPTION_REPOSFILENAME
+   local OPTION_INIT='NO'
 
    OPTION_DIRFILE="\${reposfilename}.dirs"
 
@@ -226,6 +251,14 @@ main()
             shift
 
             OPTION_DIRFILE="$1"
+         ;;
+
+         --init)
+            OPTION_INIT='YES'
+         ;;
+
+         --init-if-missing)
+            OPTION_INIT='MAYBE'
          ;;
 
          --version)
@@ -267,15 +300,13 @@ main()
          log_warning "${dirsfile#${MULLE_USER_PWD}/} is empty"
       fi
 
-
       local i
-      local reposfile
 
       log_fluff "Directories from file ($dirsfile)"
 
       .foreachline i in ${dirs}
       .do
-         handle_reposfile "${i}" "${reposfilename}"
+         handle_reposfile "${i}" "${reposfilename}" "${OPTION_INIT}"
       .done
    else
       if [ $# -eq 0 ]
@@ -290,7 +321,7 @@ main()
 
       for i in "$@"
       do
-         handle_reposfile "${i}" "${reposfilename}"
+         handle_reposfile "${i}" "${reposfilename}" "${OPTION_INIT}"
       done
    fi
 }

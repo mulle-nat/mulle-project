@@ -118,7 +118,7 @@ search_and_replace()
    #
    # uses mulle-sourcetree-parser.h library
    #
-   lines="`get_dependency_address_nodetype_branch_tag_url`"
+   lines="`project::sourcetree-parser::get_dependency_address_nodetype_branch_tag_url`"
 
    shell_disable_glob; IFS=$'\n'
    for line in ${lines}

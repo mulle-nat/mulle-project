@@ -44,6 +44,7 @@ fi
 #
 # Do this first to get aliases
 #
+MULLE_EXECUTABLE="${BASH_SOURCE[0]:-${(%):-%x}}"
 . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-bashfunctions.sh" || exit 1
 
 ###
@@ -53,7 +54,6 @@ fi
 ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###
 ###########################################################################
 
-MULLE_EXECUTABLE="${BASH_SOURCE[0]:-${(%):-%x}}"
 
 if [ -z "${MULLE_PROJECT_LIBEXEC_DIR}" ]
 then
@@ -136,7 +136,8 @@ r_create_debian()
 
    log_verbose "Run mulle-install --prefix \"/tmp/${directory}${OPTION_ROOT}\""
 
-   exekutor mulle-make install -k --prefix "/tmp/${directory}${OPTION_ROOT}" >&2 || exit 1
+   rexekutor mulle-make ${MULLE_TECHNICAL_FLAGS} \
+                  install -k --prefix "/tmp/${directory}${OPTION_ROOT}" >&2 || exit 1
 
    redirect_exekutor "/tmp/${directory}/DEBIAN/control" write_control || exit 1
 
@@ -267,8 +268,8 @@ main()
 
    options_setup_trace "${MULLE_TRACE}" && set -x
 
-   . "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-project-git.sh" || exit 1
-   . "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-version.sh"     || exit 1
+   include "project::git"     || exit 1
+   include "project::version" || exit 1
 
    #
    # parameters sent by mulle-project-distribute
@@ -298,8 +299,9 @@ main()
    [ $# -eq 0 ] || shift  # ARCHIVE_URL
    [ $# -eq 0 ] || shift  # DEBIAN_DEPENDENCIES
 
+   # we are not really using DEBIAN_REPOSITORY anywhere ?
    DEBIAN_REPOSITORY="${1:-${DEBIAN_REPOSITORY}}" ; [ $# -eq 0 ] || shift  # DEBIAN_REPOSITORY
-
+   DEBIAN_REPOSITORY="${DEBIAN_REPOSITORY:-main}"
    [ $# -eq 0 ] || shift  # TAG
 
    if [ -z "${PROJECT}" ]
@@ -338,7 +340,7 @@ main()
          if [ "${OPTION_UPDATE}" = 'YES' ] && [ -x "${DEBIAN_DISTS}/did-update.sh" ]
          then
             (
-              log_info "Executing ./did-update.sh ${DEBIAN_REPOSITORY:-main} in ..."
+              log_info "Executing ./did-update.sh ${DEBIAN_REPOSITORY} in ..."
 
               #
               # this calls srcO/debian-software/did-upload.sh
@@ -346,7 +348,7 @@ main()
               r_basename "${debianfile}"
 
               exekutor cd "${DEBIAN_DISTS}" && \
-              exekutor ./did-update.sh "${DEBIAN_REPOSITORY:-main}" "${RVAL}"
+              exekutor ./did-update.sh "${DEBIAN_REPOSITORY}" "${RVAL}"
             ) || exit 1
          fi
       else

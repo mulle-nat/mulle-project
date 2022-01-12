@@ -132,7 +132,7 @@ produce_environment()
    #
    # uses mulle-sourcetree-parser.h library
    #
-   lines="`get_dependency_address_nodetype_branch_tag_url -r`"
+   lines="`project::sourcetree-parser::get_dependency_address_nodetype_branch_tag_url -r`"
 
    shell_disable_glob; IFS=$'\n'
    for line in ${lines}

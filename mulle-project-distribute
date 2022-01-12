@@ -78,6 +78,7 @@ fi
 #
 # Do this first to get aliases
 #
+MULLE_EXECUTABLE="${BASH_SOURCE[0]:-${(%):-%x}}"
 . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-bashfunctions.sh" || exit 1
 
 ###
@@ -87,7 +88,6 @@ fi
 ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###
 ###########################################################################
 
-MULLE_EXECUTABLE="${BASH_SOURCE[0]:-${(%):-%x}}"
 
 if [ -z "${MULLE_PROJECT_LIBEXEC_DIR}" ]
 then
@@ -209,7 +209,7 @@ __environment_main()
    MULLE_TAP_USER="${MULLE_TAP_USER:-${TAP_USER}}"
    MULLE_TAP_NAME="${MULLE_TAP_NAME:-${TAP_NAME}}"
 
-   CODEON_TAP_USER="${CODEON_TAP_USER:-codeon-gmbh}"
+   CODEON_TAP_USER="${CODEON_TAP_USER:-mulle-cc}"
    CODEON_TAP_NAME="${CODEON_TAP_NAME:-software}"
 
    # TODO: so much hard coding, should put this outside into
