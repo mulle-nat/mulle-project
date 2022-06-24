@@ -16,7 +16,7 @@ MULLE_EXECUTABLE_VERSION="0.0.0"
 #
 # Figure out MULLE_BASHFUNCTIONS_LIBEXEC_DIR on this machine if needed.
 #
-if [ -z "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}" ]
+if ! [ ${MULLE_BASHFUNCTIONS_LIBEXEC_DIR+x} ]
 then
    MULLE_BASHFUNCTIONS_LIBEXEC_DIR="`mulle-bashfunctions libexec-dir`" || exit 1
    export MULLE_BASHFUNCTIONS_LIBEXEC_DIR
@@ -26,7 +26,7 @@ fi
 # The booter reruns the executable either with bash or zsh, whatever the
 # system provides. On the second run --no-auto-shell will be set first.
 #
-if [ "$1" != --no-auto-shell ]
+if [ "${1:-}" != --no-auto-shell ]
 then
    . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-boot.sh" || exit 1
 else
@@ -68,9 +68,10 @@ print_flags()
    cat <<EOF
    --all               : execute in all projects,subprojects,tests
    --eval              : evaluate command line, requires tricky quoting though
+   --if <expr>         : ignore project if shell expression evaluates to false
    --ignore <name>     : ignore a project from REPOS, multiples are possible
    --others            : also execute in other projects, like demo
-   --sde               : skip repositories that are mulle-sde projects
+   --sde               : only execute in mulle-sde projects
    --output-no-header  : don't visually separate command output
    --parallel          : execute operations in parallel
    --repos-file <f>    : REPOS file to use
@@ -128,9 +129,14 @@ Usage:
       OTHER_NAME      : set if its an other project test
       TEST_NAME       : set if its a test
 
+   These values are alsot available in the --if expression.
+
 Examples:
    List git status of all projects:
       mulle-project-all --parallel --output-no-header git status -s
+
+   Create a .gitattributes file for projects under git control:
+      mulle-project-all --if "[ -d .git ]" cp /tmp/.gitattributes .
 
    Generate hacky include statements for all projects:
       mulle-project-all -s --eval printf '%s\\\\n' '\#include\ \<\${NAME}.h\>'
@@ -161,7 +167,7 @@ EOF
 
 shell_it()
 {
-   log_entry "shell_it" "$1" ...
+   log_entry "shell_it" "$@"
 
    [ -z "$1" ] && return
 
@@ -170,6 +176,20 @@ shell_it()
 
       r_basename "$1"
       NAME="$RVAL"
+
+      if [ ! -z "${OPTION_IF}" ]
+      then
+         if ! NAME="'${NAME}'" \
+              PROJECT_NAME="'${PROJECT_NAME}'" \
+              SUBPROJECT_NAME="'${SUBPROJECT_NAME}'" \
+              OTHER_NAME="'${OTHER_NAME}'" \
+              TEST_NAME="'${TEST_NAME}'" \
+              eval_exekutor "${OPTION_IF}"
+         then
+            log_info "Skip ${C_RESET_BOLD}$1"
+            return
+         fi
+      fi
 
       case ",${OPTION_ADORN}," in
          *,no-bar,*|*,no-top-bar,*|*,none,*)
@@ -205,9 +225,10 @@ shell_it()
 
       shift
 
+
       if [ "${OPTION_EVAL}" = 'YES' ]
       then
-         eval_exekutor NAME="'${RVAL}'" \
+         eval_exekutor NAME="'${NAME}'" \
                        PROJECT_NAME="'${PROJECT_NAME}'" \
                        SUBPROJECT_NAME="'${SUBPROJECT_NAME}'" \
                        OTHER_NAME="'${OTHER_NAME}'" \
@@ -268,8 +289,8 @@ project_it()
                         ) `"
 
          old="${SUBPROJECT_NAME}"
-         for subproject in ${subprojects}
-         do
+         .foreachpath subproject in ${subprojects}
+         .do
             case "${subproject}" in
                craftinfo/*)
                   # ignore
@@ -284,7 +305,7 @@ project_it()
                   fi
                ;;
             esac
-         done
+         .done
 
          SUBPROJECT_NAME="${old}"
       ;;
@@ -296,14 +317,12 @@ project_it()
          local test 
 
          tests="`( cd "${project}" ; mulle-env --search-here environment \
-                                       get MULLE_SDE_TEST_PATH 2> /dev/null )`"
+                                       get --lenient MULLE_SDE_TEST_PATH 2> /dev/null )`"
          tests="${tests:-test}"
 
          old="${TEST_NAME}"
-         IFS=':'
-         for test in ${tests}
-         do
-            IFS="${DEFAULT_IFS}"
+         .foreachpath test in ${tests}
+         .do
             if [ -d "${project}/${test}" ]
             then
                TEST_NAME="${test}"
@@ -313,8 +332,7 @@ project_it()
                   exit 1
                fi
             fi
-         done
-         IFS="${DEFAULT_IFS}"
+         .done
 
          TEST_NAME="${old}"
       ;;
@@ -330,18 +348,15 @@ project_it()
          others="${others:-demo}"
 
          old="${OTHER_NAME}"
-         IFS=':'
-         for other in ${others}
-         do
-            IFS="${DEFAULT_IFS}"
+         .foreachpath other in ${others}
+         .do
             if [ -d "${project}/${other}" ]
             then
                OTHER_NAME="${other}"
 
                project_it "${project}/${other}" "${mode}" "$@"
             fi
-         done
-         IFS="${DEFAULT_IFS}"
+         .done
 
          OTHER_NAME="${old}"
       ;;
@@ -364,7 +379,7 @@ parallel_execute_argument_first()
    local _parallel_jobs
    local _parallel_fails
 
-   [ $# -eq 0 ] && internal_fail "missing commandline"
+   [ $# -eq 0 ] && _internal_fail "missing commandline"
 
    _parallel_begin
 
@@ -419,7 +434,7 @@ main()
    local OPTION_PARALLEL
    local OPTION_SDE_TEST='NO'
    local OPTION_EVAL
-
+   local OPTION_IF
    local OPTION_IGNORE
 
    #
@@ -453,6 +468,23 @@ main()
 
             r_add_line "${OPTION_IGNORE}" "$1"
             OPTION_IGNORE="${RVAL}"
+         ;;
+
+         --if)
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
+            shift
+
+            r_concat "${OPTION_IF}" "$1" "&&"
+            OPTION_IF="${RVAL}"
+         ;;
+
+
+         --if-exists)
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
+            shift
+
+            r_concat "${OPTION_IF}" "[ -e \"$1\" ]"
+            OPTION_IF="${RVAL}"
          ;;
 
          -l|--lenient)

@@ -33,6 +33,7 @@ Command                            | Description
 `mulle-project-distcheck`          | Predicts if a `mulle-project-distribute` would fail
 `mulle-project-distribute`         | Create and publish releases (github)
 `mulle-project-extension-versions` | Maintain version of mulle-sde extensions
+`mulle-project-gitignore`          | Add files to .gitignore, prevents duplicates
 `mulle-project-git-prerelease`     | Push master into a prerelease branch on github
 `mulle-project-github-status`      | Poll github action status for CI state
 `mulle-project-init`               | Initial setup and update

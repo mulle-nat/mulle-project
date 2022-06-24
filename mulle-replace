@@ -16,7 +16,7 @@ MULLE_EXECUTABLE_VERSION="0.0.0"
 #
 # Figure out MULLE_BASHFUNCTIONS_LIBEXEC_DIR on this machine if needed.
 #
-if [ -z "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}" ]
+if ! [ ${MULLE_BASHFUNCTIONS_LIBEXEC_DIR+x} ]
 then
    MULLE_BASHFUNCTIONS_LIBEXEC_DIR="`mulle-bashfunctions libexec-dir`" || exit 1
    export MULLE_BASHFUNCTIONS_LIBEXEC_DIR
@@ -26,7 +26,7 @@ fi
 # The booter reruns the executable either with bash or zsh, whatever the
 # system provides. On the second run --no-auto-shell will be set first.
 #
-if [ "$1" != --no-auto-shell ]
+if [ "${1:-}" != --no-auto-shell ]
 then
    . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-boot.sh" || exit 1
 else
@@ -58,7 +58,9 @@ MULLE_EXECUTABLE="${BASH_SOURCE[0]:-${(%):-%x}}"
 
 print_flags()
 {
-   echo "   -f          : force operation"
+   echo "   -f          : force operation on protected files"
+   echo "   -1          : replace only once per line"
+   echo "   --regex     : use sed regexp"
    echo "   --          : skip options"
 
    ##
@@ -79,7 +81,9 @@ Usage:
    mulle-replace [flags] <find> <replace> <file>
 
    Replace a string with another string in a file.
-   Use -f flag for protect files.
+
+   You will need to escape the '/' characters, if you choose the --regex
+   option.
    
 Flags:
 EOF
@@ -89,97 +93,92 @@ EOF
 }
 
 
-main()
+
+delete_line()
 {
-   local MULLE_FLAG_MAGNUM_FORCE='NO'
+   log_entry delete_line "$@"
 
-   # technical flags
-   local MULLE_TRACE
-   local MULLE_FLAG_EXEKUTOR_DRY_RUN='NO'
-   local MULLE_FLAG_LOG_LOCAL='NO'
-   local MULLE_FLAG_LOG_DEBUG='NO'
-   local MULLE_FLAG_LOG_EXEKUTOR='NO'
-   local MULLE_FLAG_LOG_FLUFF='NO'
-   local MULLE_FLAG_LOG_SCRIPTS='NO'
-   local MULLE_FLAG_LOG_SETTINGS='NO'
-   local MULLE_FLAG_LOG_VERBOSE='NO'
-   local MULLE_FLAG_LOG_MERGE='NO'
-   local MULLE_TRACE_POSTPONE='NO'
+   local find="$1"
+   local filename="$2"
 
-   local OPTION_SED=""
+   local escaped_find
 
-   #
-   # simple flag handling
-   #
-   while [ $# -ne 0 ]
-   do
-      if options_technical_flags "$1"
-      then
-         shift
-         continue
-      fi
+   if [ "${OPTION_ESCAPE}" = 'YES' ]
+   then
+      r_escaped_sed_pattern "${find}"
+      escaped_find="${RVAL}"
+   else
+      escaped_find="${find}"
+   fi
 
-      case "$1" in
-         -f|--force)
-            MULLE_FLAG_MAGNUM_FORCE='YES'
-         ;;
+   local before
+   local after
 
-         -h*|--help|help)
-            usage
-         ;;
+   if [ "${MULLE_FLAG_LOG_VERBOSE}" = 'YES' ]
+   then
+      before="`rexekutor cat "${filename}"`"
+   fi
 
-         -g|--global)
-            OPTION_SED="g"
-         ;;
+   if [ "${MULLE_FLAG_EXEKUTOR_DRY_RUN}" = 'YES' -a "${MULLE_FLAG_LOG_VERBOSE}" = 'YES' ]
+   then
+      after="`rexekutor sed "/${escaped_find}/d" "${filename}" `" || return 1
+      log_verbose "Changes"
+      rexekutor diff -b <( echo "${before}") <( echo "${after}" ) >&2
+      return $?
+   fi
 
-         --version)
-            printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
-            exit 0
-         ;;
+   local unprotect
 
-         --)
-            shift
-            break
-         ;;
+   if [ "${MULLE_FLAG_MAGNUM_FORCE}" = 'YES' -a ! -w "${filename}" ]
+   then
+      unprotect='YES'
+   fi
 
-         ##
-         ## ADD YOUR FLAGS HERE
-         ##
+   local permissions
 
-         -*)
-            usage "Unknown flag \"$1\""
-         ;;
+   if [ "${unprotect}" = 'YES' ]
+   then
+      permissions="`lso "${filename}"`"
+      rexekutor chmod +w "${filename}"
+   fi
 
-         *)
-            break
-         ;;
-      esac
+   inplace_sed "/${escaped_find}/d" "${filename}" || return 1
 
-      shift
-   done
+   if [ "${unprotect}" = 'YES' ]
+   then
+      rexekutor chmod "${permissions}" "${filename}"
+   fi
 
-   options_setup_trace "${MULLE_TRACE}" && set -x
+   if [ "${MULLE_FLAG_LOG_VERBOSE}" = 'YES' ]
+   then
+      log_verbose "Changes"
+      rexekutor diff -b <( echo "${before}") "${filename}" >&2
+   fi
+}
 
-   [ $# -lt 3 ] && usage "missing argument" 
+
+replace()
+{
+   log_entry replace "$@"
 
    local find="$1"
    local replace="$2"
    local filename="$3"
 
-   shift 3
+   local escaped_find
+   local escaped_replace
 
-   [ $# -ne 0 ] && usage "superflous arguments \"$*\"" 
+   if [ "${OPTION_ESCAPE}" = 'YES' ]
+   then
+      r_escaped_sed_pattern "${find}"
+      escaped_find="${RVAL}"
 
-   [ -f "${filename}" ] || fail "File not found"
-
-   local escaped_find 
-   local escaped_replace 
-
-   r_escaped_sed_pattern "${find}"
-   escaped_find="${RVAL}"
-
-   r_escaped_sed_replacement "${replace}"
-   escaped_replace="${RVAL}"
+      r_escaped_sed_replacement "${replace}"
+      escaped_replace="${RVAL}"
+   else
+      escaped_find="${find}"
+      escaped_replace="${replace}"
+   fi
 
    local before
    local after
@@ -224,6 +223,122 @@ main()
       log_verbose "Changes"
       rexekutor diff -b <( echo "${before}") "${filename}" >&2
    fi
+}
+
+
+main()
+{
+   local MULLE_FLAG_MAGNUM_FORCE='NO'
+
+   # technical flags
+   local MULLE_TRACE
+   local MULLE_FLAG_EXEKUTOR_DRY_RUN='NO'
+   local MULLE_FLAG_LOG_LOCAL='NO'
+   local MULLE_FLAG_LOG_DEBUG='NO'
+   local MULLE_FLAG_LOG_EXEKUTOR='NO'
+   local MULLE_FLAG_LOG_FLUFF='NO'
+   local MULLE_FLAG_LOG_SCRIPTS='NO'
+   local MULLE_FLAG_LOG_SETTINGS='NO'
+   local MULLE_FLAG_LOG_VERBOSE='NO'
+   local MULLE_FLAG_LOG_MERGE='NO'
+   local MULLE_TRACE_POSTPONE='NO'
+
+   local OPTION_SED="g"
+   local OPTION_ESCAPE='YES'
+   local OPTION_DELETE_LINE='NO'
+
+   #
+   # simple flag handling
+   #
+   while [ $# -ne 0 ]
+   do
+      if options_technical_flags "$1"
+      then
+         shift
+         continue
+      fi
+
+      case "$1" in
+         -f|--force)
+            MULLE_FLAG_MAGNUM_FORCE='YES'
+         ;;
+
+         -h*|--help|help)
+            usage
+         ;;
+
+         -1|--once)
+            OPTION_SED=""
+         ;;
+
+         --delete-line)
+            OPTION_DELETE_LINE="YES"
+         ;;
+
+         -g|--global)
+            OPTION_SED="g"
+         ;;
+
+         --regex|--regexp)
+            OPTION_ESCAPE='NO'
+         ;;
+
+         --version)
+            printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
+            exit 0
+         ;;
+
+         --)
+            shift
+            break
+         ;;
+
+         ##
+         ## ADD YOUR FLAGS HERE
+         ##
+
+         -*)
+            usage "Unknown flag \"$1\""
+         ;;
+
+         *)
+            break
+         ;;
+      esac
+
+      shift
+   done
+
+   options_setup_trace "${MULLE_TRACE}" && set -x
+
+   if [ "${OPTION_DELETE_LINE}" = 'YES' ]
+   then
+      [ $# -lt 2 ] && usage "missing argument"
+
+      local find="$1"
+      local filename="$2"
+
+      shift 2
+
+      [ $# -ne 0 ] && usage "superflous arguments \"$*\""
+
+      [ -f "${filename}" ] || fail "File not found"
+
+      delete_line "${find}" "${filename}"
+      return $?
+   fi
+
+   [ $# -lt 3 ] && usage "missing argument"
+
+   local find="$1"
+   local replace="$2"
+   local filename="$3"
+
+   shift 3
+
+   [ $# -ne 0 ] && usage "superflous arguments \"$*\""
+
+   replace "${find}" "${replace}" "${filename}"
 }
 
 

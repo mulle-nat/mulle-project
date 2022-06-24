@@ -17,7 +17,7 @@ MULLE_EXECUTABLE_VERSION="0.0.0"
 #
 # Figure out MULLE_BASHFUNCTIONS_LIBEXEC_DIR on this machine if needed.
 #
-if [ -z "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}" ]
+if ! [ ${MULLE_BASHFUNCTIONS_LIBEXEC_DIR+x} ]
 then
    MULLE_BASHFUNCTIONS_LIBEXEC_DIR="`mulle-bashfunctions libexec-dir`" || exit 1
    export MULLE_BASHFUNCTIONS_LIBEXEC_DIR
@@ -27,7 +27,7 @@ fi
 # The booter reruns the executable either with bash or zsh, whatever the
 # system provides. On the second run --no-auto-shell will be set first.
 #
-if [ "$1" != --no-auto-shell ]
+if [ "${1:-}" != --no-auto-shell ]
 then
    . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-boot.sh" || exit 1
 else
@@ -160,8 +160,10 @@ search_and_replace()
       local upcaseid
       local name
 
+      include "case"
+
       r_basename "${_address}"
-      r_de_camel_case_upcase_identifier "${RVAL}"
+      r_smart_upcase_identifier "${RVAL}"
       upcaseid="${RVAL}"
 
       local newnodetype
@@ -204,7 +206,7 @@ search_and_replace()
       then
          exekutor mulle-sourcetree \
                         ${MULLE_TECHNICAL_FLAGS} \
-                        ${MULLE_SOURCETREE_FLAGS} \
+                        ${MULLE_SOURCETREE_FLAGS:-} \
                      set "${_address}" nodetype "${newnodetype}"
          action='YES'
       fi
@@ -213,7 +215,7 @@ search_and_replace()
       then
          exekutor mulle-sourcetree \
                         ${MULLE_TECHNICAL_FLAGS} \
-                        ${MULLE_SOURCETREE_FLAGS} \
+                        ${MULLE_SOURCETREE_FLAGS:-} \
                      set "${_address}" branch "${newbranch}"
          action='YES'
       fi
@@ -222,7 +224,7 @@ search_and_replace()
       then
          exekutor mulle-sourcetree \
                         ${MULLE_TECHNICAL_FLAGS} \
-                        ${MULLE_SOURCETREE_FLAGS} \
+                        ${MULLE_SOURCETREE_FLAGS:-} \
                      set "${_address}" url "${newurl}"
          action='YES'
       fi
@@ -231,7 +233,7 @@ search_and_replace()
       then
          exekutor mulle-sourcetree \
                         ${MULLE_TECHNICAL_FLAGS} \
-                        ${MULLE_SOURCETREE_FLAGS} \
+                        ${MULLE_SOURCETREE_FLAGS:-} \
                      set "${_address}" tag "${newtag}"
          action='YES'
       fi

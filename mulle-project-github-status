@@ -17,7 +17,7 @@ MULLE_EXECUTABLE_VERSION="0.0.0"
 #
 # Figure out MULLE_BASHFUNCTIONS_LIBEXEC_DIR on this machine if needed.
 #
-if [ -z "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}" ]
+if ! [ ${MULLE_BASHFUNCTIONS_LIBEXEC_DIR+x} ]
 then
    MULLE_BASHFUNCTIONS_LIBEXEC_DIR="`mulle-bashfunctions libexec-dir`" || exit 1
    export MULLE_BASHFUNCTIONS_LIBEXEC_DIR
@@ -27,7 +27,7 @@ fi
 # The booter reruns the executable either with bash or zsh, whatever the
 # system provides. On the second run --no-auto-shell will be set first.
 #
-if [ "$1" != --no-auto-shell ]
+if [ "${1:-}" != --no-auto-shell ]
 then
    . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-boot.sh" || exit 1
 else
@@ -211,10 +211,7 @@ check_repo()
 
    result="`github_get_action_runs "${user}" "${repo}" `" || return 1
 
-   if [ "${MULLE_FLAG_LOG_SETTINGS}" = 'YES' ]
-   then
-      log_trace2 "json: ${result}"
-   fi
+   log_setting "json: ${result}"
 
    count="`rexekutor jq '.total_count' <<< "${result}" `"
    if [ ${count} -eq 0 ]

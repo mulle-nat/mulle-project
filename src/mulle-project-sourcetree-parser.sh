@@ -45,7 +45,7 @@ project::sourcetree-parser::get_dependency_address_nodetype_branch_tag_url()
    # maybe name no-bequeath no-link-bequeath ?
    #
    rexekutor mulle-sourcetree \
-                  ${MULLE_SOURCETREE_FLAGS} \
+                  ${MULLE_SOURCETREE_FLAGS:-} \
                   -N \
                list --output-format raw \
                     --output-no-header \
@@ -120,12 +120,9 @@ project::sourcetree-parser::parse_nodetype_branch_tag_url()
 
    local line="$1"
 
-   if [ "${MULLE_FLAG_LOG_SETTINGS}" = 'YES' ]
-   then
-      log_trace2 "line                : >${line}<"
-   fi
+   log_setting "line                : >${line}<"
 
-   [ -z "${line}" ] && internal_fail "line is empty"
+   [ -z "${line}" ] && _internal_fail "line is empty"
 
    _address="${line%%;*}"
    line=${line#*;}
@@ -137,16 +134,13 @@ project::sourcetree-parser::parse_nodetype_branch_tag_url()
    line=${line#*;}
    _url="${line%%;*}"
 
-   if [ "${MULLE_FLAG_LOG_SETTINGS}" = 'YES' ]
-   then
-      log_trace2 "address             : ${_address}"
-      log_trace2 "nodetype            : ${_nodetype}"
-      log_trace2 "branch              : ${_branch}"
-      log_trace2 "tag                 : ${_tag}"
-      log_trace2 "url                 : ${_url}"
-   fi
+   log_setting "address             : ${_address}"
+   log_setting "nodetype            : ${_nodetype}"
+   log_setting "branch              : ${_branch}"
+   log_setting "tag                 : ${_tag}"
+   log_setting "url                 : ${_url}"
 
-   [ -z "${_address}" ] && internal_fail "address is empty"
+   [ -z "${_address}" ] && _internal_fail "address is empty"
 
    local s
 
@@ -244,18 +238,15 @@ project::sourcetree-parser::parse_nodetype_branch_tag_url()
    s="${s##/}"       # remove slash
    _repo="${s%%/*}"   # get _repo (that's all we want)
 
-   if [ "${MULLE_FLAG_LOG_SETTINGS}" = 'YES' ]
-   then
-      log_trace2 "branch_fallback     : ${_branch_fallback}"
-      log_trace2 "branch_identifier   : ${_branch_identifier}"
-      log_trace2 "nodetype_fallback   : ${_nodetype_fallback}"
-      log_trace2 "nodetype_identifier : ${_nodetype_identifier}"
-      log_trace2 "url_fallback        : ${_url_fallback}"
-      log_trace2 "url_identifier      : ${_url_identifier}"
-      log_trace2 "host                : ${_host}"
-      log_trace2 "user                : ${_user}"
-      log_trace2 "repo                : ${_repo}"
-   fi
+   log_setting "branch_fallback     : ${_branch_fallback}"
+   log_setting "branch_identifier   : ${_branch_identifier}"
+   log_setting "nodetype_fallback   : ${_nodetype_fallback}"
+   log_setting "nodetype_identifier : ${_nodetype_identifier}"
+   log_setting "url_fallback        : ${_url_fallback}"
+   log_setting "url_identifier      : ${_url_identifier}"
+   log_setting "host                : ${_host}"
+   log_setting "user                : ${_user}"
+   log_setting "repo                : ${_repo}"
 
    return 0
    # don't need the other stuff so far...

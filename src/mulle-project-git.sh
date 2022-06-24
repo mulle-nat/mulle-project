@@ -226,7 +226,7 @@ project::git::_check_remote()
 
    local name="$1"
 
-   [ -z "${name}" ] && internal_fail "empty parameter"
+   [ -z "${name}" ] && _internal_fail "empty parameter"
 
    log_info "Check if remote \"${name}\" is present"
 
@@ -536,7 +536,7 @@ project::git::r_commit_options()
       'YES')
          if project::git::can_amend
          then
-            log_warning "Last commit was tagged or merged or pushed. You may \
+            _log_warning "Last commit was tagged or merged or pushed. You may \
 need to force push to remotes now."
          fi
          RVAL="--amend --no-edit"
@@ -550,7 +550,7 @@ need to force push to remotes now."
       'DEFAULT'|'SAFE')
          if ! project::git::can_amend
          then
-            log_verbose "Will create a new commit as the last commit has been \
+            _log_verbose "Will create a new commit as the last commit has been \
 tagged or merged or pushed"
 
             r_escaped_singlequotes "${message}"
@@ -569,9 +569,94 @@ tagged or merged or pushed"
       ;;
 
       *)
-         internal_fail "must specify an amend option"
+         _internal_fail "must specify an amend option"
       ;;
    esac
+}
+
+
+project::git::append_to_gitignore_if_needed()
+{
+   local file="$1"
+
+   [ -z "${file}" ] && _internal_fail "empty file"
+
+   local line
+
+   if [ -f ".gitignore" ]
+   then
+      case "${file}" in
+         \#*)
+            fail 'Fool! Don''t add comments this way!'
+         ;;
+
+         */*)
+            local directory
+
+            directory="${file##/}"
+            directory="${directory%%/}"
+
+            local pattern0
+            local pattern1
+            local pattern2
+            local pattern3
+
+            # variations with leading and trailing slashes
+            pattern0="${directory}"
+            pattern1="${directory}/"
+            pattern2="/${directory}"
+            pattern3="/${directory}/"
+
+            if rexekutor fgrep -q -s -x -e "${pattern0}" .gitignore
+            then
+               log_verbose "Duplicate ${C_RESET_BOLD}${pattern0}${C_VERBOSE} found"
+               return
+            fi
+            if rexekutor fgrep -q -s -x -e "${pattern1}" .gitignore
+            then
+               log_verbose "Duplicate ${C_RESET_BOLD}${pattern1}${C_VERBOSE} found"
+               return
+            fi
+            if rexekutor fgrep -q -s -x -e "${pattern2}" .gitignore
+            then
+               log_verbose "Duplicate ${C_RESET_BOLD}${pattern2}${C_VERBOSE} found"
+               return
+            fi
+            if rexekutor fgrep -q -s -x -e "${pattern3}" .gitignore
+            then
+               log_verbose "Duplicate ${C_RESET_BOLD}${pattern3}${C_VERBOSE} found"
+               return
+            fi
+         ;;
+
+         *)
+            if rexekutor fgrep -q -s -x -e "${file}" .gitignore
+            then
+               log_verbose "Duplicate ${C_RESET_BOLD}${file}${C_VERBOSE} found"
+               return
+            fi
+         ;;
+      esac
+   fi
+
+   #
+   # prepend \n because it is safer, in case .gitignore has no trailing
+   # LF which it often seems to not have
+   # fgrep is bugged on at least OS X 10.x, so can't use -e chaining
+
+   local terminator
+   local line
+
+   line="${file}"
+   terminator="`rexekutor tail -c 1 ".gitignore" 2> /dev/null | tr '\012' '|'`"
+
+   if [ "${terminator}" != "|" ]
+   then
+      line="$'\n'${line}"
+   fi
+
+   log_info "Adding \"${file}\" to \".gitignore\""
+   redirect_append_exekutor .gitignore printf "%s\n" "${line}" || fail "Couldn't append to .gitignore"
 }
 
 

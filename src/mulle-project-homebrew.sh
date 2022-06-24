@@ -75,9 +75,9 @@ project::homebrew::generate_formula_header()
    local archiveurl="$6"
    local tag="$7"
 
-   [ -z "${version}" ]    && internal_fail "empty version"
-   [ -z "${archiveurl}" ] && internal_fail "empty archiveurl"
-   [ -z "${tag}" ]        && internal_fail "empty tag"
+   [ -z "${version}" ]    && _internal_fail "empty version"
+   [ -z "${archiveurl}" ] && _internal_fail "empty archiveurl"
+   [ -z "${tag}" ]        && _internal_fail "empty tag"
    local tmparchive
 
    tmparchive="/tmp/${project}-${tag}-archive"
@@ -350,7 +350,6 @@ project::homebrew::_generate_formula()
       generator="generate_brew_formula_build"
    fi
 
-
    project::homebrew::generate_formula_header "${project}" "${name}" "${version}" \
                                 "${homepage}" "${desc}" "${archiveurl}" "${tag}" &&
    project::homebrew::generate_formula_dependencies "${dependencies}" "${builddependencies}" &&
@@ -369,11 +368,11 @@ project::homebrew::formula_push()
 {
    log_entry "project::homebrew::formula_push" "$@"
 
-   local rbfile="$1" ; shift
-   local version="$1" ; shift
-   local name="$1" ; shift
-   local homebrewtap="$1" ; shift
-   local tag="$1"; shift
+   local rbfile="$1"
+   local version="$2"
+   local name="$3"
+   local homebrewtap="$4"
+   local tag="$5"
 
    HOMEBREW_TAP_BRANCH="${HOMEBREW_TAP_BRANCH:-${GIT_DEFAULT_BRANCH:-master}}"
    HOMEBREW_TAP_REMOTE="${HOMEBREW_TAP_REMOTE:-origin}"
@@ -403,19 +402,19 @@ project::homebrew::push()
 {
    log_entry "project::homebrew::push" "$@"
 
-   local name="$1"; shift
-   local version="$1"; shift
-   local homebrewtap="$1"; shift
-   local rbfile="$1"; shift
-   local tag="$1"; shift
+   local name="$1"
+   local version="$2"
+   local homebrewtap="$3"
+   local rbfile="$4"
+   local tag="$5"
 
    local formula
 
-   [ -z "${name}" ]        && internal_fail "missing name"
-   [ -z "${version}" ]     && internal_fail "missing version"
-   [ -z "${homebrewtap}" ] && internal_fail "missing homebrewtap"
-   [ -z "${rbfile}" ]      && internal_fail "missing rbfile"
-   [ -z "${tag}" ]         && internal_fail "missing tag"
+   [ -z "${name}" ]        && _internal_fail "missing name"
+   [ -z "${version}" ]     && _internal_fail "missing version"
+   [ -z "${homebrewtap}" ] && _internal_fail "missing homebrewtap"
+   [ -z "${rbfile}" ]      && _internal_fail "missing rbfile"
+   [ -z "${tag}" ]         && _internal_fail "missing tag"
 
    [ ! -d "${homebrewtap}" ] && fail "Failed to locate tap directory \"${homebrewtap}\" from \"$PWD\""
 
@@ -445,14 +444,14 @@ project::homebrew::generate()
 # DESC must not be empty
    [ -z "${desc}" ]  && fail "DESC is empty"
 
-   [ -z "${project}" ]     && internal_fail "missing project"
-   [ -z "${name}" ]        && internal_fail "missing name"
-   [ -z "${version}" ]     && internal_fail "missing version"
-   [ -z "${homepage}" ]    && internal_fail "missing homepage"
-   [ -z "${archiveurl}" ]  && internal_fail "missing archiveurl"
-   [ -z "${homebrewtap}" ] && internal_fail "missing homebrewtap"
-   [ -z "${rbfile}" ]      && internal_fail "missing rbfile"
-   [ -z "${tag}" ]         && internal_fail "missing tag"
+   [ -z "${project}" ]     && _internal_fail "missing project"
+   [ -z "${name}" ]        && _internal_fail "missing name"
+   [ -z "${version}" ]     && _internal_fail "missing version"
+   [ -z "${homepage}" ]    && _internal_fail "missing homepage"
+   [ -z "${archiveurl}" ]  && _internal_fail "missing archiveurl"
+   [ -z "${homebrewtap}" ] && _internal_fail "missing homebrewtap"
+   [ -z "${rbfile}" ]      && _internal_fail "missing rbfile"
+   [ -z "${tag}" ]         && _internal_fail "missing tag"
 
 
    [ ! -d "${homebrewtap}" ] && fail "Failed to locate tap directory \"${homebrewtap}\" from \"$PWD\""

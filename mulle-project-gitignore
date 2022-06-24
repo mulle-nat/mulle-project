@@ -1,6 +1,6 @@
 #! /bin/sh
 #
-#   Copyright (c) 2020 Nat! - Mulle kybernetiK
+#   Copyright (c) 2022 Nat! - Mulle kybernetiK
 #   All rights reserved.
 #
 #   Redistribution and use in source and binary forms, with or without
@@ -29,7 +29,8 @@
 #   ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 #   POSSIBILITY OF SUCH DAMAGE.
 #
-[ "${TRACE}" = 'YES' -o "${MULLE_PROJECT_CMAKE_GRAPHVIZ_TRACE}" = 'YES' ] && set -x && : "$0" "$@"
+
+[ "${TRACE}" = 'YES' -o "${MULLE_PROJECT_GITIGNORE_TRACE}" = 'YES' ] && set -x && : "$0" "$@"
 
 
 MULLE_EXECUTABLE_VERSION="0.0.0"
@@ -72,7 +73,8 @@ fi
 # Do this first to get aliases
 #
 MULLE_EXECUTABLE="${BASH_SOURCE[0]:-${(%):-%x}}"
-. "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-bashfunctions.sh" || exit 1
+
+. "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-bashfunctions-all.sh" || exit 1
 
 ###
 # # Now we are in bash or zsh with mulle-bashfunctions loaded
@@ -81,138 +83,59 @@ MULLE_EXECUTABLE="${BASH_SOURCE[0]:-${(%):-%x}}"
 ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###
 ###########################################################################
 
+if [ -z "${MULLE_PROJECT_LIBEXEC_DIR}" ]
+then
+   r_get_libexec_dir "${MULLE_EXECUTABLE}" "mulle-project" "mulle-project-git.sh"
+   MULLE_PROJECT_LIBEXEC_DIR="${RVAL}"
+fi
+
+
+print_flags()
+{
+   options_technical_flags_usage " : "
+}
 
 
 usage()
 {
+   [ $# -ne 0 ] && log_error "$*"
+
+
    cat <<EOF >&2
 Usage:
-   mulle-project-cmake-graphviz
+   mulle-project-gitignore [flags] <file>
 
-   If there is a mulle-sde CMakeLists.txt, this will print a graphical
-   representation of the local include tree in graphviz dot format.
+   Add a file or directory to the .gitignore, if it's not already present.
 
-   Just feed it into graphviz or look at it in an editor like VSCode with a
-   graphviz preview. (Give the file a \`.dot\` extension)
+Flags:
 EOF
+   print_flags | LC_ALL=C sort >&2
+
    exit 1
-}
-
-
-# places to search for cmake files
-CMAKE_INCLUDE_PATH="cmake:cmake/reflect:cmake/share"
-
-# run it in a mulle-sde project to get a graphviz file, showing the way
-# files are included
-
-get_include_filenames()
-{
-   log_entry "get_include_filenames" "$@"
-
-   local filename="$1"
-
-   rexekutor sed -n -e '/^#/d' \
-                    -e "s/.*include( *\\([A-Za-z0-9_]*\\).*/\\1.cmake/p" \
-                    "${filename}"
-}
-
-
-dump_includes()
-{
-   log_entry "dump_includes" "$@"
-
-   local filename="$1"
-   local color="$2"
-
-   local name
-
-   name="`basename -- "${filename}"`"
-
-   if [ ! -z "${color}" ]
-   then
-      printf "\"%s\" [ bgcolor=\"%s\" ]\n" "${name}" "${color}"
-   fi
-
-   #
-   # these are evaluated at cmake runtime and can't be dumped
-   #
-   if [ "${name}" = "_Dependencies.cmake" ]
-   then
-      echo "   \"${name}\" -> \"dependency/include/*/cmake/DependenciesAndLibraries.cmake\""
-   else
-      if [ "${name}" = "_Libraries.cmake" ]
-      then
-         echo "   \"${name}\" -> \"dependency/include/*/cmake/DependenciesAndLibraries.cmake\""
-      else
-         rexekutor sed -n -e '/^#/d' \
-                          -e "s/.*include( *\\([A-Za-z0-9_]*\\).*/   \"${name}\" -> \"\\1.cmake\"/p" \
-                          "${filename}"
-      fi
-   fi
-}
-
-
-r_find_include()
-{
-   log_entry "r_find_include" "$@"
-
-   local name="$1"
-
-   local i
-
-   .foreachpath i in ${CMAKE_INCLUDE_PATH}
-   .do
-      r_filepath_concat "${i}" "${name}"
-      if [ -f "${RVAL}" ]
-      then
-         log_debug "${RVAL} found"
-         return 0
-      fi
-   .done
-
-   RVAL=
-   return 1
-}
-
-
-dump_file()
-{
-   log_entry "dump_file" "$@"
-
-   local filename="$1"
-   local color="$2"
-
-   local name
-
-   if fgrep -x -q "${filename}" <<< "${DUMPED}"
-   then
-      return
-   fi
-   DUMPED="${filename}
-${DUMPED}"
-
-   local includes
-
-   dump_includes "${filename}" "${color}"
-   includes="`get_include_filenames "${filename}"`" || exit 1
-
-   .foreachline name in ${includes}
-   .do
-      if r_find_include "${name}"
-      then
-         dump_file "${RVAL}"
-      else
-         :
-         # doesn't really matter if optional though
-         # echo "*** cmake file \"${name}\" not found" >&2
-      fi
-   .done
 }
 
 
 
 main()
 {
+   local MULLE_FLAG_MAGNUM_FORCE='NO'
+
+   # technical flags
+   local MULLE_TRACE
+   local MULLE_FLAG_EXEKUTOR_DRY_RUN='NO'
+   local MULLE_FLAG_LOG_LOCAL='NO'
+   local MULLE_FLAG_LOG_DEBUG='NO'
+   local MULLE_FLAG_LOG_EXEKUTOR='NO'
+   local MULLE_FLAG_LOG_FLUFF='NO'
+   local MULLE_FLAG_LOG_SCRIPTS='NO'
+   local MULLE_FLAG_LOG_SETTINGS='NO'
+   local MULLE_FLAG_LOG_VERBOSE='NO'
+   local MULLE_FLAG_LOG_MERGE='NO'
+   local MULLE_TRACE_POSTPONE='NO'
+
+   #
+   # simple flag handling
+   #
    while [ $# -ne 0 ]
    do
       if options_technical_flags "$1"
@@ -222,38 +145,43 @@ main()
       fi
 
       case "$1" in
-         -h|--help|help)
+         -f|--force)
+            MULLE_FLAG_MAGNUM_FORCE='YES'
+         ;;
+
+         -h*|--help|help)
             usage
          ;;
+
+         --version)
+            printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
+            exit 0
+         ;;
+
+         ##
+         ## ADD YOUR FLAGS HERE
+         ##
+
          -*)
-            usage "Unknown option \"$1\""
+            usage "Unknown flag \"$1\""
          ;;
 
          *)
             break
          ;;
       esac
+
       shift
    done
 
    options_setup_trace "${MULLE_TRACE}" && set -x
 
-   cat <<EOF
-digraph cmake
-{
-   rankdir="LR"
-   node [shape="note"]
-   graph [ordering="out"]
+   include "project::git"
 
-EOF
+   [ $# -eq 0 ] && usage "Missing file"
 
-   local DUMPED
-
-   dump_file "CMakeLists.txt"
-
-   cat <<EOF
-}
-EOF
+   project::git::append_to_gitignore_if_needed "$@"
 }
 
-main "$@"
+
+call_with_flags "main" "${MULLE_PROJECT_VERSIONCHECK_FLAGS}" "$@"
