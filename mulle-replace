@@ -193,7 +193,7 @@ replace()
       after="`rexekutor sed "s/${escaped_find}/${escaped_replace}/${OPTION_SED}" "${filename}" `" || return 1
       log_verbose "Changes"
       rexekutor diff -b <( echo "${before}") <( echo "${after}" ) >&2
-      return $?
+      return 0
    fi
 
    local unprotect
@@ -223,6 +223,8 @@ replace()
       log_verbose "Changes"
       rexekutor diff -b <( echo "${before}") "${filename}" >&2
    fi
+
+   return 0
 }
 
 
@@ -311,20 +313,21 @@ main()
 
    options_setup_trace "${MULLE_TRACE}" && set -x
 
+   local rval
+
    if [ "${OPTION_DELETE_LINE}" = 'YES' ]
    then
       [ $# -lt 2 ] && usage "missing argument"
 
       local find="$1"
-      local filename="$2"
 
-      shift 2
+      shift 1
 
-      [ $# -ne 0 ] && usage "superflous arguments \"$*\""
-
-      [ -f "${filename}" ] || fail "File not found"
-
-      delete_line "${find}" "${filename}"
+      while [ $# -ne 0 ]
+      do
+         delete_line "${find}" "$1" || return $?
+         shift
+      done
       return $?
    fi
 
@@ -332,13 +335,15 @@ main()
 
    local find="$1"
    local replace="$2"
-   local filename="$3"
 
-   shift 3
+   shift 2
 
-   [ $# -ne 0 ] && usage "superflous arguments \"$*\""
-
-   replace "${find}" "${replace}" "${filename}"
+   while [ $# -ne 0 ]
+   do
+      replace "${find}" "${replace}" "$1" || return $?
+      shift
+   done
+   return $?
 }
 
 

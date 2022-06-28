@@ -15,7 +15,9 @@
 Most of these scripts are used during readying a new release of **mulle-objc**.
 
 The process is quite involved and has organically grown over time. For starters
-it is recommended to get familiar with `mulle-project-all` and `mulle-project-commit` and `mulle-project-version`.
+it is recommended to get familiar with `mulle-project-all` and
+`mulle-project-commit` and `mulle-project-version`. Of use outside of
+project management are `mulle-replace` and `mulle-gitignore`.
 
 Later on `mulle-project-sourcetree-doctor` and
 `mulle-project-releasenotes` can be of great help.
@@ -53,7 +55,7 @@ Command                            | Description
 `mulle-project-version`            | Examine and change project versions
 `mulle-project-versioncheck`       | Create version checks for the preprocessor from dependencies
 `mulle-replace`                    | Simple string replacer for mulle-project-all
-
+`mulle-gitignore`                  | Add files and directories to .gitgnore
 
 #### What `mulle-project-distribute` does
 

@@ -579,17 +579,21 @@ project::git::append_to_gitignore_if_needed()
 {
    local file="$1"
 
-   [ -z "${file}" ] && _internal_fail "empty file"
+   r_trim_whitespace "${file}"
+   file="${RVAL}"
+
+   case "${file}" in
+      ""|\#*)
+         # log_warning 'Fool! Don''t add comments this way!'
+         return
+      ;;
+   esac
 
    local line
 
    if [ -f ".gitignore" ]
    then
       case "${file}" in
-         \#*)
-            fail 'Fool! Don''t add comments this way!'
-         ;;
-
          */*)
             local directory
 
@@ -650,9 +654,9 @@ project::git::append_to_gitignore_if_needed()
    line="${file}"
    terminator="`rexekutor tail -c 1 ".gitignore" 2> /dev/null | tr '\012' '|'`"
 
-   if [ "${terminator}" != "|" ]
+   if [ ! -z "${terminator}" -a "${terminator}" != "|" ]
    then
-      line="$'\n'${line}"
+      line=$'\n'"${line}"
    fi
 
    log_info "Adding \"${file}\" to \".gitignore\""

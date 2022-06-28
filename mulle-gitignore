@@ -92,7 +92,8 @@ fi
 
 print_flags()
 {
-   options_technical_flags_usage " : "
+   echo "   --stdin : read file values from stdin instead"
+   options_technical_flags_usage "   : "
 }
 
 
@@ -103,9 +104,9 @@ usage()
 
    cat <<EOF >&2
 Usage:
-   mulle-project-gitignore [flags] <file>
+   mulle-gitignore [flags] <file>
 
-   Add a file or directory to the .gitignore, if it's not already present.
+   Add a file or directory to the .gitignore file, if it's not already present.
 
 Flags:
 EOF
@@ -133,6 +134,7 @@ main()
    local MULLE_FLAG_LOG_MERGE='NO'
    local MULLE_TRACE_POSTPONE='NO'
 
+   local FLAG_STDIN='NO'
    #
    # simple flag handling
    #
@@ -151,6 +153,10 @@ main()
 
          -h*|--help|help)
             usage
+         ;;
+
+         --stdin)
+            FLAG_STDIN='YES'
          ;;
 
          --version)
@@ -178,9 +184,24 @@ main()
 
    include "project::git"
 
+   local line
+
+   if [ "${FLAG_STDIN}" = 'YES' ]
+   then
+      IFS=$'\n'
+      while read -r line
+      do
+         project::git::append_to_gitignore_if_needed "${line}"
+      done
+      return 0
+   fi
+
    [ $# -eq 0 ] && usage "Missing file"
 
-   project::git::append_to_gitignore_if_needed "$@"
+   .foreachline line in "$*"
+   .do
+      project::git::append_to_gitignore_if_needed "${line}"
+   .done
 }
 
 

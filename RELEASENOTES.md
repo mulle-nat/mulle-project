@@ -1,3 +1,10 @@
+## 3.1.0
+
+* new tool mulle-gitignore
+* mulle-replace can now deal with multiple files
+* new command mulle-project-gitignore
+
+
 # 3.0.0
 
 * new executable mulle-project-reposfile to compose a REPOS file from many REPOS files
