@@ -1,3 +1,7 @@
+### 3.1.1
+
+* Various small improvements
+
 ## 3.1.0
 
 * new tool mulle-gitignore

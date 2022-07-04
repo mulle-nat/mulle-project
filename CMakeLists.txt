@@ -30,7 +30,6 @@ mulle-project-distcheck
 mulle-project-distribute
 mulle-project-extension-versions
 mulle-project-github-status
-mulle-project-gitignore
 mulle-project-git-prerelease
 mulle-project-git-submodules
 mulle-project-init
@@ -50,6 +49,8 @@ mulle-project-travis-ci-prerelease
 mulle-project-untag
 mulle-project-version
 mulle-project-versioncheck
+mulle-gitignore
+mulle-replace
 )
 
 
