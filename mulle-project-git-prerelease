@@ -102,6 +102,7 @@ print_flags()
    echo "   --check            : check if operation would succeed"
    echo "   --tag <tag>        : force tag the commit" 
    echo "   --clobber          : ignore commits in prerelease, clobber them"
+   echo "   --touch            : create a .touch file to force a push to github"
    echo "   --sloppy <message> : committing unsaved changes in master"
    echo "   --always-amend     : always amend the commit [dangerous]"
    echo "   --no-amend         : never amend, just create a new commit (default)"
@@ -174,6 +175,7 @@ main()
    local OPTION_CHECK
    local OPTION_CLOBBER
    local OPTION_TAG
+   local OPTION_TOUCH
    local OPTION_AMEND='NO'
    local DEFAULT_ORIGIN='origin'
    local DEFAULT_GITHUB='github'
@@ -266,6 +268,10 @@ main()
             OPTION_TAG="$1"
          ;;
 
+         --touch)
+            OPTION_TOUCH=YES
+         ;;
+
          --version)
             printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
             exit 0
@@ -319,6 +325,14 @@ main()
    #
    # If there are commits, possibly commit them
    #
+   if [ "${OPTION_TOUCH}" = 'YES' ] && project::git::is_clean
+   then
+      log_verbose "Generating .touch file"
+      redirect_exekutor .touch uuidgen
+      exekutor git add .touch
+      OPTION_SLOPPY='YES'
+   fi
+
    if ! project::git::is_clean
    then
       if [ -z "${OPTION_SLOPPY}" ]

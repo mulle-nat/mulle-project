@@ -264,7 +264,7 @@ project_it()
          then
             if [ ! -d "${project}/.mulle/share/sde" ]
             then
-               log_warning "No sde project in ${C_RESET_BOLD}${project}"
+               log_info "No sde project in ${C_RESET_BOLD}${project}"
                return
             fi
          fi
@@ -479,7 +479,7 @@ main()
          ;;
 
 
-         --if-exists)
+         --if-exists|--if-file|--if-exists-file)
             [ $# -eq 1 ] && fail "missing parameter for \"$1\""
             shift
 
@@ -499,7 +499,7 @@ main()
             OPTION_PARALLEL='YES'
          ;;
 
-         -o|--others-only|--only-others)
+         -o|--others-only|--only-others|--other-only|--only-other)
             OPTION_MODE="others"
          ;;
 
@@ -510,7 +510,7 @@ main()
             OPTION_REPOSFILE="$1"
          ;;
 
-         -t|--tests-only|--only-tests)
+         -t|--tests-only|--only-tests|--test-only|--only-test)
             OPTION_MODE="tests"
          ;;
 
@@ -521,7 +521,7 @@ main()
             OPTION_EXISTS_FILE="$1"
          ;;
 
-         --subprojects-only|--only-subprojects)
+         --subprojects-only|--only-subprojects|--subproject-only|--only-subproject)
             OPTION_MODE="subprojects"
          ;;
 
@@ -584,6 +584,8 @@ main()
    then
       repos="`rexekutor egrep -v '^#' "${reposfile}"`"
    else
+      [ ! -z "${OPTION_REPOSFILE}" ] && fail "\"${reposfile}\" not found"
+
       shell_enable_nullglob
       repos="`ls -1d */.mulle/share/sde | sed -e "s/\/\.mulle\/share\/sde$//" `"
       shell_disable_nullglob

@@ -62,15 +62,17 @@ fi
 
 print_flags()
 {
-   echo "   -f     : force operation"
-   echo "   -mulle : pass thru to mulle-project-git-prerelease"
+   echo "   -f            : force operation"
+   echo "   --mulle       : pass thru to mulle-project-git-prerelease"
+   echo "   --word <s>    : word to match for in commit message (prerelease)"
+   echo "   --message <s> : commit message (prerelease)"
 
    ##
    ## ADD YOUR FLAGS DESCRIPTIONS HERE
    ##
 
    options_technical_flags_usage \
-                "  : "
+                "         : "
 }
 
 
@@ -84,8 +86,7 @@ Usage:
    mulle-project-squash-prerelease [flags]
 
    Squash all leading commits that contain the word "prerelease" in the
-   commit message into one commit. Flags are passed to 
-   mulle-project-git-prerelease. (Hint: use --mulle)
+   commit message into one commit. (Hint: use --mulle)
 
 Flags:
 EOF
@@ -113,7 +114,8 @@ main()
    local MULLE_FLAG_LOG_MERGE='NO'
    local MULLE_TRACE_POSTPONE='NO'
 
-   local OPTION_WORD="prerelease"
+   local OPTION_WORDS=""
+   local OPTION_MESSAGE="prerelease"
    local OPTION_REV="HEAD"
    local OPTION_MULLE="HEAD"
 
@@ -140,6 +142,21 @@ main()
          --version)
             printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
             exit 0
+         ;;
+
+         --message)
+            [ $# -eq 1 ] && fail "missing argument to $1"
+            shift
+
+            OPTION_MESSAGE="$1"
+         ;;
+
+         --word)
+            [ $# -eq 1 ] && fail "missing argument to $1"
+            shift
+
+            r_comma_concat "${OPTION_WORDS}" "$1"
+            OPTION_WORDS="${RVAL}"
          ;;
 
          --mulle)
@@ -175,17 +192,32 @@ main()
    local commit
    local count
    local message
+   local found
+   local word
+
+   OPTION_WORDS="${OPTION_WORDS:-prerelease}"
 
    count=0
-   for commit in `rexekutor git rev-list "${OPTION_REV}" `
-   do     
+   .foreachline commit in `rexekutor git rev-list "${OPTION_REV}" `
+   .do
       message="`git log -1 --pretty='format:%s' "${commit}" `"
-      if ! grep -q -s -w "${OPTION_WORD}" <<< "${message}"
-      then 
-         break        
+
+      found='NO'
+      .foreachitem word in ${OPTION_WORDS}
+      .do
+         if grep -q -s -w "${word}" <<< "${message}"
+         then
+            found='YES'
+            .break
+         fi
+      .done
+      if [ "${found}" = 'NO' ]
+      then
+         .break
       fi
+
       count=$((count + 1))
-   done
+   .done
 
    case "${count}" in 
       0|1)
@@ -197,7 +229,7 @@ main()
    log_info "Squashing ${count} contiguous prerelease commits"
 
    exekutor git reset --soft HEAD~${count} && 
-   exekutor git commit -m "${OPTION_WORD}" || return 1
+   exekutor git commit -m "${OPTION_MESSAGE}" || return 1
 
    log_info "Pushing prerelease changes"
 
