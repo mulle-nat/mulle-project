@@ -1,58 +1,11 @@
-#! /bin/sh
+#! /usr/bin/env mulle-bash
+# shellcheck shell=bash
 
 [ "${TRACE}" = 'YES' -o "${MULLE_PROJECT_EXTENSION_VERSIONS_TRACE}" = 'YES' ] && set -x && : "$0" "$@"
 
 
 MULLE_EXECUTABLE_VERSION="0.0.0"
 
-
-##########################################################################
-###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###
-###########################################################################
-# #
-# # PRELUDE - Standard startup code for loading mulle-bashfunctions
-# #
-###
-
-#
-# Figure out MULLE_BASHFUNCTIONS_LIBEXEC_DIR on this machine if needed.
-#
-if ! [ ${MULLE_BASHFUNCTIONS_LIBEXEC_DIR+x} ]
-then
-   MULLE_BASHFUNCTIONS_LIBEXEC_DIR="`mulle-bashfunctions libexec-dir`" || exit 1
-   export MULLE_BASHFUNCTIONS_LIBEXEC_DIR
-fi
-
-#
-# The booter reruns the executable either with bash or zsh, whatever the
-# system provides. On the second run --no-auto-shell will be set first.
-#
-if [ "${1:-}" != --no-auto-shell ]
-then
-   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-boot.sh" || exit 1
-else
-   shift    # get rid of --no-auto-shell
-fi
-
-
-#
-# Include mulle-bashfunctions.sh         : default functions
-#         mulle-bashfunctions-none.sh    : almost no functions
-#         mulle-bashfunctions-minimal.sh : few functions for basic scripts
-#         mulle-bashfunctions-all.sh     : everything, even obscure functions
-#
-# Do this first to get aliases
-#
-. "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-bashfunctions.sh" || exit 1
-
-###
-# # Now we are in bash or zsh with mulle-bashfunctions loaded
-# #
-###########################################################################
-###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###
-###########################################################################
-
-MULLE_EXECUTABLE="${BASH_SOURCE[0]:-${(%):-%x}}"
 
 if [ -z "${MULLE_PROJECT_LIBEXEC_DIR}" ]
 then
@@ -115,18 +68,18 @@ list_extension()
    then
       if [ "${version}" = "${project_version}" ]
       then
-         log_warning "\"${extension#${MULLE_USER_PWD}/}\" has been needlessly bumped"
+         log_warning "\"${extension#"${MULLE_USER_PWD}/"}\" has been needlessly bumped"
       else
-         log_info "\"${extension#${MULLE_USER_PWD}/}\" is unchanged"
+         log_info "\"${extension#"${MULLE_USER_PWD}/"}\" is unchanged"
       fi
       return
    fi
 
    if [ "${version}" = "${project_version}" ]
    then
-      log_info "\"${extension#${MULLE_USER_PWD}/}\" has been bumped already"
+      log_info "\"${extension#"${MULLE_USER_PWD}/"}\" has been bumped already"
    else
-      log_warning "\"${extension#${MULLE_USER_PWD}/}\" needs a bump ($version)"
+      log_warning "\"${extension#"${MULLE_USER_PWD}/"}\" needs a bump ($version)"
    fi
 }
 
@@ -149,9 +102,9 @@ bump_extension()
    then
       if [ "${version}" = "${project_version}" ]
       then
-         log_info "\"${extension#${MULLE_USER_PWD}/}\" was needlessly bumped"
+         log_info "\"${extension#"${MULLE_USER_PWD}/"}\" was needlessly bumped"
       else
-         log_verbose "\"${extension#${MULLE_USER_PWD}/}\" is unchanged"
+         log_verbose "\"${extension#"${MULLE_USER_PWD}/"}\" is unchanged"
       fi
       return
    fi
@@ -163,12 +116,12 @@ bump_extension()
          fail "Project version is same as extension version. Bump it first."
       fi
 
-      log_verbose "\"${extension#${MULLE_USER_PWD}/}\" is already bumped"
+      log_verbose "\"${extension#"${MULLE_USER_PWD}/"}\" is already bumped"
       return
    fi
 
    redirect_exekutor "${version_file}" echo "${project_version}"
-   log_info "\"${extension#${MULLE_USER_PWD}/}\" has been bumped"
+   log_info "\"${extension#"${MULLE_USER_PWD}/"}\" has been bumped"
 }
 
 
@@ -191,13 +144,13 @@ unbump_extension()
       if [ "${version}" = "${project_version}" ]
       then
          exekutor git checkout "${tag}" -- "${version_file}" || exit 1
-         log_info "\"${extension#${MULLE_USER_PWD}/}\" has been unbumped"
+         log_info "\"${extension#"${MULLE_USER_PWD}/"}\" has been unbumped"
       else
-         log_verbose "\"${extension#${MULLE_USER_PWD}/}\" is unchanged"
+         log_verbose "\"${extension#"${MULLE_USER_PWD}/"}\" is unchanged"
       fi
    fi
 
-   log_verbose "\"${extension#${MULLE_USER_PWD}/}\" has changes"
+   log_verbose "\"${extension#"${MULLE_USER_PWD}/"}\" has changes"
 }
 
 

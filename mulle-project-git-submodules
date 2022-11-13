@@ -1,4 +1,5 @@
-#! /usr/bin/env bash
+#! /usr/bin/env mulle-bash
+# shellcheck shell=bash
 #
 # This script creates git submodule calls for a repository
 #

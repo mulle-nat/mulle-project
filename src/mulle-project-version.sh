@@ -1,4 +1,4 @@
-#! /usr/bin/env bash
+# shellcheck shell=bash
 #
 #   Copyright (c) 2017 Nat! - Mulle kybernetiK
 #   All rights reserved.
@@ -88,11 +88,16 @@ project::version::get_project_version()
       return 1
    fi
 
-   match="`fgrep -s -w "${versionname}" "${filename}" | head -1`"
+   match="`fgrep -s -w "${versionname}" "${filename}" | head -2`"
+   # get rid of an ifdef
+   match="`egrep -v '^#if' <<< "${match}" | head -1`"
+
    if [ -z "${match}" ]
    then
       match="`egrep -v '^#' "${filename}" | head -1`"
    fi
+
+   log_debug "match=${match}"
 
    case "${match}" in
       *"<<"*)

@@ -1,59 +1,10 @@
-#! /bin/sh
+#! /usr/bin/env mulle-bash
+# shellcheck shell=bash
 
 [ "${TRACE}" = 'YES' -o "${SHELL_ALL_TRACE}" = 'YES' ] && set -x && : "$0" "$@"
 
 
 MULLE_EXECUTABLE_VERSION="0.0.0"
-
-##########################################################################
-###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###
-###########################################################################
-# #
-# # PRELUDE - Standard startup code for loading mulle-bashfunctions
-# #
-###
-
-#
-# Figure out MULLE_BASHFUNCTIONS_LIBEXEC_DIR on this machine if needed.
-#
-if ! [ ${MULLE_BASHFUNCTIONS_LIBEXEC_DIR+x} ]
-then
-   MULLE_BASHFUNCTIONS_LIBEXEC_DIR="`mulle-bashfunctions libexec-dir`" || exit 1
-   export MULLE_BASHFUNCTIONS_LIBEXEC_DIR
-fi
-
-#
-# The booter reruns the executable either with bash or zsh, whatever the
-# system provides. On the second run --no-auto-shell will be set first.
-#
-if [ "${1:-}" != --no-auto-shell ]
-then
-   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-boot.sh" || exit 1
-else
-   shift    # get rid of --no-auto-shell
-fi
-
-
-#
-# Include mulle-bashfunctions.sh         : default functions
-#         mulle-bashfunctions-none.sh    : almost no functions
-#         mulle-bashfunctions-minimal.sh : few functions for basic scripts
-#         mulle-bashfunctions-all.sh     : everything, even obscure functions
-#
-# Do this first to get aliases
-#
-MULLE_EXECUTABLE="${BASH_SOURCE[0]:-${(%):-%x}}"
-
-. "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-bashfunctions.sh" || exit 1
-
-###
-# # Now we are in bash or zsh with mulle-bashfunctions loaded
-# #
-###########################################################################
-###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###
-###########################################################################
-
-
 
 if [ -z "${MULLE_PROJECT_LIBEXEC_DIR}" ]
 then
@@ -180,7 +131,7 @@ handle_reposfile()
          text="`ls -1d */.mulle | sed -n 's/\(.*\)\/\.mulle/\1/p'`"
          if [ -z "${text}" ]
          then
-            fail "No mulle-sde projects found in ${PWD#${MULLE_USER_PWD}/}"
+            fail "No mulle-sde projects found in ${PWD#"${MULLE_USER_PWD}/"}"
          fi
          redirect_exekutor "${reposfilename}" printf "%s\n" "${text}"
       ) || exit 1
@@ -190,7 +141,7 @@ handle_reposfile()
          echo "# $reposfile"
          remove_comments_and_prepend_string "${reposfile}" "${relfile}"
       else
-         fail "No \"${reposfilename}\" file in \"${absfile#${MULLE_USER_PWD}/}\""
+         fail "No \"${reposfilename}\" file in \"${absfile#"${MULLE_USER_PWD}/"}\""
       fi
    fi
 }
@@ -297,7 +248,7 @@ main()
 
       if [ -z "${dirs}" ]
       then
-         log_warning "${dirsfile#${MULLE_USER_PWD}/} is empty"
+         log_warning "${dirsfile#"${MULLE_USER_PWD}/"} is empty"
       fi
 
       local i

@@ -1,4 +1,5 @@
-#! /bin/sh
+#! /usr/bin/env mulle-bash
+# shellcheck shell=bash
 #
 #   Copyright (c) 2017 Nat! - Mulle kybernetiK
 #   All rights reserved.
@@ -39,55 +40,6 @@
 [ "${TRACE}" = 'YES' -o "${MULLE_PROJECT_DISTRIBUTE_TRACE}" = 'YES' ] && set -x && : "$0" "$@"
 
 MULLE_EXECUTABLE_VERSION="0.0.0"
-
-
-##########################################################################
-###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###
-###########################################################################
-# #
-# # PRELUDE - Standard startup code for loading mulle-bashfunctions
-# #
-###
-
-#
-# Figure out MULLE_BASHFUNCTIONS_LIBEXEC_DIR on this machine if needed.
-#
-if ! [ ${MULLE_BASHFUNCTIONS_LIBEXEC_DIR+x} ]
-then
-   MULLE_BASHFUNCTIONS_LIBEXEC_DIR="`mulle-bashfunctions libexec-dir`" || exit 1
-   export MULLE_BASHFUNCTIONS_LIBEXEC_DIR
-fi
-
-#
-# The booter reruns the executable either with bash or zsh, whatever the
-# system provides. On the second run --no-auto-shell will be set first.
-#
-if [ "${1:-}" != --no-auto-shell ]
-then
-   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-boot.sh" || exit 1
-else
-   shift    # get rid of --no-auto-shell
-fi
-
-
-#
-# Include mulle-bashfunctions.sh         : default functions
-#         mulle-bashfunctions-none.sh    : almost no functions
-#         mulle-bashfunctions-minimal.sh : few functions for basic scripts
-#         mulle-bashfunctions-all.sh     : everything, even obscure functions
-#
-# Do this first to get aliases
-#
-MULLE_EXECUTABLE="${BASH_SOURCE[0]:-${(%):-%x}}"
-. "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-bashfunctions.sh" || exit 1
-
-###
-# # Now we are in bash or zsh with mulle-bashfunctions loaded
-# #
-###########################################################################
-###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###
-###########################################################################
-
 
 if [ -z "${MULLE_PROJECT_LIBEXEC_DIR}" ]
 then
@@ -419,11 +371,14 @@ main()
    local OPTION_DO_PUSH_FORMULA="DEFAULT"
    local OPTION_DO_GIT_RELEASE="DEFAULT"
    local OPTION_DO_GENERATE_FORMULA="DEFAULT"
+   local OPTION_DO_PRE_RELEASE="DEFAULT"
    local OPTION_DO_POST_RELEASE="DEFAULT"
    local OPTION_VERSION_TAG="YES"
    local OPTION_FORCE_PUSH="NO"
 
    source_file "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-project-user-files-settings.sh" "$@"   || exit 1
+
+   LANGUAGE=
 
    while [ $# -ne 0 ]
    do
@@ -495,6 +450,14 @@ main()
             OPTION_DO_PUSH_FORMULA='NO'
          ;;
 
+         --pre-release)
+            OPTION_DO_PRE_RELEASE='YES'
+         ;;
+
+         --no-pre-release)
+            OPTION_DO_PRE_RELEASE='NO'
+         ;;
+
          --post-release)
             OPTION_DO_POST_RELEASE='YES'
          ;;
@@ -545,6 +508,12 @@ main()
             [ $# -eq 1 ] && fail "missing parameter for \"$1\""
             shift
             HOMEPAGE_URL="$1"
+         ;;
+
+         --language)
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
+            shift
+            LANGUAGE="$1"
          ;;
 
          --origin)
@@ -710,6 +679,7 @@ main()
 
    log_setting "OPTION_DO_GIT_RELEASE      = ${OPTION_DO_GIT_RELEASE}"
    log_setting "OPTION_DO_GENERATE_FORMULA = ${OPTION_DO_GENERATE_FORMULA}"
+   log_setting "OPTION_DO_PRE_RELEASE      = ${OPTION_DO_PRE_RELEASE}"
    log_setting "OPTION_DO_POST_RELEASE     = ${OPTION_DO_POST_RELEASE}"
    log_setting "OPTION_DO_PUSH_FORMULA     = ${OPTION_DO_PUSH_FORMULA}"
 
@@ -720,6 +690,10 @@ main()
    if [ "${OPTION_DO_GENERATE_FORMULA}" != 'DEFAULT' ]
    then
       DO_GENERATE_FORMULA="${OPTION_DO_GENERATE_FORMULA}"
+   fi
+   if [ "${OPTION_DO_PRE_RELEASE}" != 'DEFAULT' ]
+   then
+      DO_PRE_RELEASE="${OPTION_DO_PRE_RELEASE}"
    fi
    if [ "${OPTION_DO_POST_RELEASE}" != 'DEFAULT' ]
    then
@@ -734,6 +708,7 @@ main()
    then
       log_trace2 "DO_GIT_RELEASE      = ${DO_GIT_RELEASE}"
       log_trace2 "DO_GENERATE_FORMULA = ${DO_GENERATE_FORMULA}"
+      log_trace2 "DO_PRE_RELEASE      = ${DO_PRE_RELEASE}"
       log_trace2 "DO_POST_RELEASE     = ${DO_POST_RELEASE}"
       log_trace2 "DO_PUSH_FORMULA     = ${DO_PUSH_FORMULA}"
    fi
@@ -750,6 +725,7 @@ main()
    if [ "${DO_GIT_RELEASE}" != 'YES' -a  \
         "${DO_GENERATE_FORMULA}" != 'YES' -a  \
         "${DO_PUSH_FORMULA}" != 'YES' -a \
+        "${DO_PRE_RELEASE}" != 'YES' -a \
         "${DO_POST_RELEASE}" != 'YES' ]
    then
       fail "Nothing to do! .mulle/etc/project/version-info.sh and .mulle/etc/project/formula-info.sh are missing"
@@ -763,26 +739,56 @@ main()
       exit_or_continue_if_dry_run=':'
    fi
 
+   #
+   # check if someone installed a pre_release function
+   # if yes call it
+   #
+   if [ "${DO_PRE_RELEASE}" = 'YES' ]
+   then
+      if [ "${VERIFY_ONLY}" != 'YES' ]
+      then
+         if shell_is_function "pre_release"
+         then
+            log_info "Pre release..."
+            pre_release ${MULLE_TECHNICAL_FLAGS} \
+                        "${PROJECT}" \
+                        "${NAME}" \
+                        "${VERSION}" \
+                        "${DEPENDENCIES}" \
+                        "${BUILD_DEPENDENCIES}" \
+                        "${HOMEPAGE_URL}" \
+                        "${DESC}" \
+                        "${ARCHIVE_URL}" \
+                        "${DEBIAN_DEPENDENCIES}" \
+                        "${DEBIAN_REPOSITORY}" \
+                        "${TAG}"
+         else
+            log_fluff "No pre release"
+         fi
+      fi
+   fi
+
+
    if [ "${DO_GIT_RELEASE}" = 'YES' ]
    then
       # do the release
       project::git::verify_main "${BRANCH}" \
-                      "${ORIGIN}" \
-                      "${TAG}" \
-                      "${GITHUB}" \
-                      "${OPTION_LATEST_TAG}" \
-                      "${OPTION_FORCE_PUSH}" || ${exit_or_continue_if_dry_run} 1
+                                "${ORIGIN}" \
+                                "${TAG}" \
+                                "${GITHUB}" \
+                                "${OPTION_LATEST_TAG}" \
+                                "${OPTION_FORCE_PUSH}" || ${exit_or_continue_if_dry_run} 1
 
       if [ "${VERIFY_ONLY}" != 'YES' ]
       then
          log_info "Git release..."
 
          project::git::main "${BRANCH}" \
-                         "${ORIGIN}" \
-                         "${TAG}" \
-                         "${GITHUB}" \
-                         "${OPTION_LATEST_TAG}" \
-                         "${OPTION_FORCE_PUSH}" || ${exit_or_continue_if_dry_run} 1
+                            "${ORIGIN}" \
+                            "${TAG}" \
+                            "${GITHUB}" \
+                            "${OPTION_LATEST_TAG}" \
+                            "${OPTION_FORCE_PUSH}" || ${exit_or_continue_if_dry_run} 1
       fi
    else
       log_fluff "No git release"
@@ -806,16 +812,16 @@ main()
 
          # generate the formula and push it
          if ! project::homebrew::generate "${PROJECT}" \
-                                "${NAME}" \
-                                "${VERSION}" \
-                                "${DEPENDENCIES}" \
-                                "${BUILD_DEPENDENCIES}" \
-                                "${HOMEPAGE_URL}" \
-                                "${DESC}" \
-                                "${ARCHIVE_URL}" \
-                                "${HOMEBREW_TAP}" \
-                                "${RBFILE}" \
-                                "${TAG}"
+                                          "${NAME}" \
+                                          "${VERSION}" \
+                                          "${DEPENDENCIES}" \
+                                          "${BUILD_DEPENDENCIES}" \
+                                          "${HOMEPAGE_URL}" \
+                                          "${DESC}" \
+                                          "${ARCHIVE_URL}" \
+                                          "${HOMEBREW_TAP}" \
+                                          "${RBFILE}" \
+                                          "${TAG}"
          then
             log_error "Homebrew generation failed!"
             ${exit_or_continue_if_dry_run}  1
@@ -829,10 +835,10 @@ main()
    if [ "${DO_PUSH_FORMULA}" = 'YES' ]
    then
       if ! project::homebrew::push "${NAME}" \
-                         "${VERSION}" \
-                         "${HOMEBREW_TAP}" \
-                         "${RBFILE}" \
-                         "${TAG}"
+                                   "${VERSION}" \
+                                   "${HOMEBREW_TAP}" \
+                                   "${RBFILE}" \
+                                   "${TAG}"
       then
          log_error "Homebrew formula push failed!"
          ${exit_or_continue_if_dry_run} 1

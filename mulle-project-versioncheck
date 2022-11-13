@@ -1,4 +1,5 @@
-#! /bin/sh
+#! /usr/bin/env mulle-bash
+# shellcheck shell=bash
 
 [ "${TRACE}" = 'YES' -o "${MULLE_PROJECT_VERSIONCHECK_TRACE}" = 'YES' ] && set -x && : "$0" "$@"
 
@@ -307,7 +308,7 @@ ${C_INFO}Run mulle-sde fetch if this is unexpected."
    then
       if [ "${MULLE_FLAG_MAGNUM_FORCE}" != 'YES' ]
       then
-         log_warning "No reflect ${folder#${MULLE_USER_PWD}/} here"
+         log_warning "No reflect ${folder#"${MULLE_USER_PWD}/"} here"
          return
       fi
    fi
@@ -322,7 +323,7 @@ ${C_INFO}Run mulle-sde fetch if this is unexpected."
    then
       if [ "${OPTION_UPDATE}" = 'ONLY' ]
       then
-         log_warning "No update as ${dstfile#${MULLE_USER_PWD}/} is missing"
+         log_warning "No update as ${dstfile#"${MULLE_USER_PWD}/"} is missing"
          return
       fi
 
@@ -330,7 +331,7 @@ ${C_INFO}Run mulle-sde fetch if this is unexpected."
       r_mkdir_parent_if_missing "${dstfile}"
    fi
 
-   log_info "${PROJECT_NAME} ${verb} ${dstfile#${MULLE_USER_PWD}/}"
+   log_info "${PROJECT_NAME} ${verb} ${dstfile#"${MULLE_USER_PWD}/"}"
 
    local text
 

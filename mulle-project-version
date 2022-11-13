@@ -1,4 +1,5 @@
-#! /bin/sh
+#! /usr/bin/env mulle-bash
+# shellcheck shell=bash
 #
 #   Copyright (c) 2017 Nat! - Mulle kybernetiK
 #   All rights reserved.
@@ -34,53 +35,6 @@
 
 MULLE_EXECUTABLE_VERSION="0.0.0"
 
-##########################################################################
-###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###
-###########################################################################
-# #
-# # PRELUDE - Standard startup code for loading mulle-bashfunctions
-# #
-###
-
-#
-# Figure out MULLE_BASHFUNCTIONS_LIBEXEC_DIR on this machine if needed.
-#
-if ! [ ${MULLE_BASHFUNCTIONS_LIBEXEC_DIR+x} ]
-then
-   MULLE_BASHFUNCTIONS_LIBEXEC_DIR="`mulle-bashfunctions libexec-dir`" || exit 1
-   export MULLE_BASHFUNCTIONS_LIBEXEC_DIR
-fi
-
-#
-# The booter reruns the executable either with bash or zsh, whatever the
-# system provides. On the second run --no-auto-shell will be set first.
-#
-if [ "${1:-}" != --no-auto-shell ]
-then
-   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-boot.sh" || exit 1
-else
-   shift    # get rid of --no-auto-shell
-fi
-
-
-#
-# Include mulle-bashfunctions.sh         : default functions
-#         mulle-bashfunctions-none.sh    : almost no functions
-#         mulle-bashfunctions-minimal.sh : few functions for basic scripts
-#         mulle-bashfunctions-all.sh     : everything, even obscure functions
-#
-# Do this first to get aliases
-#
-. "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-bashfunctions.sh" || exit 1
-
-###
-# # Now we are in bash or zsh with mulle-bashfunctions loaded
-# #
-###########################################################################
-###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###
-###########################################################################
-
-MULLE_EXECUTABLE="${BASH_SOURCE[0]:-${(%):-%x}}"
 
 if [ -z "${MULLE_PROJECT_LIBEXEC_DIR}" ]
 then
@@ -501,18 +455,18 @@ write_version()
          if [ ! -z "${other}" ]
          then
             project::version::set "${VERSION}" \
-                                "${other}" \
-                                "${VERSIONMIRRORNAME}" \
-                                "${VERSIONCUSTOM}" || exit 1
+                                  "${other}" \
+                                  "${VERSIONMIRRORNAME}" \
+                                  "${VERSIONCUSTOM}" || exit 1
          fi
       done
       IFS="${DEFAULT_IFS}" ; shell_enable_glob
 
       # set mirrors first before "real", which is nicer in case of fails
       project::version::set "${VERSION}" \
-                          "${VERSIONFILE}" \
-                          "${VERSIONNAME}" \
-                          "${VERSIONCUSTOM}" || exit 1
+                            "${VERSIONFILE}" \
+                            "${VERSIONNAME}" \
+                            "${VERSIONCUSTOM}" || exit 1
    fi
 
    if [ "${OPTION_WRITE_XCODE_VERSION}" = 'YES' ]
@@ -530,6 +484,8 @@ write_version()
 
 verify_version()
 {
+   log_entry "verify_version" "$@"
+
    # lame ass bug check
    case "$*" in
       *--reset*)
@@ -537,7 +493,7 @@ verify_version()
       ;;
    esac
 
-   VERIFY_VERSION="`rexekutor "$0" "$@" --reset`" || _internal_fail "Could not get VERIFY_VERSION"
+   VERIFY_VERSION="`rexekutor "${MULLE_EXECUTABLE}" "$@" --reset`" || _internal_fail "Could not get VERIFY_VERSION"
 
    if [ "${VERSION}" != "${VERIFY_VERSION}" ]
    then
@@ -550,9 +506,37 @@ verify_version()
 }
 
 
-parse_arguments()
+main()
 {
-   log_entry "parse_arguments" "$@"
+   local directory
+
+   local OPTION_ADD_MAJOR="0"
+   local OPTION_ADD_MINOR="0"
+   local OPTION_ADD_PATCH="0"
+   local OPTION_ADD_CUSTOM="0"
+   local OPTION_FIRST_PATCH="0"
+   local OPTION_FIRST_CUSTOM="0"
+   local OPTION_READ_INFO='YES'
+   local OPTION_READ_XCODE_VERSION='NO'
+   local OPTION_WRITE='DEFAULT'
+   local OPTION_WRITE_XCODE_VERSION='DEFAULT'
+   local OPTION_WRITE_EXTENSION_VERSIONS='DEFAULT'
+   local OPTION_XCODEPROJ=""
+   local OPTION_TAG_WARNING='YES'
+   local OPTION_CUSTOM_VERSIONING
+   local OPTION_VERSIONNAME
+   local OPTION_VERSIONFILE
+   local OPTION_IS_OK
+   local OPTION_IF_NEEDED
+   local OPTION_RELEASENOTES
+
+   if [ -f ".mulle/etc/project/.first_patch" ]
+   then
+      OPTION_FIRST_PATCH="`cat ".mulle/etc/project/.first_patch"`"
+   fi
+
+   # clobber some environment variables...
+   LANGUAGE=
 
    while [ $# -ne 0 ]
    do
@@ -746,39 +730,6 @@ parse_arguments()
       PROJECT="${1:-${DIRECTORY_NAME}}"
       [ $# -ne 0 ] && shift
    fi
-}
-
-
-main()
-{
-   local directory
-
-   local OPTION_ADD_MAJOR="0"
-   local OPTION_ADD_MINOR="0"
-   local OPTION_ADD_PATCH="0"
-   local OPTION_ADD_CUSTOM="0"
-   local OPTION_FIRST_PATCH="0"
-   local OPTION_FIRST_CUSTOM="0"
-   local OPTION_READ_INFO='YES'
-   local OPTION_READ_XCODE_VERSION='NO'
-   local OPTION_WRITE='DEFAULT'
-   local OPTION_WRITE_XCODE_VERSION='DEFAULT'
-   local OPTION_WRITE_EXTENSION_VERSIONS='DEFAULT'
-   local OPTION_XCODEPROJ=""
-   local OPTION_TAG_WARNING='YES'
-   local OPTION_CUSTOM_VERSIONING
-   local OPTION_VERSIONNAME
-   local OPTION_VERSIONFILE
-   local OPTION_IS_OK
-   local OPTION_IF_NEEDED
-   local OPTION_RELEASENOTES
-
-   if [ -f ".mulle/etc/project/.first_patch" ]
-   then
-      OPTION_FIRST_PATCH="`cat ".mulle/etc/project/.first_patch"`"
-   fi
-
-   parse_arguments "$@"
 
    if [ "${OPTION_READ_INFO}" = 'YES' ]
    then

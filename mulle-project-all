@@ -1,57 +1,10 @@
-#! /bin/sh
+#! /usr/bin/env mulle-bash
+# shellcheck shell=bash
 
 [ "${TRACE}" = 'YES' -o "${SHELL_ALL_TRACE}" = 'YES' ] && set -x && : "$0" "$@"
 
 
 MULLE_EXECUTABLE_VERSION="0.0.0"
-
-##########################################################################
-###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###
-###########################################################################
-# #
-# # PRELUDE - Standard startup code for loading mulle-bashfunctions
-# #
-###
-
-#
-# Figure out MULLE_BASHFUNCTIONS_LIBEXEC_DIR on this machine if needed.
-#
-if ! [ ${MULLE_BASHFUNCTIONS_LIBEXEC_DIR+x} ]
-then
-   MULLE_BASHFUNCTIONS_LIBEXEC_DIR="`mulle-bashfunctions libexec-dir`" || exit 1
-   export MULLE_BASHFUNCTIONS_LIBEXEC_DIR
-fi
-
-#
-# The booter reruns the executable either with bash or zsh, whatever the
-# system provides. On the second run --no-auto-shell will be set first.
-#
-if [ "${1:-}" != --no-auto-shell ]
-then
-   . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-boot.sh" || exit 1
-else
-   shift    # get rid of --no-auto-shell
-fi
-
-
-#
-# Include mulle-bashfunctions.sh         : default functions
-#         mulle-bashfunctions-none.sh    : almost no functions
-#         mulle-bashfunctions-minimal.sh : few functions for basic scripts
-#         mulle-bashfunctions-all.sh     : everything, even obscure functions
-#
-# Do this first to get aliases
-#
-. "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-bashfunctions.sh" || exit 1
-
-###
-# # Now we are in bash or zsh with mulle-bashfunctions loaded
-# #
-###########################################################################
-###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###   ###
-###########################################################################
-
-MULLE_EXECUTABLE="${BASH_SOURCE[0]:-${(%):-%x}}"
 
 
 if [ -z "${MULLE_PROJECT_LIBEXEC_DIR}" ]
@@ -67,6 +20,7 @@ print_flags()
    ##
    cat <<EOF
    --all               : execute in all projects,subprojects,tests
+   --directory <dir>   : enter subdirectory, before executing project command
    --eval              : evaluate command line, requires tricky quoting though
    --if <expr>         : ignore project if shell expression evaluates to false
    --ignore <name>     : ignore a project from REPOS, multiples are possible
@@ -225,6 +179,10 @@ shell_it()
 
       shift
 
+      if [ ! -z "${OPTION_DIRECTORY}" ]
+      then
+         cd "${OPTION_DIRECTORY}" || exit 1
+      fi
 
       if [ "${OPTION_EVAL}" = 'YES' ]
       then
@@ -257,7 +215,7 @@ project_it()
       *,main-project,*)
          if [ -z "${PROJECT_NAME}" ]
          then
-            PROJECT_NAME="$1"
+            PROJECT_NAME="${project}"
          fi
 
          if [ "${OPTION_SDE_TEST}" = 'YES' ]
@@ -287,6 +245,8 @@ project_it()
                          mulle-sde -N subproject list --format '%a\n' \
                                                       --output-no-header 2> /dev/null
                         ) `"
+
+         local old
 
          old="${SUBPROJECT_NAME}"
          .foreachpath subproject in ${subprojects}
@@ -320,6 +280,8 @@ project_it()
                                        get --lenient MULLE_SDE_TEST_PATH 2> /dev/null )`"
          tests="${tests:-test}"
 
+         local old
+
          old="${TEST_NAME}"
          .foreachpath test in ${tests}
          .do
@@ -346,6 +308,8 @@ project_it()
          others="`( cd "${project}" ; mulle-env --search-here environment \
                            get MULLE_SDE_OTHER_PROJECTS_PATH 2> /dev/null )`"
          others="${others:-demo}"
+
+         local old
 
          old="${OTHER_NAME}"
          .foreachpath other in ${others}
@@ -431,6 +395,7 @@ main()
    local OPTION_LENIENT='YES'
    local OPTION_MODE="main-project"
    local OPTION_REPOSFILE
+   local OPTION_DIRECTORY
    local OPTION_PARALLEL
    local OPTION_SDE_TEST='NO'
    local OPTION_EVAL
@@ -456,6 +421,14 @@ main()
 
          -a|--all)
             OPTION_MODE="main-project,subprojects,tests,others"
+         ;;
+
+         -d|--directory)
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
+            shift
+
+            r_concat "${OPTION_DIRECTORY}" "$1" "&&"
+            OPTION_DIRECTORY="${RVAL}"
          ;;
 
          -e|--eval)
