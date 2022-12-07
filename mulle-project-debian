@@ -138,6 +138,9 @@ main()
       . .mulle/etc/project/publisher-info.sh
    fi
 
+   local key
+   local value
+
    r_dirname "$0"
    EXE_DIR="${RVAL}"
    LIBEXEC_DIR="`"${EXE_DIR}/mulle-project" libexec-dir`" || exit 1
@@ -186,8 +189,6 @@ main()
          --*)
             [ $# -eq 1 ] && fail "missing parameter for \"$1\""
 
-            local key
-
             key="`sed 's/^..//' <<< "$1"`"
             key="`tr '-' '_' <<< "${key}"`"
             key="`tr '[a-z]' '[A-Z]' <<< "${key}"`"
@@ -197,8 +198,6 @@ main()
             fi
 
             shift
-
-            local value
 
             value="$1"
 

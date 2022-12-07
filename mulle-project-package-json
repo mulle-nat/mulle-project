@@ -275,15 +275,19 @@ print_dependencies()
    local tag
    local line
 
-   shell_disable_glob
-   IFS=$'\n'
-   for line in `rexekutor mulle-sde dependency list -r -- \
+   local s
+   local user
+   local repo
+   local print_tag
+
+
+   .foreachline line in `rexekutor mulle-sde dependency list -r -- \
                                                        --dedupe-mode url-filename \
                                                        --output-eval \
                                                        --output-no-column \
                                                        --output-no-header \
                                                        --format "%a;%t;%u\\n"`
-   do
+   .do
       name="${line%%;*}"
       line="${line#*;}"
       tag="${line%%;*}"
@@ -291,10 +295,6 @@ print_dependencies()
 
       case "${url}" in
          *github.com*/archive/*)
-            local s
-            local user
-            local repo
-
             s="${url#*:}"
             s="${s#//}"
             s="${s#github.com/}"
@@ -322,8 +322,6 @@ print_dependencies()
          ;;
       esac
 
-      local print_tag
-
       print_tag=">=0.0.1"
       # if it isn't numeric it won't show up on github
       case "${tag}" in
@@ -334,27 +332,20 @@ print_dependencies()
          *)
             local alias_tag
 
-            shell_disable_glob
-            IFS=
-            for alias_tag in `${MULLE_FETCH:-mulle-fetch} github "${user}" "${repo}"  \
+            .foreachline alias_tag in `${MULLE_FETCH:-mulle-fetch} github "${user}" "${repo}"  \
                                                           get-tag-aliases "${tag}" `
-            do
+            .do
                case "${alias_tag}" in
                   [vV][0-9]*\.[0-9]*\.[0-9]*|[0-9]*\.[0-9]*\.[0-9]*)
                      print_tag="^${alias_tag#[Vv]}"
-                     break
+                     .break
                   ;;
                esac
-            done
-            shell_enable_glob
-            IFS="${DEFAULT_IFS}"
+            .done
          ;;
       esac
       printf "#semver:${print_tag}\""
-
-   done
-   IFS="${DEFAULT_IFS}"
-   shell_enable_glob
+   .done
 
    printf "\n${INDENT}}"
 }

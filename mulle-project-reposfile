@@ -70,11 +70,11 @@ remove_comments_and_prepend_string()
    log_entry "remove_comments_and_prepend_string" "$@"
 
    local file="$1"
-   local path="$2"
+   local pathitem="$2"
 
    local escaped
 
-   r_escaped_sed_replacement "${path}"
+   r_escaped_sed_replacement "${pathitem}"
    escaped="${RVAL}"
 
    rexekutor sed -e '/^#/d' \

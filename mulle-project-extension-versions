@@ -79,7 +79,7 @@ list_extension()
    then
       log_info "\"${extension#"${MULLE_USER_PWD}/"}\" has been bumped already"
    else
-      log_warning "\"${extension#"${MULLE_USER_PWD}/"}\" needs a bump ($version)"
+      log_warning "\"${extension#"${MULLE_USER_PWD}/"}\" needs a bump ($version -> ${project_version})"
    fi
 }
 

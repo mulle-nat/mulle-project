@@ -38,28 +38,26 @@ project::homebrew::get_class_from_name()
 
    local formula
 
-   ## formula is dervied from name, which is rbfile w/o extension
+   ## formula is derived from name, which is rbfile w/o extension
 
-   formula="$(tr '-' ' ' <<< "${name}")"
+   formula="${name//-/ }"
 
-   (
+   local i
+   local tmp
+   local result
 
-      local i
-      local tmp
-      local result
-
-      IFS=" "
-      for i in $formula
-      do
-         if [ ! -z "$i" ]
-         then
-            tmp="$(tr '[A-Z]' '[a-z]' <<< "${i}")"
-            tmp="$(tr '[a-z]' '[A-Z]' <<< "${tmp:0:1}")${tmp:1}"
-            result="${result}${tmp}"
-         fi
-      done
-      printf "%s\n" "${result}"
-   )
+   IFS=" "
+   for i in $formula
+   do
+      if [ ! -z "$i" ]
+      then
+         r_lowercase "${i}"
+         tmp="${RVAL}"
+         r_uppercase "${tmp:0:1}"
+         result="${result}${RVAL}${tmp:1}"
+      fi
+   done
+   printf "%s\n" "${result}"
 }
 
 

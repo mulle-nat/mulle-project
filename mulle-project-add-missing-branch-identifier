@@ -72,56 +72,55 @@ search_and_replace()
    #
    lines="`project::sourcetree-parser::get_dependency_address_nodetype_branch_tag_url`"
 
-   shell_disable_glob; IFS=$'\n'
-   for line in ${lines}
-   do
-      shell_enable_glob; IFS="${DEFAULT_IFS}"
+   local upcaseid
+   local name
+   local newnodetype
+   local newbranch
+   local newurl
+   local newtag
+   local action
 
-      local _address
-      local _nodetype
-      local _branch
-      local _url
-      local _host
-      local _user
-      local _repo
-      local _nodetype_identifier
-      local _nodetype_fallback
-      local _branch_identifier
-      local _branch_fallback
-      local _url_identifier
-      local _url_fallback
-      local _tag_identifier
-      local _tag_fallback
+   include "case"
+
+   local _address
+   local _nodetype
+   local _branch
+   local _url
+   local _host
+   local _user
+   local _repo
+   local _nodetype_identifier
+   local _nodetype_fallback
+   local _branch_identifier
+   local _branch_fallback
+   local _url_identifier
+   local _url_fallback
+   local _tag_identifier
+   local _tag_fallback
+
+   .foreachline line in ${lines}
+   .do
+      [ -z "${line}" ] && .continue
 
       if ! project::sourcetree-parser::parse_nodetype_branch_tag_url "${line}"
       then
-         continue
+         .continue
       fi
 
       if [ ! -z "${_user}" ] && ! project::sourcetree-parser::is_matching_wildcards "${matching_users}" "${_user}"
       then
          log_fluff "\"${_user}\" does not match \"${matching_users}\""
-         continue
+         .continue
       fi
       if [ ! -z "${_repo}" ] && ! project::sourcetree-parser::is_matching_wildcards "${matching_repos}" "${_repo}"
       then
          log_fluff "\"${_repo}\" does not match \"${matching_repos}\""
-         continue
+         .continue
       fi
-
-      local upcaseid
-      local name
-
-      include "case"
 
       r_basename "${_address}"
       r_smart_upcase_identifier "${RVAL}"
       upcaseid="${RVAL}"
-
-      local newnodetype
-      local newbranch
-      local newurl
-      local newtag
 
       if [ -z "${_nodetype_fallback}" ]
       then
@@ -150,8 +149,6 @@ search_and_replace()
       else
          newtag="\${${upcaseid}_TAG:-${_tag_fallback}}"
       fi
-
-      local action
 
       action='NO'
       if [ "${newnodetype}" != "${_nodetype}" ]
@@ -193,9 +190,7 @@ search_and_replace()
       then
          log_fluff "No change for ${_address}"
       fi
-   done
-
-   shell_enable_glob; IFS="${DEFAULT_IFS}"
+   .done
 }
 
 

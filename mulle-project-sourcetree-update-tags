@@ -52,11 +52,6 @@ print_commands()
 {
    log_entry "print_commands" "$@"
 
-   local url
-   local name
-   local tag
-   local line
-
    local stash_dir
 
    stash_dir="${MULLE_SOURCETREE_STASH_DIRNAME:-stash}"
@@ -65,21 +60,24 @@ print_commands()
       log_warning "Could not locate the stash directory. H"
    fi
 
-   shell_disable_glob
-   IFS=$'\n'
-   for line in `rexekutor mulle-sde dependency list -- \
+   local found
+   local line
+   local url
+   local name
+   local tag
+   local version
+
+   .foreachline line in `rexekutor mulle-sde dependency list -- \
                                                     --dedupe-mode url-filename \
                                                     --output-eval \
                                                     --output-no-column \
                                                     --output-no-header \
                                                     --format "%a;%t;%u\\n"`
-   do
+   .do
       name="${line%%;*}"
       line="${line#*;}"
       tag="${line%%;*}"
       url="${line#*;}"
-
-      local found
 
       if [ ! -z "${OPTION_MATCHERS}" -o $# -ne 0 ]
       then
@@ -93,10 +91,8 @@ print_commands()
             esac
          done
 
-         [ -z "${found}" ] && continue
+         [ -z "${found}" ] && .continue
       fi
-
-      local version
 
       filename="`mulle-sde dependency source-dir "${name}" `" || exit 1
 
@@ -116,14 +112,11 @@ print_commands()
       if [ -z "${version}" ]
       then
          log_warning "Couldn't figure out the version for ${name}"
-         continue
+         .continue
       fi
 
       echo "mulle-sde dependency set '${name}' tag '^${version}'"
-   done
-
-   IFS="${DEFAULT_IFS}"
-   shell_enable_glob
+   .done
 }
 
 
@@ -238,16 +231,11 @@ main()
       if [ "${OPTION_EXECUTE_COMMANDS}" = 'YES' ]
       then
          local line
-         shell_disable_glob
 
-         IFS=$'\n'
-         for line in ${text}
-         do
+         .foreachline line in ${text}
+         .do
             eval_exekutor "${line}"
-         done
-
-         IFS="${DEFAULT_IFS}"
-         shell_enable_glob
+         .done
       fi
    fi
 }

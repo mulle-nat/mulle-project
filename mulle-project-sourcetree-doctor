@@ -102,7 +102,11 @@ __doctor_archive_nodeline()
             fi
 
             case "${user}" in
-               codeon-gmbh|mulle-c|mulle-objc|mulle-core|mulle-concurrent|MulleEOF|MulleWeb|MulleFoundation|MulleUI)
+               mulle-c|mulle-cc|mulle-objc|mulle-core|mulle-concurrent|MulleEOF|MulleWeb|MulleFoundation|MulleUI)
+               ;;
+
+               codeon-gmbh)
+                  log_warning "${_address}: URL \"${_url} specifies obsolete github user \"${user}\""
                ;;
 
                mulle-nat)

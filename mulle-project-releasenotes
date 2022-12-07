@@ -508,6 +508,12 @@ scratch_dump_stdin()
 
    local collect
 
+   local found
+   local tags
+   local tag
+   local markers
+
+
    IFS=$'\n'
    while :
    do
@@ -540,10 +546,6 @@ scratch_dump_stdin()
          ;;
       esac
 
-      local found
-      local tags
-      local tag
-
       found=
       tags="`parse_git_tags_in_line "${line:2}" `" || return 1
       for tag in ${tags}
@@ -563,8 +565,6 @@ scratch_dump_stdin()
       then
          found="${version}"
       fi
-
-      local markers
 
       if [ ! -z "${found}" ]
       then

@@ -35,6 +35,7 @@ EOF
    if [ ! -z "${MULLE_TRACE}" ]
    then
       cat <<EOF
+   --if-exists <file>  : ignore project if <file> does not exist
    --lenient           : lenient operation, errors don't preempt (default)
    --main-project      : also execute in main project
    --subprojects       : also execute in subprojects
@@ -246,8 +247,6 @@ project_it()
                                                       --output-no-header 2> /dev/null
                         ) `"
 
-         local old
-
          old="${SUBPROJECT_NAME}"
          .foreachpath subproject in ${subprojects}
          .do
@@ -280,8 +279,6 @@ project_it()
                                        get --lenient MULLE_SDE_TEST_PATH 2> /dev/null )`"
          tests="${tests:-test}"
 
-         local old
-
          old="${TEST_NAME}"
          .foreachpath test in ${tests}
          .do
@@ -308,8 +305,6 @@ project_it()
          others="`( cd "${project}" ; mulle-env --search-here environment \
                            get MULLE_SDE_OTHER_PROJECTS_PATH 2> /dev/null )`"
          others="${others:-demo}"
-
-         local old
 
          old="${OTHER_NAME}"
          .foreachpath other in ${others}
@@ -345,7 +340,7 @@ parallel_execute_argument_first()
 
    [ $# -eq 0 ] && _internal_fail "missing commandline"
 
-   _parallel_begin
+   __parallel_begin
 
    local argument
 
@@ -369,28 +364,13 @@ parallel_execute_argument_first()
       fi
    .done
 
-   _parallel_end
+   __parallel_end
 }
 
 
 
 main()
 {
-   local MULLE_FLAG_MAGNUM_FORCE='NO'
-
-   # technical flags
-   local MULLE_TRACE
-   local MULLE_FLAG_EXEKUTOR_DRY_RUN='NO'
-   local MULLE_FLAG_LOG_LOCAL='NO'
-   local MULLE_FLAG_LOG_DEBUG='NO'
-   local MULLE_FLAG_LOG_EXEKUTOR='NO'
-   local MULLE_FLAG_LOG_FLUFF='NO'
-   local MULLE_FLAG_LOG_SCRIPTS='NO'
-   local MULLE_FLAG_LOG_SETTINGS='NO'
-   local MULLE_FLAG_LOG_VERBOSE='NO'
-   local MULLE_FLAG_LOG_MERGE='NO'
-   local MULLE_TRACE_POSTPONE='NO'
-
    local OPTION_ADORN
    local OPTION_LENIENT='YES'
    local OPTION_MODE="main-project"
