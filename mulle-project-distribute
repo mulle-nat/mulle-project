@@ -113,7 +113,6 @@ project_is_compatible_version()
 }
 
 
-
 __environment_main()
 {
    # --- COMMON ---
@@ -407,7 +406,7 @@ main()
          ;;
 
         -f|--force-push)
-            OPTION_FORCE_PUSH='NO'
+            OPTION_FORCE_PUSH='YES'
          ;;
 
          --no-git)

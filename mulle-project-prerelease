@@ -9,6 +9,7 @@
 MULLE_EXECUTABLE_USAGE_NAME=mulle-project-distribute \
    mulle-project-distribute \
       "$@" \
+      --force-push \
       --branch prerelease  \
       --latest-tag latest-prerelease \
       --no-version-tag \

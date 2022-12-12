@@ -442,6 +442,13 @@ project::git::_commit_main()
       fi
    fi
 
+   local gitpushflags
+
+   if [ "${forcepush}" = 'YES' ]
+   then
+      gitpushflags="-f"
+   fi
+
    #
    # make it a release
    #
@@ -470,28 +477,28 @@ project::git::_commit_main()
    fi
 
    log_info "Push \"${dstbranch}\" with tags to \"${origin}\""
-   exekutor git push "${origin}" "${dstbranch}" || ${return_or_continue_if_dry_run} 1
+   exekutor git push ${gitpushflags} "${origin}" "${dstbranch}" || ${return_or_continue_if_dry_run} 1
    if [ ! -z "${tag}" ]
    then
-      exekutor git push "${origin}" "${tag}" || ${return_or_continue_if_dry_run} 1
+      exekutor git push ${gitpushflags} "${origin}" "${tag}" || ${return_or_continue_if_dry_run} 1
    fi
    if [ ! -z "${latesttag}" ]
    then
-      exekutor git push "${origin}" "${latesttag}" || ${return_or_continue_if_dry_run} 1
+      exekutor git push ${gitpushflags}  "${origin}" "${latesttag}" || ${return_or_continue_if_dry_run} 1
    fi
 
    if [ "${have_github}" = 'YES' ]
    then
       log_info "Push \"${dstbranch}\" with tags to \"${github}\""
-      exekutor git push "${github}" "${dstbranch}" || ${return_or_continue_if_dry_run} 1
+      exekutor git push ${gitpushflags} "${github}" "${dstbranch}" || ${return_or_continue_if_dry_run} 1
 
       if [ ! -z "${tag}" ]
       then
-         exekutor git push "${github}" "${tag}" || ${return_or_continue_if_dry_run} 1
+         exekutor git push ${gitpushflags} "${github}" "${tag}" || ${return_or_continue_if_dry_run} 1
       fi
       if [ ! -z "${latesttag}" ]
       then
-         exekutor git push "${github}" "${latesttag}" || ${return_or_continue_if_dry_run} 1
+         exekutor git push ${gitpushflags} "${github}" "${latesttag}" || ${return_or_continue_if_dry_run} 1
       fi
    fi
 }
