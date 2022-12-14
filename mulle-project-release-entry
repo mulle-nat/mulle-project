@@ -15,8 +15,10 @@ fi
 
 print_flags()
 {
-   echo "   -f    : force operation"
-
+   echo "   -f        : force operation"
+   echo "   -m        : suppress output if there is only a patch change"
+   echo "   -p <date> : use date as previous release date instead of tag"
+   echo "   -b        : put ** around major change fields"
    ##
    ## ADD YOUR FLAGS DESCRIPTIONS HERE
    ##
@@ -43,6 +45,7 @@ EOF
 
    exit 1
 }
+
 
 convert_datestring_to_timestamp()
 {
@@ -78,6 +81,7 @@ emit_line()
 {
    local version="$1"
    local tag="$2"
+   local marker="$3"
 
    local repo
    local user
@@ -88,10 +92,14 @@ emit_line()
    repo="`mulle-sde env get PROJECT_NAME 2> /dev/null`"
    if [ -z "${repo}" ]
    then
-      repo="`basename -- "${dir}" `"
+      r_basename "${dir}"
+      repo="${RVAL}"
    fi
-   dir="`dirname -- "${dir}" `"
-   user="`basename -- "${dir}" `"
+
+   r_dirname "${dir}"
+   dir="${RVAL}"
+   r_basename "${dir}"
+   user="${RVAL}"
 
    case "${user}" in
       srcS)
@@ -99,7 +107,7 @@ emit_line()
       ;;
    esac
 
-   echo "[${repo}](//github.com/${user}/${repo}/RELEASENOTES.md) | ${version} | ${tag:--}"
+   echo "| ${marker}[${repo}](//github.com/${user}/${repo}/RELEASENOTES.md)${marker} | ${marker}${version}${marker} | ${tag:--} |"
 }
 
 
@@ -164,6 +172,8 @@ run()
 
    local timestamp1="$1"
    local timestamp2="$2"
+   local suppress="$3"
+   local boldmarker="$4"
 
    local version
 
@@ -182,11 +192,10 @@ run()
    latest_commit="`rexekutor git rev-list -n 1 latest --`"
    if [ -z "${latest_commit}" ]
    then
-      emit_line "${version}"
+      emit_line "${version}" "" "${boldmarker}"
       return
    fi
 
-   local tag
    local version_commit
 
    #
@@ -194,6 +203,9 @@ run()
    # and version as well as its the latest. Guess last one from timestamp
    #
    version_commit="`rexekutor git rev-list -n 1 "${version}" -- 2> /dev/null`"
+
+   local tag
+
    if [ ! -z "${version_commit}" ]
    then
       tag="`git_numeric_tags_in_timerange "${timestamp1}" "${timestamp2}" \
@@ -205,28 +217,39 @@ run()
             | egrep '^[0-9]*\.[0-9]*\.[0-9]*$' | head -1`"
    fi
 
-   emit_line "${version}" "${tag}"
+   if [ "${suppress}" = 'YES' -o "${boldmarker}" = 'YES' ]
+   then
+      #
+      # if somethings funny, lets just bold it
+      # sanity check that version tag are parseable...
+      #
+      case "${version};${tag}" in
+         *\.*\.*\;*\.*\.*)
+            include "version"
+
+            r_version_distance "${tag}" "${version}"
+            if [ "$RVAL" -lt 256 ]
+            then
+               # check that both are reasonably valid tags
+               return
+            fi
+
+            if [ "$RVAL" -lt 1048576 ]
+            then
+               boldmarker=""
+            fi
+         ;;
+      esac
+   fi
+   emit_line "${version}" "${tag}" "${boldmarker}"
 }
 
 
 main()
 {
-   local MULLE_FLAG_MAGNUM_FORCE='NO'
-
-   # technical flags
-   local MULLE_TRACE
-   local MULLE_FLAG_EXEKUTOR_DRY_RUN='NO'
-   local MULLE_FLAG_LOG_LOCAL='NO'
-   local MULLE_FLAG_LOG_DEBUG='NO'
-   local MULLE_FLAG_LOG_EXEKUTOR='NO'
-   local MULLE_FLAG_LOG_FLUFF='NO'
-   local MULLE_FLAG_LOG_SCRIPTS='NO'
-   local MULLE_FLAG_LOG_SETTINGS='NO'
-   local MULLE_FLAG_LOG_VERBOSE='NO'
-   local MULLE_FLAG_LOG_MERGE='NO'
-   local MULLE_TRACE_POSTPONE='NO'
-
    local OPTION_PREVIOUS_RELEASE_DATE
+   local OPTION_SUPPRESS_ONLY_PATCH_CHANGES
+   local OPTION_BOLD_MARKER
 
    #
    # simple flag handling
@@ -240,19 +263,30 @@ main()
       fi
 
       case "$1" in
-         -f|--force)
-            MULLE_FLAG_MAGNUM_FORCE='YES'
-         ;;
-
          -h*|--help|help)
             usage
          ;;
 
+         -f|--force)
+            MULLE_FLAG_MAGNUM_FORCE='YES'
+         ;;
 
          --version)
             printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
             exit 0
          ;;
+
+         -m|--suppress-only-patch-changes)
+            OPTION_SUPPRESS_ONLY_PATCH_CHANGES='YES'
+         ;;
+
+         -b|--bold-marker)
+            [ $# -eq 1 ] && fail "missing argument to $1"
+            shift
+
+            OPTION_BOLD_MARKER="$1"
+         ;;
+
 
          -p|--previous-release-date)
             [ $# -eq 1 ] && fail "missing argument to $1"
@@ -277,7 +311,7 @@ main()
 
    if [ -z "${OPTION_PREVIOUS_RELEASE_DATE}" ]
    then
-      run
+      run "" "" "${OPTION_SUPPRESS_ONLY_PATCH_CHANGES}" "${OPTION_BOLD_MARKER}"
       return $?
    fi
 
@@ -294,8 +328,7 @@ main()
    timestamp2=$(( timestamp1 + 7200 * 7 ))
 
    # we want to ignore commits after this timestamp
-   run "" "${timestamp2}"
+   run "" "${timestamp2}" "${OPTION_SUPPRESS_ONLY_PATCH_CHANGES}" "${OPTION_BOLD_MARKER}"
 }
-
 
 call_with_flags "main" "${MULLE_PROJECT_RELEASE_ENTRY_FLAGS}" "$@"

@@ -3,7 +3,9 @@
 #
 # we have a different name for this command, because the chance of
 # forgetting a parameter is high and accidentally running a proper
-# mulle-project-distribute is hard to roll back
+# mulle-project-distribute is hard to roll back. A prerelease is clobbering
+# the original "prerelease" branch. You should merge with "release" only,
+# prerelease is a oneway street.
 #
 
 MULLE_EXECUTABLE_USAGE_NAME=mulle-project-distribute \
