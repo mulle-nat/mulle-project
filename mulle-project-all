@@ -248,7 +248,7 @@ project_it()
                         ) `"
 
          old="${SUBPROJECT_NAME}"
-         .foreachpath subproject in ${subprojects}
+         .foreachline subproject in ${subprojects}
          .do
             case "${subproject}" in
                craftinfo/*)

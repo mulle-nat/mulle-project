@@ -17,7 +17,6 @@ fi
 print_flags()
 {
    echo "   -f    : force operation"
-
    ##
    ## ADD YOUR FLAGS DESCRIPTIONS HERE
    ##
@@ -61,6 +60,17 @@ __doctor_archive_nodeline()
    local upcaseid="$1"
 
    local expect
+   local defvalue
+
+   defvalue=${_nodetype##*-}
+   defvalue=${defvalue%\}}
+
+   expect="\${${upcaseid}_NODETYPE:-${defvalue}}"
+   if [ "${_nodetype}" != "${expect}" ]
+   then
+      log_warning "${_address}: nodetype is \"${_nodetype}\" not \"${expect}\""
+   fi
+
 
    expect="\${${upcaseid}_TAG:-latest}"
    if [ "${_tag}" != "${expect}" ]
@@ -217,7 +227,7 @@ doctor_nodeline()
       ;;
    esac
 
-   r_smart_upcase_identifier "${RVAL}"
+   r_smart_file_upcase_identifier "${RVAL}"
    upcaseid="${RVAL}"
 
    if find_line "${UPCASEIDS}" "${upcaseid}"
@@ -321,14 +331,10 @@ main()
    local nodeline
 
    nodelines="`sourcetree::cfg::read "${1:-/}" `" || exit 1
-   shell_disable_glob ; IFS=$'\n'
-   for nodeline in ${nodelines}
-   do
-      IFS="${DEFAULT_IFS}" ; shell_enable_glob
-
+   .foreachline nodeline in ${nodelines}
+   .do
       doctor_nodeline "${nodeline}"
-   done
-   IFS="${DEFAULT_IFS}" ; shell_enable_glob
+   .done
 }
 
 

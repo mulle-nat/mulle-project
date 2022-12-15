@@ -119,7 +119,7 @@ search_and_replace()
       fi
 
       r_basename "${_address}"
-      r_smart_upcase_identifier "${RVAL}"
+      r_smart_file_upcase_identifier "${RVAL}"
       upcaseid="${RVAL}"
 
       if [ -z "${_nodetype_fallback}" ]
