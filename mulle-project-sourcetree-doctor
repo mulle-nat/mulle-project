@@ -65,12 +65,22 @@ __doctor_archive_nodeline()
    defvalue=${_nodetype##*-}
    defvalue=${defvalue%\}}
 
+
    expect="\${${upcaseid}_NODETYPE:-${defvalue}}"
    if [ "${_nodetype}" != "${expect}" ]
    then
       log_warning "${_address}: nodetype is \"${_nodetype}\" not \"${expect}\""
    fi
 
+   expect="\${${upcaseid}_URL:-"
+   case "${_url}" in
+      ${expect}*)
+      ;;
+
+      *)
+         log_warning "${_address}: url \"${_url}\" does not start with \"${expect}\""
+      ;;
+   esac
 
    expect="\${${upcaseid}_TAG:-latest}"
    if [ "${_tag}" != "${expect}" ]
@@ -260,21 +270,6 @@ doctor_nodeline()
 
 main()
 {
-   local MULLE_FLAG_MAGNUM_FORCE='NO'
-
-   # technical flags
-   local MULLE_TRACE
-   local MULLE_FLAG_EXEKUTOR_DRY_RUN='NO'
-   local MULLE_FLAG_LOG_LOCAL='NO'
-   local MULLE_FLAG_LOG_DEBUG='NO'
-   local MULLE_FLAG_LOG_EXEKUTOR='NO'
-   local MULLE_FLAG_LOG_FLUFF='NO'
-   local MULLE_FLAG_LOG_SCRIPTS='NO'
-   local MULLE_FLAG_LOG_SETTINGS='NO'
-   local MULLE_FLAG_LOG_VERBOSE='NO'
-   local MULLE_FLAG_LOG_MERGE='NO'
-   local MULLE_TRACE_POSTPONE='NO'
-
    #
    # simple flag handling
    #
@@ -314,16 +309,10 @@ main()
 
    options_setup_trace "${MULLE_TRACE}" && set -x
 
-   MULLE_SOURCETREE_LIBEXEC_DIR="`mulle-sourcetree libexec-dir`" || return 1
-
-   . "${MULLE_SOURCETREE_LIBEXEC_DIR}/mulle-sourcetree-environment.sh" || return 1
-   . "${MULLE_SOURCETREE_LIBEXEC_DIR}/mulle-sourcetree-cfg.sh" || return 1
-   . "${MULLE_SOURCETREE_LIBEXEC_DIR}/mulle-sourcetree-nodeline.sh" || return 1
-   if [ -z "${MULLE_CASE_SH}" ]
-   then
-      # shellcheck source=mulle-case.sh
-      . "${MULLE_BASHFUNCTIONS_LIBEXEC_DIR}/mulle-case.sh"  || return 1
-   fi
+   include "sourcetree::environment"
+   include "sourcetree::cfg"
+   include "sourcetree::nodeline"
+   include "case"
 
    sourcetree::environment::default
 

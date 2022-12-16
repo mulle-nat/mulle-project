@@ -74,6 +74,8 @@ read_project_environment()
 
 get_url()
 {
+   log_entry "get_url" "$@"
+
    local repository
    local name
    local user
@@ -102,6 +104,8 @@ get_url()
 
 get_repository()
 {
+   log_entry "get_repository" "$@"
+
    if [ ! -z "${PROJECT_REPOSITORY}" ]
    then
       echo "${PROJECT_REPOSITORY}"
@@ -136,6 +140,8 @@ get_repository()
 
 get_homepage()
 {
+   log_entry "get_homepage" "$@"
+
    if [ ! -z "${PROJECT_HOMEPAGE}" ]
    then
       echo "${PROJECT_HOMEPAGE}"
@@ -146,36 +152,58 @@ get_homepage()
 }
 
 
-
 print_version()
 {
+   log_entry "print_version" "$@"
+
    local version
 
    # picks up our environment though
-   version="`PROJECT_UPCASE_IDENTIFIER= rexekutor mulle-project-version -s`" || exit 1
+   version="`PROJECT_UPCASE_IDENTIFIER= rexekutor mulle-project-version -s`" || _internal_fail "No project version found"
    printf "%s" "${INDENT}\"version\" : \"${version}\""
 }
 
 
 print_name()
 {
-   [ -z "${PROJECT_NAME}" ] && exit 1
+   log_entry "print_name" "$@"
+
+   [ -z "${PROJECT_NAME}" ] && _internal_fail "No PROJECT_NAME set"
 
    printf "%s" "${INDENT}\"name\" : \"${PROJECT_NAME}\"";
 }
 
 
+get_description_4()
+{
+   rexekutor head -4 "README.md" \
+   | egrep '^####' \
+   | sed -e 's/^####//' -e 's/^ //g'
+}
+
+
+get_description_2()
+{
+   rexekutor sed -e '/^[[:space:]]*$/d' "README.md" \
+   | head -2 \
+   | tail -1
+}
+
+
 get_description()
 {
+   log_entry "get_description" "$@"
+
    if [ ! -z "${DESC}" ]
    then
       echo "${DESC}"
    else
       if [ -f "README.md" ]
       then
-         rexekutor head -4 "README.md" \
-         | egrep '^####' \
-         | sed -e 's/^####//' -e 's/^ //g'
+         if ! get_description_4
+         then
+            get_description_2
+         fi
       fi
    fi
 }
@@ -183,30 +211,40 @@ get_description()
 
 print_description()
 {
+   log_entry "print_description" "$@"
+
    printf "%s" "${INDENT}\"description\" : \"`get_description`\"";
 }
 
 
 print_homepage()
 {
+   log_entry "print_homepage" "$@"
+
    printf "%s" "${INDENT}\"homepage\" : \"`get_homepage`\"";
 }
 
 
 print_bugs()
 {
+   log_entry "print_bugs" "$@"
+
    printf "%s" "${INDENT}\"bugs\" : \"`get_url`/issues\"";
 }
 
 
 print_keywords()
 {
+   log_entry "print_keywords" "$@"
+
    printf "%s" "${INDENT}\"keywords\" : []"
 }
 
 
 get_license_text()
 {
+   log_entry "get_license_text" "$@"
+
    if [ -f LICENSE ]
    then
       head -1 LICENSE
@@ -221,6 +259,8 @@ get_license_text()
 
 get_license()
 {
+   log_entry "get_license" "$@"
+
    local line
 
    # grep LICENSE.txt
@@ -239,6 +279,8 @@ get_license()
 
 print_license()
 {
+   log_entry "print_license" "$@"
+
    local license
 
    license="`get_license`"
@@ -248,12 +290,16 @@ print_license()
 
 print_author()
 {
+   log_entry "print_author" "$@"
+
    printf "%s" "${INDENT}\"author\" : \"Nat\!\""
 }
 
 
 print_repository()
 {
+   log_entry "print_repository" "$@"
+
    printf "%s\n" "${INDENT}\"repository\" : {"
    printf "%s\n" "${INDENT}${INDENT}\"type\" : \"git\","
    printf "%s\n" "${INDENT}${INDENT}\"url\" : \"`get_repository`\""
@@ -263,6 +309,7 @@ print_repository()
 
 print_dependencies()
 {
+   log_entry "print_dependencies" "$@"
 
    printf "${INDENT}\"dependencies\" : {"
 
@@ -279,14 +326,21 @@ print_dependencies()
    local user
    local repo
    local print_tag
+   local alias_tag
 
+   local lines
+   local aliases
 
-   .foreachline line in `rexekutor mulle-sde dependency list -r -- \
-                                                       --dedupe-mode url-filename \
-                                                       --output-eval \
-                                                       --output-no-column \
-                                                       --output-no-header \
-                                                       --format "%a;%t;%u\\n"`
+   lines=`rexekutor mulle-sde ${MULLE_TECHNICAL_FLAGS} \
+                              ${MULLE_SDE_FLAGS} \
+                        dependency list -r -- \
+                           --dedupe-mode url-filename \
+                           --output-eval \
+                           --output-no-column \
+                           --output-no-header \
+                           --format "%a;%t;%u\\n"` || exit 1
+
+   .foreachline line in ${lines}
    .do
       name="${line%%;*}"
       line="${line#*;}"
@@ -312,13 +366,14 @@ print_dependencies()
             fi
          ;;
 
+         "")
+            .continue
+         ;;
+
          *)
-            if [ ! -z "${url}" ]
-            then
-               printf "${sep}"
-               sep=",\\n${INDENT}${INDENT}"
-               printf "\"%s\" : \"%s" "${name}" "${url}"
-            fi
+            printf "${sep}"
+            sep=",\\n${INDENT}${INDENT}"
+            printf "\"%s\" : \"%s" "${name}" "${url}"
          ;;
       esac
 
@@ -327,24 +382,27 @@ print_dependencies()
       case "${tag}" in
          [0-9].*)
             print_tag="^${tag#[Vv]}"
+            printf "#semver:${print_tag}\""
          ;;
 
          *)
-            local alias_tag
-
-            .foreachline alias_tag in `${MULLE_FETCH:-mulle-fetch} github "${user}" "${repo}"  \
-                                                          get-tag-aliases "${tag}" `
-            .do
-               case "${alias_tag}" in
-                  [vV][0-9]*\.[0-9]*\.[0-9]*|[0-9]*\.[0-9]*\.[0-9]*)
-                     print_tag="^${alias_tag#[Vv]}"
-                     .break
-                  ;;
-               esac
-            .done
+#            aliases="`${MULLE_FETCH:-mulle-fetch} ${MULLE_TECHNICAL_FLAGS} \
+#                                                 ${MULLE_FETCH_FLAGS} \
+#                                             github "${user}" "${repo}"  \
+#                                             get-tag-aliases "${tag}" `"
+#
+#            .foreachline alias_tag in ${aliases}
+#            .do
+#               case "${alias_tag}" in
+#                  [vV][0-9]*\.[0-9]*\.[0-9]*|[0-9]*\.[0-9]*\.[0-9]*)
+#                     print_tag="^${alias_tag#[Vv]}"
+#                     .break
+#                  ;;
+#               esac
+#            .done
+            printf "\""
          ;;
       esac
-      printf "#semver:${print_tag}\""
    .done
 
    printf "\n${INDENT}}"
@@ -353,6 +411,8 @@ print_dependencies()
 
 print_json()
 {
+   log_entry "print_json" "$@"
+
    INDENT="   "
    echo "{"
       print_name
@@ -379,20 +439,6 @@ print_json()
 
 main()
 {
-   local MULLE_FLAG_MAGNUM_FORCE='NO'
-   # technical flags
-   local MULLE_TRACE
-   local MULLE_FLAG_EXEKUTOR_DRY_RUN='NO'
-   local MULLE_FLAG_LOG_LOCAL='NO'
-   local MULLE_FLAG_LOG_DEBUG='NO'
-   local MULLE_FLAG_LOG_EXEKUTOR='NO'
-   local MULLE_FLAG_LOG_FLUFF='NO'
-   local MULLE_FLAG_LOG_SCRIPTS='NO'
-   local MULLE_FLAG_LOG_SETTINGS='NO'
-   local MULLE_FLAG_LOG_VERBOSE='NO'
-   local MULLE_FLAG_LOG_MERGE='NO'
-   local MULLE_TRACE_POSTPONE='NO'
-
    local OPTION_OUTPUT_FILE="-"
    #
    # simple flag handling
@@ -468,7 +514,7 @@ main()
    then
       print_json
    else
-      text="`print_json`"
+      text="`print_json`" || return 1
       redirect_exekutor "${OPTION_OUTPUT_FILE}" echo "${text}"
    fi
 }
