@@ -1,6 +1,6 @@
 ### 3.1.2
 
-* Various small improvements
+* new --skip-until and --skip-from flags for mulle-project-all
 
 ### 3.1.1
 

@@ -43,6 +43,8 @@ EOF
    --only-main-project : only execute in main project (default)
    --only-tests        : only execute in tests directories
    --only-subprojects  : only execute in subprojects project
+   --skip-from <s>     : skip projects in REPOS starting with <s>
+   --skip-until <s>    : skip projects in REPOS until and including <s>
 EOF
    fi
 
@@ -368,6 +370,52 @@ parallel_execute_argument_first()
 }
 
 
+r_repos_contents()
+{
+   log_entry "r_repos_contents" "$@"
+
+   local reposfile="$1"
+   local skipfrom="$2"
+   local skipuntil="$3"
+
+   local repos
+
+   if [ -f "${reposfile}" ]
+   then
+      repos="`rexekutor egrep -v '^#' "${reposfile}" | sed -e '/^[[:space:]]*$/d' `"
+   else
+      [ ! -z "${reposfile}" ] && fail "\"${reposfile}\" not found"
+
+      shell_enable_nullglob
+      repos="`ls -1d */.mulle/share/sde | sed -e "s/\/\.mulle\/share\/sde$//" `"
+      shell_disable_nullglob
+   fi
+
+   if [ -z "${skipfrom}${skipuntil}" ]
+   then
+      RVAL="${repos}"
+      return
+   fi
+
+   if [ ! -z "${skipfrom}" ]
+   then
+      r_escaped_sed_pattern "${skipfrom}"
+      skipfrom="/^${RVAL}\$/"
+   else
+      skipfrom='0'
+   fi
+
+   if [ ! -z "${skipuntil}" ]
+   then
+      r_escaped_sed_pattern "${skipuntil}"
+      skipuntil="/^${RVAL}\$/"
+   else
+      skipuntil='$'
+   fi
+
+   RVAL="`rexekutor sed -e "${skipfrom},${skipuntil}d" <<< "${repos}"`"
+}
+
 
 main()
 {
@@ -381,6 +429,9 @@ main()
    local OPTION_EVAL
    local OPTION_IF
    local OPTION_IGNORE
+   local OPTION_SKIP_FROM
+   local OPTION_SKIP_UNTIL
+   local OPTION_PRINT
 
    #
    # simple flag handling
@@ -431,7 +482,6 @@ main()
             OPTION_IF="${RVAL}"
          ;;
 
-
          --if-exists|--if-file|--if-exists-file)
             [ $# -eq 1 ] && fail "missing parameter for \"$1\""
             shift
@@ -467,13 +517,6 @@ main()
             OPTION_MODE="tests"
          ;;
 
-         --if-exists-file)
-            [ $# -eq 1 ] && usage "missing argument to $1"
-            shift
-
-            OPTION_EXISTS_FILE="$1"
-         ;;
-
          --subprojects-only|--only-subprojects|--subproject-only|--only-subproject)
             OPTION_MODE="subprojects"
          ;;
@@ -490,6 +533,24 @@ main()
 
          --sde|--sde-test)
             OPTION_SDE_TEST='YES'
+         ;;
+
+         --skip-from)
+            [ $# -eq 1 ] && usage "missing argument to $1"
+            shift
+
+            OPTION_SKIP_FROM="$1"
+         ;;
+
+         --skip-until)
+            [ $# -eq 1 ] && usage "missing argument to $1"
+            shift
+
+            OPTION_SKIP_UNTIL="$1"
+         ;;
+
+         --print)
+            OPTION_PRINT='YES'
          ;;
 
          --strict)
@@ -529,19 +590,15 @@ main()
 
    options_setup_trace "${MULLE_TRACE}" && set -x
 
-   local reposfile 
-   local repos 
+   local repos
 
-   reposfile="${OPTION_REPOSFILE:-REPOS}"
-   if [ -f "${reposfile}" ]
+   r_repos_contents "${OPTION_REPOSFILE:-REPOS}" "${OPTION_SKIP_FROM}" "${OPTION_SKIP_UNTIL}"
+   repos="${RVAL}"
+
+   if [ "${OPTION_PRINT}" = 'YES' ]
    then
-      repos="`rexekutor egrep -v '^#' "${reposfile}"`"
-   else
-      [ ! -z "${OPTION_REPOSFILE}" ] && fail "\"${reposfile}\" not found"
-
-      shell_enable_nullglob
-      repos="`ls -1d */.mulle/share/sde | sed -e "s/\/\.mulle\/share\/sde$//" `"
-      shell_disable_nullglob
+      printf "%s\n" "${repos}"
+      exit 0
    fi
 
    if [ "${OPTION_PARALLEL}" = 'YES' ]
@@ -564,14 +621,7 @@ main()
          .continue
       fi
 
-      if [ ! -z "${i}" ]
-      then
-         if [ ! -z "${OPTION_EXISTS_FILE}" ] && [ ! -e "${i}/${OPTION_EXISTS_FILE}" ]
-         then
-            .continue
-         fi
-         project_it "$i" "${OPTION_MODE}" "$@"
-      fi
+      project_it "$i" "${OPTION_MODE}" "$@"
    .done
 }
 

@@ -141,10 +141,6 @@ main()
    local key
    local value
 
-   r_dirname "$0"
-   EXE_DIR="${RVAL}"
-   LIBEXEC_DIR="`"${EXE_DIR}/mulle-project" libexec-dir`" || exit 1
-
    while [ $# -ne 0 ]
    do
       if options_technical_flags "$1"
