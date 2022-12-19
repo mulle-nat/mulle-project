@@ -44,7 +44,8 @@ EOF
    --only-tests        : only execute in tests directories
    --only-subprojects  : only execute in subprojects project
    --skip-from <s>     : skip projects in REPOS starting with <s>
-   --skip-until <s>    : skip projects in REPOS until and including <s>
+   --skip-until <s>    : skip projects in REPOS until <s>
+   --skip-past <s>     : skip projects in REPOS until and including <s>
 EOF
    fi
 
@@ -377,6 +378,7 @@ r_repos_contents()
    local reposfile="$1"
    local skipfrom="$2"
    local skipuntil="$3"
+   local skippast="$4"
 
    local repos
 
@@ -391,7 +393,7 @@ r_repos_contents()
       shell_disable_nullglob
    fi
 
-   if [ -z "${skipfrom}${skipuntil}" ]
+   if [ -z "${skipfrom}${skipuntil}${skippast}" ]
    then
       RVAL="${repos}"
       return
@@ -401,19 +403,25 @@ r_repos_contents()
    then
       r_escaped_sed_pattern "${skipfrom}"
       skipfrom="/^${RVAL}\$/"
-   else
-      skipfrom='0'
    fi
+
+   local first
 
    if [ ! -z "${skipuntil}" ]
    then
+      first="${skipuntil}"
       r_escaped_sed_pattern "${skipuntil}"
       skipuntil="/^${RVAL}\$/"
-   else
-      skipuntil='$'
    fi
 
-   RVAL="`rexekutor sed -e "${skipfrom},${skipuntil}d" <<< "${repos}"`"
+   if [ ! -z "${skippast}" ]
+   then
+      first=
+      r_escaped_sed_pattern "${skippast}"
+      skipuntil="/^${RVAL}\$/"  # sic
+   fi
+
+   r_add_line "${first}" "`rexekutor sed -e "${skipfrom:-0},${skipuntil:-"\$"}d" <<< "${repos}"`"
 }
 
 
@@ -549,6 +557,13 @@ main()
             OPTION_SKIP_UNTIL="$1"
          ;;
 
+         --skip-past)
+            [ $# -eq 1 ] && usage "missing argument to $1"
+            shift
+
+            OPTION_SKIP_PAST="$1"
+         ;;
+
          --print)
             OPTION_PRINT='YES'
          ;;
@@ -590,9 +605,17 @@ main()
 
    options_setup_trace "${MULLE_TRACE}" && set -x
 
+   if [ ! -z "${OPTION_SKIP_PAST}" -a ! -z "${OPTION_SKIP_UNTIL}" ]
+   then
+      fail "Specify --skip-until or --skip-past but not both"
+   fi
+
    local repos
 
-   r_repos_contents "${OPTION_REPOSFILE:-REPOS}" "${OPTION_SKIP_FROM}" "${OPTION_SKIP_UNTIL}"
+   r_repos_contents "${OPTION_REPOSFILE:-REPOS}" \
+                    "${OPTION_SKIP_FROM}" \
+                    "${OPTION_SKIP_UNTIL}" \
+                    "${OPTION_SKIP_PAST}"
    repos="${RVAL}"
 
    if [ "${OPTION_PRINT}" = 'YES' ]

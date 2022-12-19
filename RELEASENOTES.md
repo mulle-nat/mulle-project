@@ -1,3 +1,10 @@
+## 3.2.0
+
+* fix default homebrew formula
+* update mulle-project-version to be able to mirror version in xcodeproj
+* add --skip-past to mulle-project-all
+
+
 ### 3.1.2
 
 * new --skip-until and --skip-from flags for mulle-project-all

@@ -126,7 +126,7 @@ main()
       tag="${version}-prerelease"
    fi
 
-   mulle-project-untag ${MULLE_TECHNICAL_FLAGS} "${tag:-${version}}" || exit 1
+   rexekutor mulle-project-untag ${MULLE_TECHNICAL_FLAGS} "${tag:-${version}}" || exit 1
 
    if [ "${dogit}" = 'YES' ]
    then
@@ -139,9 +139,9 @@ main()
 
    if [ "${OPTION_PRERELEASE}" = 'YES' ]
    then
-      mulle-project-prerelease ${MULLE_TECHNICAL_FLAGS}
+      rexekutor mulle-project-prerelease ${MULLE_TECHNICAL_FLAGS}
    else
-      mulle-project-distribute ${MULLE_TECHNICAL_FLAGS}
+      rexekutor mulle-project-distribute ${MULLE_TECHNICAL_FLAGS}
    fi
 }
 

@@ -49,6 +49,7 @@ mulle-project-travis-ci-prerelease
 mulle-project-untag
 mulle-project-version
 mulle-project-versioncheck
+mulle-shasum-url
 mulle-gitignore
 mulle-replace
 )

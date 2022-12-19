@@ -127,7 +127,6 @@ get_version()
 
    if [ "${OPTION_READ_XCODE_VERSION}" = 'YES' -o "${OPTION_WRITE_XCODE_VERSION}" = 'YES' ]
    then
-      ACTUAL_XCODEPROJ="${OPTION_XCODEPROJ}"
       if [ -z "${ACTUAL_XCODEPROJ}" ]
       then
          ACTUAL_XCODEPROJ="`ls -1d *.xcodeproj | head -1`" 2> /dev/null
@@ -447,11 +446,8 @@ write_version()
       #
       local other
 
-      shell_disable_glob; IFS=$'\n'
-      for other in ${VERSIONFILEMIRRORS}
-      do
-         IFS="${DEFAULT_IFS}" ; shell_enable_glob
-
+      .foreachline other in ${VERSIONFILEMIRRORS}
+      .do
          if [ ! -z "${other}" ]
          then
             project::version::set "${VERSION}" \
@@ -459,8 +455,7 @@ write_version()
                                   "${VERSIONMIRRORNAME}" \
                                   "${VERSIONCUSTOM}" || exit 1
          fi
-      done
-      IFS="${DEFAULT_IFS}" ; shell_enable_glob
+      .done
 
       # set mirrors first before "real", which is nicer in case of fails
       project::version::set "${VERSION}" \
@@ -508,8 +503,6 @@ verify_version()
 
 main()
 {
-   local directory
-
    local OPTION_ADD_MAJOR="0"
    local OPTION_ADD_MINOR="0"
    local OPTION_ADD_PATCH="0"
@@ -529,6 +522,8 @@ main()
    local OPTION_IS_OK
    local OPTION_IF_NEEDED
    local OPTION_RELEASENOTES
+
+   local directory
 
    if [ -f ".mulle/etc/project/.first_patch" ]
    then
@@ -750,6 +745,7 @@ main()
    VERSIONNAME="${OPTION_VERSIONNAME:-${VERSIONNAME}}"
    VERSIONFILE="${OPTION_VERSIONFILE:-${VERSIONFILE}}"
    VERSIONCUSTOM="${OPTION_CUSTOM_VERSIONING:-${VERSIONCUSTOM}}"
+   VERSIONXCODEPROJ="${OPTION_XCODEPROJ:-${VERSIONXCODEPROJ}}"
 
    if [ "${OPTION_WRITE}" = "${DEFAULT}" ]
    then
@@ -760,7 +756,12 @@ main()
    then
       if [ "${OPTION_WRITE}" = "YES" ]
       then
-         OPTION_WRITE_XCODE_VERSION="${OPTION_WRITE_XCODE_VERSION:-NO}"
+         if [ -z "${VERSIONXCODEPROJ}" ]
+         then
+            OPTION_WRITE_XCODE_VERSION="NO"
+         else
+            OPTION_WRITE_XCODE_VERSION="YES"
+         fi
       else
          OPTION_WRITE_XCODE_VERSION="NO"
       fi
@@ -771,7 +772,7 @@ main()
    then
       if [ "${OPTION_WRITE}" = "YES" ]
       then
-         OPTION_WRITE_EXTENSION_VERSIONS="${OPTION_WRITE_EXTENSION_VERSIONS:-YES}"
+         OPTION_WRITE_EXTENSION_VERSIONS="YES"
       else
          OPTION_WRITE_EXTENSION_VERSIONS="NO"
       fi
@@ -811,10 +812,11 @@ main()
       warn_version
    fi
 
-   log_verbose "VERSION=${VERSION}"
-   log_verbose "VERSIONNAME=${VERSIONNAME}"
-   log_verbose "VERSIONFILE=${VERSIONFILE}"
-   log_verbose "VERSIONCUSTOM=${VERSIONCUSTOM}"
+   log_setting "VERSION=${VERSION}"
+   log_setting "VERSIONNAME=${VERSIONNAME}"
+   log_setting "VERSIONFILE=${VERSIONFILE}"
+   log_setting "VERSIONCUSTOM=${VERSIONCUSTOM}"
+   log_setting "VERSIONXCODEPROJ=${VERSIONXCODEPROJ}"
 
    if [ "${OPTION_WRITE}" = 'YES' \
         -o "${OPTION_WRITE_XCODE_VERSION}" = 'YES' \

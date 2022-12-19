@@ -34,7 +34,7 @@
 
 
 
-MULLE_PROJECT_VERSION="3.1.2"
+MULLE_PROJECT_VERSION="3.2.0"
 
 
 project::usage()

@@ -167,8 +167,16 @@ project::git::can_push()
 
    local result
 
-   if ! exekutor git fetch -q "${remote}" "${branch}"
+   if ! rexekutor git fetch -q "${remote}" "${branch}"
    then
+      if [ "${branch}" = "master" ]
+      then
+         return 1
+      fi
+      if exekutor git fetch -q "${remote}" "master"
+      then
+         return 0
+      fi
       return 1
    fi
 

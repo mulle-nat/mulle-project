@@ -8,7 +8,8 @@ LANGUAGE="bash"                # c,cpp, objc, bash ...
 # NAME="${PROJECT}"        # formula filename without .rb extension
 
 DEPENDENCIES='${MULLE_NAT_TAP}mulle-bashfunctions
-${MULLE_SDE_TAP}mulle-make'
+${MULLE_SDE_TAP}mulle-sde'
 
 
-DEBIAN_DEPENDENCIES="mulle-bashfunctions (>= 4.0.0), mulle-make"
+
+DEBIAN_DEPENDENCIES="mulle-bashfunctions (>= 5.0.0), mulle-sde"

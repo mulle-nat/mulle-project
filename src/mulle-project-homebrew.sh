@@ -161,10 +161,8 @@ project::homebrew::_print_dependencies()
    local lines
    local line
 
-   shell_disable_glob; IFS=$'\n'
-   for dependency in ${dependencies}
-   do
-      shell_enable_glob; IFS="${DEFAULT_IFS}"
+   .foreachline dependency in ${dependencies}
+   .do
       dependency="`eval "echo \"${dependency}\"" `"
 
       line="${INDENTATION}depends_on \"${dependency}\"${epilog}"
@@ -172,9 +170,7 @@ project::homebrew::_print_dependencies()
       # initial LF is liked
       lines="${lines}
 ${line}"
-   done
-
-   shell_enable_glob; IFS="${DEFAULT_IFS}"
+   .done
 
    if [ ! -z "${lines}" ]
    then
@@ -244,56 +240,54 @@ project::homebrew::generate_formula_mulle_build()
    local name="$1" ; shift
    local version="$1" ; shift
 
-   local aux_args
-   local option
-
-   for option in "$@"
-   do
-      aux_args=" ,${aux_args}\"${option}\""
-   done
-
    local lines
 
+# though mulle-bashfunctions is a dependency of mulle-make it will not
+# make into the build PATH, so specify separately
+
    lines="`cat <<EOF
+${INDENTATION}depends_on "mulle-kybernetik/software/mulle-make" => :build
+${INDENTATION}depends_on "mulle-kybernetik/software/mulle-env" => :build
+${INDENTATION}depends_on "mulle-kybernetik/software/mulle-bashfunctions" => :build
 
 ${INDENTATION}def install
-${INDENTATION}${INDENTATION}system "mulle-install", "-vvv", "--prefix", prefix, "--homebrew"${aux_args}
+${INDENTATION}${INDENTATION}system "mulle-make", "-v", "install", "--prefix", "#{prefix}", "."
 ${INDENTATION}end
 EOF
 `"
-   exekutor printf "%s\n" "${lines}"
+   rexekutor printf "%s\n" "${lines}"
 }
 
 
-project::homebrew::generate_formula_mulle_test()
-{
-   log_entry "project::homebrew::generate_formula_mulle_test" "$@"
-
-   local project="$1"; shift
-   local name="$1" ; shift
-   local version="$1" ; shift
-
-   local aux_args
-   local option
-
-   for option in "$@"
-   do
-      aux_args=" ,${aux_args}\"${option}\""
-   done
-
-   local lines
-
-   lines="`cat <<EOF
-
-${INDENTATION}test do
-${INDENTATION}${INDENTATION}if File.directory? 'test'
-${INDENTATION}${INDENTATION}${INDENTATION}system "mulle-test", "-vvv", "--fast-test"
-${INDENTATION}${INDENTATION}end
-${INDENTATION}end
-EOF
-`"
-   exekutor printf "%s\n" "${lines}"
-}
+# project::homebrew::generate_formula_mulle_test()
+# {
+#    log_entry "project::homebrew::generate_formula_mulle_test" "$@"
+#
+#    local project="$1"; shift
+#    local name="$1" ; shift
+#    local version="$1" ; shift
+#
+#    local aux_args
+#    local option
+#
+#    for option in "$@"
+#    do
+#       aux_args=" ,${aux_args}\"${option}\""
+#    done
+#
+#    local lines
+#
+#    lines="`cat <<EOF
+#
+# ${INDENTATION}test do
+# ${INDENTATION}${INDENTATION}if File.directory? 'test'
+# ${INDENTATION}${INDENTATION}${INDENTATION}system "mulle-test", "-vvv", "--fast-test"
+# ${INDENTATION}${INDENTATION}end
+# ${INDENTATION}end
+# EOF
+# `"
+#    exekutor printf "%s\n" "${lines}"
+# }
 
 
 project::homebrew::generate_formula_footer()
@@ -322,7 +316,7 @@ project::homebrew::_generate_formula_build()
    local version="$3"
 
    project::homebrew::generate_formula_mulle_build "${project}" "${name}" "${version}"
-   project::homebrew::generate_formula_mulle_test  "${project}" "${name}" "${version}"
+#   project::homebrew::generate_formula_mulle_test  "${project}" "${name}" "${version}"
 }
 
 
