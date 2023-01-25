@@ -151,7 +151,7 @@ __environment_main()
    if [ -z "${DEPENDENCIES}" -a -f  .DEPENDENCIES ]
    then
       log_verbose "Read DEPENDENCIES from \".DEPENDENCIES\""
-      DEPENDENCIES="`egrep -v '^#' .DEPENDENCIES`"
+      DEPENDENCIES="`grep -E -v '^#' .DEPENDENCIES`"
    fi
 
    TAP_USER="${TAP_USER:-mulle-kybernetik}"
@@ -624,7 +624,7 @@ main()
             varname="${varname//-/_}"
             r_uppercase "${varname}"
             varname="${RVAL}"
-            if ! egrep -q -s '^[A-Z_][A-Z0-9_]*$' <<< "${varname}" > /dev/null
+            if ! grep -E -q -s '^[A-Z_][A-Z0-9_]*$' <<< "${varname}" > /dev/null
             then
                fail "invalid variable specification \"${varname}\", created by \"$1\""
             fi

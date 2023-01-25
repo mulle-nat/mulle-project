@@ -310,11 +310,12 @@ main()
    options_setup_trace "${MULLE_TRACE}" && set -x
 
    include "sourcetree::environment"
+
+   sourcetree::environment::setup "${OPTION_SHAREDIR}"
+
    include "sourcetree::cfg"
    include "sourcetree::nodeline"
    include "case"
-
-   sourcetree::environment::default
 
    local nodelines
    local nodeline

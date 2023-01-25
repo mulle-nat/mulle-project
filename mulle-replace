@@ -132,6 +132,13 @@ replace()
       escaped_replace="${replace}"
    fi
 
+   local DIFF
+
+   if ! DIFF="`command -v diff`"
+   then
+      fail "diff command not installed"
+   fi
+
    local before
    local after
 
@@ -144,7 +151,7 @@ replace()
    then
       after="`rexekutor sed "s/${escaped_find}/${escaped_replace}/${OPTION_SED}" "${filename}" `" || return 1
       log_verbose "Changes"
-      rexekutor diff -b <( echo "${before}") <( echo "${after}" ) >&2
+      rexekutor "${DIFF}" -b <( echo "${before}") <( echo "${after}" ) >&2
       return 0
    fi
 
@@ -173,7 +180,7 @@ replace()
    if [ "${MULLE_FLAG_LOG_VERBOSE}" = 'YES' ]
    then
       log_verbose "Changes"
-      rexekutor diff -b <( echo "${before}") "${filename}" >&2
+      rexekutor "${DIFF}" -b <( echo "${before}") "${filename}" >&2
    fi
 
    return 0

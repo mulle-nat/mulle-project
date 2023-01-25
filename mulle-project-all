@@ -185,6 +185,11 @@ shell_it()
 
       if [ ! -z "${OPTION_DIRECTORY}" ]
       then
+         if [ ! -d "${OPTION_DIRECTORY}" ]
+         then
+            log_warning "Warning \"${OPTION_DIRECTORY}\" is missing (skipped)"
+            exit 0
+         fi
          cd "${OPTION_DIRECTORY}" || exit 1
       fi
 
@@ -246,7 +251,7 @@ project_it()
          local subproject 
 
          subprojects="`( cd "${project}"  ; 
-                         mulle-sde -N subproject list --format '%a\n' \
+                         mulle-sde -N subproject list --force-format '%a\n' \
                                                       --output-no-header 2> /dev/null
                         ) `"
 
@@ -384,7 +389,7 @@ r_repos_contents()
 
    if [ -f "${reposfile}" ]
    then
-      repos="`rexekutor egrep -v '^#' "${reposfile}" | sed -e '/^[[:space:]]*$/d' `"
+      repos="`rexekutor grep -E -v '^#' "${reposfile}" | sed -e '/^[[:space:]]*$/d' `"
    else
       [ ! -z "${reposfile}" ] && fail "\"${reposfile}\" not found"
 
@@ -466,8 +471,7 @@ main()
             [ $# -eq 1 ] && fail "missing parameter for \"$1\""
             shift
 
-            r_concat "${OPTION_DIRECTORY}" "$1" "&&"
-            OPTION_DIRECTORY="${RVAL}"
+            OPTION_DIRECTORY="$1"
          ;;
 
          -e|--eval)

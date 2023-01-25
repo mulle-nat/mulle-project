@@ -51,7 +51,7 @@ project::sourcetree-parser::get_dependency_address_nodetype_branch_tag_url()
                     --output-no-header \
                     --output-no-indent \
                     --marks dependency \
-                    --format '%a;%n;%b;%t;%u\n' \
+                    --force-format '%a;%n;%b;%t;%u\n' \
                     --nodetype tar \
                     --nodetype zip \
                     --nodetype git \

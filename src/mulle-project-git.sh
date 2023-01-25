@@ -133,11 +133,11 @@ project::git::can_amend()
 
    local branch="$1"
 
-   # if 0 then egrep matched and this means that HEAD has no tags or
+   # if 0 then grep -E matched and this means that HEAD has no tags or
    # has been pushed to any remotes
 
    # branch can be empty!!
-   git log -1 --decorate -q ${branch} | egrep '\(HEAD -> [^,)]*\)' > /dev/null
+   git log -1 --decorate -q ${branch} | grep -E '\(HEAD -> [^,)]*\)' > /dev/null
    if [ $? -ne 0 ]
    then
       log_debug "Last commit has been pushed already or is tagged already"
@@ -147,7 +147,7 @@ project::git::can_amend()
    #
    # check that last commit wasn't a merge, don't want to amend those
    #
-   git log -1 --pretty="%B" | head -1 | egrep '^Merge branch' > /dev/null
+   git log -1 --pretty="%B" | head -1 | grep -E '^Merge branch' > /dev/null
    if [ $? -eq 0 ]
    then
       log_debug "Last commit is a merge from another branch"
@@ -545,7 +545,16 @@ project::git::r_commit_options()
    log_entry project::git::r_commit_options "$@"
 
    local amend="$1"
-   local message="$2"
+   local emptyok="$2"
+   local message="$3"
+
+   local options
+
+   options=
+   if [ "${emptyok}" = 'YES' ]
+   then
+      options="--allow-empty"
+   fi
 
    case "${amend}" in
       'YES')
@@ -554,12 +563,14 @@ project::git::r_commit_options()
             _log_warning "Last commit was tagged or merged or pushed. You may \
 need to force push to remotes now."
          fi
-         RVAL="--amend --no-edit"
+         r_concat "${options}" "--amend --no-edit"
+         options="${RVAL}"
       ;;
 
       'NO')
          r_escaped_singlequotes "${message}"
-         RVAL="-m '${RVAL}'"
+         r_concat "${options}" "-m '${RVAL}'"
+         options="${RVAL}"
       ;;
 
       'DEFAULT'|'SAFE')
@@ -569,9 +580,11 @@ need to force push to remotes now."
 tagged or merged or pushed"
 
             r_escaped_singlequotes "${message}"
-            RVAL="-m '${RVAL}'"
+            r_concat "${options}" "-m '${RVAL}'"
+            options="${RVAL}"
          else
-            RVAL="--amend --no-edit"
+            r_concat "${options}" "--amend --no-edit"
+            options="${RVAL}"
          fi
       ;;
 
@@ -580,13 +593,15 @@ tagged or merged or pushed"
          then
             fail "Can not amend last commit as its been tagged or merged or pushed"
          fi
-         RVAL="--amend --no-edit"
+         r_concat "${options}" "--amend --no-edit"
+         options="${RVAL}"
       ;;
 
       *)
          _internal_fail "must specify an amend option"
       ;;
    esac
+   RVAL="${options}"
 }
 
 
@@ -626,22 +641,22 @@ project::git::append_to_gitignore_if_needed()
             pattern2="/${directory}"
             pattern3="/${directory}/"
 
-            if rexekutor fgrep -q -s -x -e "${pattern0}" .gitignore
+            if rexekutor grep -F -q -s -x -e "${pattern0}" .gitignore
             then
                log_verbose "Duplicate ${C_RESET_BOLD}${pattern0}${C_VERBOSE} found"
                return
             fi
-            if rexekutor fgrep -q -s -x -e "${pattern1}" .gitignore
+            if rexekutor grep -F -q -s -x -e "${pattern1}" .gitignore
             then
                log_verbose "Duplicate ${C_RESET_BOLD}${pattern1}${C_VERBOSE} found"
                return
             fi
-            if rexekutor fgrep -q -s -x -e "${pattern2}" .gitignore
+            if rexekutor grep -F -q -s -x -e "${pattern2}" .gitignore
             then
                log_verbose "Duplicate ${C_RESET_BOLD}${pattern2}${C_VERBOSE} found"
                return
             fi
-            if rexekutor fgrep -q -s -x -e "${pattern3}" .gitignore
+            if rexekutor grep -F -q -s -x -e "${pattern3}" .gitignore
             then
                log_verbose "Duplicate ${C_RESET_BOLD}${pattern3}${C_VERBOSE} found"
                return
@@ -649,7 +664,7 @@ project::git::append_to_gitignore_if_needed()
          ;;
 
          *)
-            if rexekutor fgrep -q -s -x -e "${file}" .gitignore
+            if rexekutor grep -F -q -s -x -e "${file}" .gitignore
             then
                log_verbose "Duplicate ${C_RESET_BOLD}${file}${C_VERBOSE} found"
                return
@@ -661,7 +676,7 @@ project::git::append_to_gitignore_if_needed()
    #
    # prepend \n because it is safer, in case .gitignore has no trailing
    # LF which it often seems to not have
-   # fgrep is bugged on at least OS X 10.x, so can't use -e chaining
+   # grep -F is bugged on at least OS X 10.x, so can't use -e chaining
 
    local terminator
    local line

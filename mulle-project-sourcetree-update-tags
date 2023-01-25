@@ -72,7 +72,7 @@ print_commands()
                                                     --output-eval \
                                                     --output-no-column \
                                                     --output-no-header \
-                                                    --format "%a;%t;%u\\n"`
+                                                    --force-format "%a;%t;%u\\n"`
    .do
       name="${line%%;*}"
       line="${line#*;}"

@@ -176,7 +176,7 @@ common_main()
          .continue
       fi
 
-      version="`rexekutor egrep -v '^#' "${version_file}" | head -1`"
+      version="`rexekutor grep -E -v '^#' "${version_file}" | head -1`"
       log_verbose "Version of \"${extension}\" is ${C_RESET_BOLD}${version}${C_VERBOSE}."
 
       if rexekutor git diff --quiet -r "${tag}" -- "${extension}" ":(exclude)${version_file}"
@@ -319,7 +319,7 @@ main()
 
    if [ -z "${tag}" ]
    then
-      tag="`rexekutor git tag -l --sort=-creatordate | egrep -x '[0-9]*\.[0-9]*\.[0-9]*' | head -1`"
+      tag="`rexekutor git tag -l --sort=-creatordate | grep -E -x '[0-9]*\.[0-9]*\.[0-9]*' | head -1`"
       if [ -z "${tag}" ]
       then
          log_info "Project has never been tagged, so versions are probably OK"

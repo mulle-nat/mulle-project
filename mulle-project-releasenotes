@@ -74,9 +74,9 @@ Flags:
    --all                    : dump all releasenotes from the beginning in one
    --commit                 : git commit --amend --no-edit releasenotes
    --default-message <text> : text to use,if there are no suitable git comments
-   --filter <executable>    : use something else than egrep to filter comments
+   --filter <executable>    : use something else than grep -E to filter comments
    --first-patch-zero       : consider patch 0 to be the first minor commit
-   --grep <arguments>       : specify egrep arguments (hackish)
+   --grep <arguments>       : specify grep -E arguments (hackish)
    --input <file>           : file to prepend comments to
    --message <text>         : message to use instead of git comments
    --missing                : emit all missing comments, not just from last tag
@@ -141,7 +141,7 @@ git_version_tags()
    log_entry "git_version_tags" "$@"
 
    rexekutor git tag --sort=committerdate \
-   | egrep -v '[a-zA-Z/!"$%&()=#;,-]' \
+   | grep -E -v '[a-zA-Z/!"$%&()=#;,-]' \
    | sed -n '1!G;h;$p'
 }
 
@@ -295,7 +295,7 @@ copy_without_first_entry()
          ;;
 
          search)
-            if egrep -s "^${markers} *" <<< "${line}"
+            if grep -E "^${markers} *" <<< "${line}"
             then
                state="copy"
                exekutor printf "%s\n" "${line}"
@@ -362,7 +362,7 @@ get_latest_releasenote_version()
       return 1
    fi
 
-   egrep -v '^[[:space:]]*$' "${filename}" | \
+   grep -E -v '^[[:space:]]*$' "${filename}" | \
       head -1 | \
       sed -n 's/^#*[[:space:]]*\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p'
 }

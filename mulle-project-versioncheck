@@ -139,7 +139,7 @@ emit_include_file()
 
    shell_disable_glob
    IFS=$'\n'
-   for name in `mulle-sde dependency list -- --output-no-header --format '%a\n' | sort`
+   for name in `mulle-sde dependency list -- --output-no-header --force-format '%a\n' | sort`
    do
       r_basename "${name}"
       if [ "${RVAL}" = "${name}" ]

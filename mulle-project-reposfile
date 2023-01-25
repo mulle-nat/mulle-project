@@ -40,14 +40,15 @@ Usage:
    mulle-project-reposfile [flags] [<directory>] ...
 
    A glorified "cat" of REPOS files in a list of directories. The contents of
-   each REPOS file is prefixed with the relative path.
+   each REPOS file is prefixed with the relative path. The result is printed
+   to stdout.
 
    A list of directories is read from a default file (REPOS.dirs), if it
    exists. This way you can predefine the list of directories and occasionally
    refresh your master REPOS list.
 
 Examples:
-      mulle-project-reposfile --repos-filename PUBLIC_REPOS
+      mulle-project-reposfile --repos-filename PUBLIC_REPOS > MY_REPOS
 
 Flags:
 EOF
@@ -244,7 +245,7 @@ main()
 
    if [ -f "${dirsfile}" ]
    then
-      dirs="`rexekutor egrep -v '^#' "${dirsfile}"`"
+      dirs="`rexekutor grep -E -v '^#' "${dirsfile}"`"
 
       if [ -z "${dirs}" ]
       then

@@ -208,17 +208,16 @@ main()
       local component
       local name
 
-      IFS=':'
-      for component in ${MULLE_FETCH_SEARCH_PATH}
-      do
-         IFS="${DEFAULT_IFS}"
-         name="`"${UUIDGEN:-uuidgen}" `"
+      .foreachpath component in ${MULLE_FETCH_SEARCH_PATH}
+      .do
+         r_uuidgen
+         name="${RVAL}"
+
          if [ -d "${component}" ]
          then
             cmd="${cmd} --volume \"${component}:/mnt/search/${name}:ro\""
          fi
-      done
-      IFS="${DEFAULT_IFS}"
+      .done
    fi
 
    if [ ! -z "${OPTION_UPGRADE_SDE_PATH}" ]

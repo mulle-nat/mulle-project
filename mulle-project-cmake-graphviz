@@ -138,7 +138,7 @@ dump_file()
 
    local name
 
-   if fgrep -x -q "${filename}" <<< "${DUMPED}"
+   if grep -F -x -q "${filename}" <<< "${DUMPED}"
    then
       return
    fi

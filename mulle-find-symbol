@@ -134,7 +134,7 @@ main()
       for j in `rexekutor find "$i" -type f -name "lib*.a" -print | sort -f`
       do
          IFS="${DEFAULT_IFS}"
-         if rexekutor nm "$j" | egrep -q "[A-T] ${escaped_symbol}\$"
+         if rexekutor nm "$j" | grep -E -q "[A-T] ${escaped_symbol}\$"
          then
             printf "%s\n" "$j: $symbol"
             match="YES"
@@ -154,7 +154,7 @@ main()
          for j in `rexekutor find "$i" -type f -name "lib*.so.*" -print | sort -f`
          do
             IFS="${DEFAULT_IFS}"
-            if rexekutor nm "$j" | egrep -q "[A-T] ${escaped_symbol}\$"
+            if rexekutor nm "$j" | grep -E -q "[A-T] ${escaped_symbol}\$"
             then
                printf "%s\n" "$j: $symbol"
                match="YES"

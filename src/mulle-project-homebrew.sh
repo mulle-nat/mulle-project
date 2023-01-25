@@ -140,7 +140,7 @@ EOF
 `"
 
    line="version \"${version}\""
-   if fgrep -q -s -e "${version}" <<< "${archiveurl}"
+   if grep -F -q -s -e "${version}" <<< "${archiveurl}"
    then
       line="# ${line}"
    fi

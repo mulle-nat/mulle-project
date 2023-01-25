@@ -235,7 +235,7 @@ upgrade_sde()
    prefix="${RVAL}"
 
    IFS=$'\n'; shell_disable_glob
-   for i in `egrep -v '^#' /mnt/sde/REPOS`
+   for i in `grep -E -v '^#' /mnt/sde/REPOS`
    do
       (
          rexekutor cd "/mnt/sde/$i" && exekutor sudo ./bin/installer "${prefix}"

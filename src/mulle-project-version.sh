@@ -49,25 +49,25 @@ project::version::split_camelcase_string()
 # does not work well for camel case
 project::version::make_cpp_string()
 {
-   tr '[a-z]' '[A-Z]' | tr ' ' '_' | tr '-' '_'
+   tr '[:lower:]' '[:upper:]' | tr ' ' '_' | tr '-' '_'
 }
 
 
 project::version::make_directory_string()
 {
-   tr '[A-Z]' '[a-z]' | tr ' ' '-' | tr '_' '-'
+   tr '[:upper:]' '[:lower:]' | tr ' ' '-' | tr '_' '-'
 }
 
 
 project::version::make_file_string_no_hyphen()
 {
-   tr '[A-Z]' '[a-z]' | tr ' ' '_' | tr '-' '_'
+   tr '[:upper:]' '[:lower:]' | tr ' ' '_' | tr '-' '_'
 }
 
 
 project::version::make_file_string()
 {
-   tr '[A-Z]' '[a-z]' | tr ' ' '_'
+   tr '[:upper:]' '[:lower:]' | tr ' ' '_'
 }
 
 
@@ -88,13 +88,13 @@ project::version::get_project_version()
       return 1
    fi
 
-   match="`fgrep -s -w "${versionname}" "${filename}" | head -2`"
+   match="`grep -F -s -w "${versionname}" "${filename}" | head -2`"
    # get rid of an ifdef
-   match="`egrep -v '^#if' <<< "${match}" | head -1`"
+   match="`grep -E -v '^#if' <<< "${match}" | head -1`"
 
    if [ -z "${match}" ]
    then
-      match="`egrep -v '^#' "${filename}" | head -1`"
+      match="`grep -E -v '^#' "${filename}" | head -1`"
    fi
 
    log_debug "match=${match}"
@@ -243,7 +243,7 @@ project::version::get_formula_name_from_project()
    local project="$1"
    local language="$2"
 
-   language="`tr '[A-Z]' '[a-z]' <<< "${language}"`"
+   language="`tr '[:upper:]' '[:lower:]' <<< "${language}"`"
    case "${language}" in
       c|sh|bash)
          printf "%s\n" "${project}" \

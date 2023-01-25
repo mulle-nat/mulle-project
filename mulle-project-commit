@@ -199,7 +199,7 @@ main()
 
    local bad_changes
 
-   bad_changes="`rexekutor egrep '^UU' <<< "${changes}" `"
+   bad_changes="`rexekutor grep -E '^UU' <<< "${changes}" `"
    if [ ! -z "${bad_changes}" ]
    then
       if [ "${OPTION_STATUS}" = 'YES' ]
@@ -225,7 +225,7 @@ ${C_RESET}${bad_changes# }"
 
       local interesting_changes
 
-      interesting_changes="`egrep -v "${ignore_patterns}" <<< "${changes}" `"
+      interesting_changes="`grep -E -v "${ignore_patterns}" <<< "${changes}" `"
       if [ ! -z "${interesting_changes}" ]
       then
          if [ "${OPTION_STATUS}" = 'YES' ]
@@ -245,7 +245,7 @@ ${C_RESET}${interesting_changes# }"
    then
       local commit_options
 
-      project::git::r_commit_options "${OPTION_AMEND}" "$*"
+      project::git::r_commit_options "${OPTION_AMEND}" "" "$*"
       commit_options="${RVAL}"
 
       log_verbose "Add changes and commit..."

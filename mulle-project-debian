@@ -187,8 +187,8 @@ main()
 
             key="`sed 's/^..//' <<< "$1"`"
             key="`tr '-' '_' <<< "${key}"`"
-            key="`tr '[a-z]' '[A-Z]' <<< "${key}"`"
-            if ! egrep -q -s '^[A-Z_][A-Z0-9_]*$' <<< "${key}" > /dev/null
+            key="`tr '[:lower:]' '[:upper:]' <<< "${key}"`"
+            if ! grep -E -q -s '^[A-Z_][A-Z0-9_]*$' <<< "${key}" > /dev/null
             then
                fail "invalid variable specification \"${key}\", created by \"$1\""
             fi
@@ -288,7 +288,7 @@ main()
          if [ "${OPTION_UPDATE}" = 'YES' ] && [ -x "${DEBIAN_DISTS}/did-update.sh" ]
          then
             (
-              log_info "Executing ./did-update.sh ${DEBIAN_REPOSITORY} in ..."
+              log_info "Executing ./did-update.sh ${DEBIAN_REPOSITORY} in \"${DEBIAN_DISTS}\"..."
 
               #
               # this calls srcO/debian-software/did-upload.sh

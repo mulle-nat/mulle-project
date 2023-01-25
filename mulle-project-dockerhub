@@ -1,0 +1,160 @@
+#! /usr/bin/env mulle-bash
+#! MULLE_BASHFUNCTIONS_VERSION=<|MULLE_BASHFUNCTIONS_VERSION|>
+# shellcheck shell=bash
+#
+
+
+[ "${TRACE}" = 'YES' -o "${MULLE_PROJECT_DOCKERHUB_TRACE}" = 'YES' ] \
+&& set -x  \
+&& : "$0" "$@"
+
+#
+# Versioning of this script
+#
+MULLE_EXECUTABLE_VERSION="0.0.0"
+
+
+project_dockerhub::print_flags()
+{
+   echo "   -f    : force operation"
+
+   ##
+   ## ADD YOUR FLAGS DESCRIPTIONS HERE
+   ##
+
+   options_technical_flags_usage \
+           "      : "
+}
+
+
+project_dockerhub::usage()
+{
+   [ $# -ne 0 ] && log_error "$*"
+
+
+   cat <<EOF >&2
+Usage:
+   mulle-project-dockerhub [flags]
+
+   Push latest version to dockerhub.
+
+Flags:
+EOF
+   project_dockerhub::print_flags | LC_ALL=C sort >&2
+
+   cat <<EOF >&2
+Environment:
+   DOCKER_VENDOR
+   DOCKER_PROJECT
+   PROJECT_NAME
+EOF
+   exit 1
+}
+
+
+project_dockerhub::main()
+{
+   #
+   # simple option/flag handling
+   #
+   local OPTION_TAGS="latest"
+   local OPTION_PROJECT="${DOCKER_PROJECT:-${PROJECT_NAME}}"
+   local OPTION_VENDOR="${DOCKER_VENDOR}"
+
+   if rexekutor [ -f .mulle ]
+   then
+      OPTION_PROJECT="${OPTION_PROJECT:-"`rexekutor mulle-env ${MULLE_TECHNICAL_FLAGS} get DOCKER_PROJECT`"}"
+      OPTION_PROJECT="${OPTION_PROJECT:-"`rexekutor mulle-env ${MULLE_TECHNICAL_FLAGS} get PROJECT_NAME`"}"
+
+      OPTION_VENDOR="${OPTION_VENDOR:-"`rexekutor mulle-env ${MULLE_TECHNICAL_FLAGS} get DOCKER_VENDOR`"}"
+   fi
+
+   while [ $# -ne 0 ]
+   do
+      if options_technical_flags "$1"
+      then
+         shift
+         continue
+      fi
+
+      case "$1" in
+         -f|--force)
+            MULLE_FLAG_MAGNUM_FORCE='YES'
+         ;;
+
+         -h*|--help|help)
+            project_dockerhub::usage
+         ;;
+
+         --project)
+            [ $# -eq 1 ] && match_list_usage "missing argument to $1"
+            shift
+
+            OPTION_PROJECT="$1"
+         ;;
+
+         --vendor)
+            [ $# -eq 1 ] && match_list_usage "missing argument to $1"
+            shift
+
+            OPTION_VENDOR="$1"
+         ;;
+
+         --version)
+            printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
+            exit 0
+         ;;
+
+         -*)
+            project_dockerhub::usage "Unknown flag \"$1\""
+         ;;
+
+         *)
+            break
+         ;;
+      esac
+
+      shift
+   done
+
+   options_setup_trace "${MULLE_TRACE}" && set -x
+
+   local directory="."
+
+   if [ $# -ne 0 ]
+   then
+      directory="$1"
+      shift
+   fi
+
+   [ $# -ne 0 ] && project_dockerhub::usage "Superflous parameters $*"
+
+
+   ##
+   ## ADD YOUR CODE HERE
+   ##
+   [ ! -f "${directory}/Dockerfile" ] && fail "No Dockerfile in \"${directory}\""
+   [ -z "${OPTION_VENDOR}" ]  && fail "No vendor specified"
+   [ -z "${OPTION_PROJECT}" ] && fail "No project specified"
+
+   version="`mulle-project-version`"
+   [ -z "${version}" ] && fail "Could not figure out version"
+
+   local tagname
+
+   for tagname in ${OPTION_TAGS} "${version}"
+   do
+      imagename="${OPTION_VENDOR}/${OPTION_PROJECT}:${tagname}"
+      exekutor docker build -t "${imagename}" "${directory}"  || exit 1
+      exekutor docker push "${imagename}"                     || exit 1
+   done
+}
+
+#
+# You can also use the function `call_with_flags`, which has been defined
+# during mulle-boot. It lets you call 'project_dockerhub::main'
+# with MULLE_PROJECT_DOCKERHUB_FLAGS interposed.
+#
+# call_with_flags "project_dockerhub::main" "${MULLE_PROJECT_DOCKERHUB_FLAGS}" "$@"
+
+project_dockerhub::main "$@"

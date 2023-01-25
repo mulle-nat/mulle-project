@@ -35,7 +35,7 @@ Usage:
    .mulle/etc/sourcetree/config contents.
 
    This script will query the GitHub API at least twice for each repository
-   as it lists in its dependencies. The GitHub limit is 60 requests per hours
+   it lists in its dependencies. The GitHub limit is 60 requests per hours
    though for unauthenticated users. That means, if you have more than 30
    dependencies, which you easily might have, that you'll run into errors. See
    mulle-fetch github for help.
@@ -119,8 +119,8 @@ get_repository()
    if [ -f ".git/config" ]
    then
       repository="`rexekutor grep 'url\ =\ git@github.com:' .git/config \
-                 | sed 's|^.*github.com:\([^/]*\)/\([^/.]*\).*|\1/\2|' \
-                 | head -1`"
+                   | sed 's|^.*github.com:\([^/]*\)/\([^/.]*\).*|github:\1/\2|' \
+                   | head -1`"
    fi
 
    if [ -z "${repository}" ]
@@ -131,7 +131,7 @@ get_repository()
       r_basename "${RVAL}"
       user="${RVAL}"
 
-      repository="${user}/${name}"
+      repository="github:${user}/${name}"
    fi
 
    echo "${repository}"
@@ -177,7 +177,7 @@ print_name()
 get_description_4()
 {
    rexekutor head -4 "README.md" \
-   | egrep '^####' \
+   | grep -E '^####' \
    | sed -e 's/^####//' -e 's/^ //g'
 }
 
@@ -338,7 +338,7 @@ print_dependencies()
                            --output-eval \
                            --output-no-column \
                            --output-no-header \
-                           --format "%a;%t;%u\\n"` || exit 1
+                           --force-format "%a;%t;%u\\n"` || exit 1
 
    .foreachline line in ${lines}
    .do

@@ -115,7 +115,7 @@ get_xcodeproj_version()
       fail "Xcode project file \"${filename}\" not found"
    fi
 
-   egrep '^[[:space:]]*CURRENT_PROJECT_VERSION[[:space:]]*=' "${filename}" | \
+   grep -E '^[[:space:]]*CURRENT_PROJECT_VERSION[[:space:]]*=' "${filename}" | \
      head -1 | \
      sed 's|^[[:space:]]*CURRENT_PROJECT_VERSION[[:space:]]*=[[:space:]]*["]*\([0-9][0-9]*.[0-9][0-9]*.[0-9][0-9]*\).*|\1|'
 }
@@ -179,7 +179,7 @@ get_version()
 
       if [ ! -f "${VERSIONFILE}" -a -f "VERSION" ]
       then
-         VERSION="`egrep -v '^#' "VERSION"`"
+         VERSION="`grep -E -v '^#' "VERSION"`"
          if [ ! -z "${VERSION}" ]
          then
             VERSIONFILE="VERSION"
@@ -287,7 +287,7 @@ status_version()
 
    local last
 
-   last="`rexekutor git tag -l --sort=-creatordate | egrep -x '[0-9]*\.[0-9]*\.[0-9]*' | head -1`"
+   last="`rexekutor git tag -l --sort=-creatordate | grep -E -x '[0-9]*\.[0-9]*\.[0-9]*' | head -1`"
    info_version "${VERSION}" "${last}"
 
    if [ "${OPTION_RELEASENOTES}" != 'NO' ]
@@ -376,7 +376,7 @@ warn_version()
       then
          log_warning "${VERSION} already exists as a git tag"
       else
-         last="`rexekutor git tag -l --sort=-creatordate | egrep -x '[0-9]*\.[0-9]*\.[0-9]*' | head -1`"
+         last="`rexekutor git tag -l --sort=-creatordate | grep -E -x '[0-9]*\.[0-9]*\.[0-9]*' | head -1`"
 
          info_version "${VERSION}" "${last}"
       fi

@@ -116,7 +116,7 @@ git_numeric_tags_sorted_by_time()
    log_entry git_numeric_tags_sorted_by_time "$@"
 
    rexekutor git tag --sort=committerdate \
-   | egrep '^[0-9]*\.[0-9]*\.[0-9]*$'
+   | grep -E '^[0-9]*\.[0-9]*\.[0-9]*$'
 }
 
 
@@ -214,7 +214,7 @@ run()
    else
       tag="`rexekutor git tag -l --points-at "${latest_commit}" \
             | sort -r -n \
-            | egrep '^[0-9]*\.[0-9]*\.[0-9]*$' | head -1`"
+            | grep -E '^[0-9]*\.[0-9]*\.[0-9]*$' | head -1`"
    fi
 
    if [ "${suppress}" = 'YES' -o "${boldmarker}" = 'YES' ]
