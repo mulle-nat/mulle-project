@@ -1,0 +1,749 @@
+#! /usr/bin/env mulle-bash
+# shellcheck shell=bash
+
+[ "${TRACE}" = 'YES' -o "${MULLE_PROJECT_PACMAN_TRACE}" = 'YES' ] && set -x && : "$0" "$@"
+
+
+MULLE_EXECUTABLE_VERSION="0.0.1"
+
+if [ -z "${MULLE_PROJECT_LIBEXEC_DIR}" ]
+then
+   r_get_libexec_dir "${MULLE_EXECUTABLE}" "mulle-project" "mulle-project-git.sh"
+   MULLE_PROJECT_LIBEXEC_DIR="${RVAL}"
+fi
+
+
+
+print_flags()
+{
+   echo "   --no-checksum  : do not compute shasums"
+
+   options_technical_flags_usage "       : "
+}
+
+
+usage()
+{
+   [ $# -ne 0 ] && log_error "$*"
+
+
+   cat <<EOF >&2
+Usage:
+   mulle-project-pacman [flags]
+
+   Create a PKGBUILD file for the linux/arch pacman package manager.
+   Run as mulle-project-man >> PKGBUILD in any mulle-sde project.
+   The resulting file can then be processed by "makepkg".
+
+   If you have a "release" branch, it will be checked for the latest
+   tag that matches [v0-9]*.*.* and this will be used. As a fallback the
+   default branch is checked.
+
+   Currently this utility is limited to cmake projects and bash projects
+   with an \`installer\` script in a local \`bin\` directory.
+
+   Project values are read from \`.mulle/etc/project/formula-info.sh\`.
+
+Flags:
+EOF
+   print_flags | LC_ALL=C sort >&2
+
+   exit 1
+}
+
+
+
+get_url()
+{
+   log_entry "get_url" "$@"
+
+   local repository
+   local name
+   local user
+
+   if [ -f ".git/config" ]
+   then
+      repository="`rexekutor grep 'url\ =\ git@github.com:' .git/config \
+                 | sed 's|^.*github.com:\([^/]*\)/\([^/.]*\).*|https://github.com/\1/\2|' \
+                 | head -1`"
+   fi
+
+   if [ -z "${repository}" ]
+   then
+      r_basename "${PWD}"
+      name="${RVAL}"
+      r_dirname "${PWD}"
+      r_basename "${RVAL}"
+      user="${RVAL}"
+
+      repository="https://github.com/${user}/${name}"
+   fi
+
+   echo "${repository}"
+}
+
+
+
+get_homepage()
+{
+   log_entry "get_homepage" "$@"
+
+   if [ ! -z "${PROJECT_HOMEPAGE}" ]
+   then
+      echo "${PROJECT_HOMEPAGE}"
+      return 0
+   fi
+
+   get_url
+}
+
+
+get_latest_tag()
+{
+   git describe --tags --match "[v0-9]*\.*\.*" --abbrev=0 $1
+}
+
+
+print_version()
+{
+   log_entry "print_version" "$@"
+
+   local version
+
+   # picks up our environment though
+   version="`get_latest_tag`" || _internal_fail "No project version found"
+   printf "pkgver=%s\n" "${version}"
+}
+
+
+print_name()
+{
+   log_entry "print_name" "$@"
+
+   if [ -z "${PROJECT}" ]
+   then
+      PROJECT="`mulle-sde -s env get PROJECT_NAME 2> /dev/null`"
+      if [ -z "${PROJECT}" ]
+      then
+         r_basename "${PWD}"
+         PROJECT="${RVAL}"
+      fi
+   fi
+
+   printf "pkgname=%s\n" "${PROJECT}"
+}
+
+
+get_description_4()
+{
+   rexekutor head -4 "README.md" \
+   | grep -E '^####' \
+   | sed -e 's/^####//' -e 's/^ //g'
+}
+
+
+get_description_2()
+{
+   rexekutor sed -e '/^[[:space:]]*$/d' "README.md" \
+   | head -2 \
+   | tail -1
+}
+
+
+get_description()
+{
+   log_entry "get_description" "$@"
+
+   if [ ! -z "${DESC}" ]
+   then
+      printf "%s\n" "${DESC}"
+   else
+      if [ -f "README.md" ]
+      then
+         if ! get_description_4
+         then
+            get_description_2
+         fi
+      fi
+   fi
+}
+
+
+print_description()
+{
+   log_entry "print_description" "$@"
+
+   RVAL="`get_description`"
+   r_escaped_doublequotes "${RVAL}"
+   printf "pkgdesc=\"%s\"\n" "${RVAL}"
+}
+
+
+print_homepage()
+{
+   log_entry "print_homepage" "$@"
+
+   RVAL="`get_homepage`"
+   r_escaped_doublequotes "${RVAL}"
+   printf "url=\"%s\"\n" "${RVAL}"
+}
+
+
+
+get_license_text()
+{
+   log_entry "get_license_text" "$@"
+
+   if [ -f LICENSE ]
+   then
+      head -1 LICENSE
+   else
+      if [ -f LICENSE.txt ]
+      then
+         head -1 LICENSE.txt
+      fi
+   fi
+}
+
+
+get_license()
+{
+   log_entry "get_license" "$@"
+
+   local line
+
+   # grep LICENSE.txt
+   line="`get_license_text`"
+   case "${line}" in
+      *BSD*3*)
+         echo "BSD-3-Clause"
+      ;;
+
+      *)
+         echo "UNLICENSED"    # dunno
+      ;;
+   esac
+}
+
+
+print_license()
+{
+   log_entry "print_license" "$@"
+
+   RVAL="`get_license`"
+   r_escaped_singlequotes "${RVAL}"
+
+   printf "license=('%s')\n" "${RVAL}"
+}
+
+
+
+print_sourcetree_dependencies()
+{
+   log_entry "print_sourcetree_dependencies" "$@"
+
+   printf "depends=("
+
+   local sep
+
+   sep=""
+
+   local name
+   local line
+   local lines
+
+   # ignore embedded
+   lines=`rexekutor mulle-sde ${MULLE_TECHNICAL_FLAGS} \
+                              ${MULLE_SDE_FLAGS} \
+                        dependency list -- \
+                           --dedupe-mode url-filename \
+                           --qualifier 'MATCHES share AND MATCHES build' \
+                           --output-eval \
+                           --output-no-column \
+                           --output-no-header \
+                           --force-format "%a;%t;%u\\n"` || exit 1
+
+   .foreachline line in ${lines}
+   .do
+      name="${line%%;*}"
+
+      r_escaped_singlequotes "${name}"
+      printf "%s'%s'" "${sep}" "${RVAL}"
+      sep=$'\n         '
+   .done
+
+   printf ")\n"
+}
+
+
+
+print_debian_dependencies()
+{
+   log_entry "print_debian_dependencies" "$@"
+
+   printf "depends=("
+
+   local sep
+
+   sep=""
+
+   local item
+   local op
+   local version
+   local name
+
+   .foreachitem item in ${DEBIAN_DEPENDENCIES}
+   .do
+      op=
+      version=
+
+      case "${item}" in
+         *\(*\)*)
+            name="${item%%\(*}"
+            item="${item#*\(}"
+
+            r_trim_whitespace "${item}"
+            case "${RVAL}" in
+               '>='*|'<='*)
+                  op="${RVAL:0:2}"
+                  version="${RVAL:2}"
+                  version="${version%\)}"
+               ;;
+               '='*|'<'*|'>'*)
+                  op="${RVAL:0:1}"
+                  version="${RVAL:1}"
+                  version="${version%\)}"
+               ;;
+
+               *)
+                  log_warning "Can't reuse ${item} for ARCH"
+               ;;
+            esac
+         ;;
+
+         *)
+            name="${item}"
+         ;;
+      esac
+
+      r_trim_whitespace "${name}"
+      r_escaped_singlequotes "${RVAL}"
+      name="${RVAL}"
+
+      r_trim_whitespace "${version}"
+      version="${RVAL}"
+
+      printf "%s'%s%s%s'" "${sep}" "${name}" "${op}" "${version}"
+      sep=$'\n         '
+   .done
+
+   printf ")\n"
+}
+
+
+print_dependencies()
+{
+   log_entry "print_dependencies" "$@"
+
+   if [ ! -z "${ARCH_DEPENDENCIES}" ]
+   then
+      printf "depends=(%s)\n" "${ARCH_DEPENDENCIES}"
+      return 0
+   fi
+
+   if mulle-sourcetree -s config status
+   then
+      print_sourcetree_dependencies "$@"
+      return $?
+   fi
+
+   if [ ! -z "${DEBIAN_DEPENDENCIES}" ]
+   then
+      print_debian_dependencies
+      return $?
+   fi
+}
+
+
+
+get_archive()
+{
+   local remote
+
+   remote="${remote:-`git remote get-url github 2> /dev/null`}"
+   remote="${remote:-`git remote get-url origin 2> /dev/null`}"
+
+   local scheme
+   local domain
+   local host
+   local scm
+   local user
+   local repo
+   local branch
+   local tag
+
+   eval `rexekutor mulle-domain parse "${remote}"`
+
+   tag="${tag:-`get_latest_tag release 2> /dev/null`}"
+   tag="${tag:-`get_latest_tag 2> /dev/null`}"
+
+   local url
+
+   rexekutor mulle-domain compose --domain "${domain}" \
+                                  --user "${user}"     \
+                                  --repo "${repo}"     \
+                                  --scm tar            \
+                                  --tag "${tag}"
+}
+
+
+get_sha256sum()
+{
+   local url="$1"
+
+   if [ "${OPTION_CHECKSUM}" = "NO" ]
+   then
+      echo SKIP
+   fi
+
+   SHASUMOPTIONS="-a 256"
+   if ! SHASUM="`command -v shasum`"
+   then
+      SHASUM="sha256sum"
+      SHASUMOPTIONS=
+   fi
+
+   r_make_tmp_directory
+   (
+      cd "${RVAL}" &&
+      curl -s -L -o blob "${url}" &&
+      ${SHASUM} ${SHASUMOPTIONS} blob | awk '{ print $1 }'
+   )
+   rmdir_safer "${RVAL}"
+}
+
+
+#
+# TODO, put embedded dependencies into "sources", so pacman fetches them
+#       then move into proper place here
+#
+print_sources()
+{
+   local archive="$1"
+
+   local chksums
+
+   log_entry "print_sources" "$@"
+
+   # download embedded dependencies
+
+   printf "source=(\"%s\"" "$1"
+
+   printf -v chksums "'%s'" "`get_sha256sum "$1"`"
+
+   if mulle-sourcetree -s config status
+   then
+      local lines
+
+      # also directly embedded
+      lines=`rexekutor mulle-sde ${MULLE_TECHNICAL_FLAGS} \
+                                 ${MULLE_SDE_FLAGS} \
+                           dependency list -- \
+                              --dedupe-mode url-filename \
+                              --qualifier 'NOT MATCHES share AND NOT MATCHES build' \
+                              --output-eval \
+                              --output-no-column \
+                              --output-no-header \
+                              --force-format "%a;%u\\n"` || exit 1
+
+      local name
+      local line
+      local url
+      local dirname
+
+      .foreachline line in ${lines}
+      .do
+         name="${line%%;*}"
+         line="${line#*;}"
+         url="${line#*;}"
+
+         r_basename "${name}"
+
+         printf "\n        %s" "\"${RVAL}::${url}\""
+
+         printf -v chksums "%s%s'%s'" "${chksums}" \
+                                      $'\n            ' \
+                                      "`get_sha256sum "${url}"`"
+      .done
+   fi
+
+   printf ")\n"
+
+   printf "sha256sums=(%s)\n" "${chksums}"
+
+}
+
+
+#
+# PREPARE
+#
+
+#
+# TODO, put embedded dependencies into "sources", so pacman fetches them
+#       then move into proper place here
+#
+print_prepare()
+{
+   log_entry "print_prepare" "$@"
+
+   if ! mulle-sourcetree -s config status
+   then
+      return
+   fi
+
+   local sep
+
+   local lines
+
+   # only flat embedded
+   lines=`rexekutor mulle-sde ${MULLE_TECHNICAL_FLAGS} \
+                              ${MULLE_SDE_FLAGS} \
+                        dependency list -- \
+                           --dedupe-mode url-filename \
+                           --qualifier 'NOT MATCHES share AND NOT MATCHES build' \
+                           --output-eval \
+                           --output-no-column \
+                           --output-no-header \
+                           --force-format "%a\\n"` || exit 1
+   if [ -z "${lines}" ]
+   then
+      return
+   fi
+
+   # download embedded dependencies
+   cat <<EOF
+
+prepare()
+{
+EOF
+
+   local name
+   local line
+   local archivename
+   local sep
+
+   sep="   "
+   .foreachline name in ${lines}
+   .do
+      r_basename "${name}"
+      archivename="${RVAL}"
+
+      # we are moving an absolute symlink here, which is OK I think
+      printf "%s%s" "${sep}" "mv \"\${srcdir}/${archivename}\" \"\${srcdir}/\${pkgname}-\${pkgver}/${name}\""
+      sep=" &&"$'\n   '
+   .done
+
+   echo
+   cat <<EOF
+}
+EOF
+}
+
+#
+# BUILD
+#
+
+#
+# need to pull this from formula-info.sh or somewhere
+# can't really assume cmake here
+#
+print_cmake_build()
+{
+   cat <<EOF
+
+build()
+{
+   cmake -B build \\
+         -S "\${srcdir}/\${pkgname}-\${pkgver}" \\
+         -DCMAKE_INSTALL_PREFIX=/usr \\
+         -DCMAKE_PREFIX_PATH=/usr \\
+         -DCMAKE_BUILD_TYPE=Release &&
+   cmake --build build --config Release
+}
+EOF
+}
+
+print_build()
+{
+   if [ "$LANGUAGE" = "bash" -a -x "./bin/installer" ]
+   then
+      return
+   fi
+
+   if [ -f "CMakeLists.txt" ]
+   then
+      print_cmake_build
+   fi
+}
+
+
+#
+# INSTALL
+#
+
+print_cmake_install()
+{
+   cat <<EOF
+
+package()
+{
+   DESTDIR="\${pkgdir}" \\
+      cmake --install build --config Release
+}
+EOF
+}
+
+
+print_bash_install()
+{
+   cat <<EOF
+
+package()
+{
+   "\${srcdir}/\${pkgname}-\${pkgver}/bin/installer" "\${pkgdir}"
+}
+EOF
+}
+
+
+print_install()
+{
+   if [ -x "bin/installer" ]
+   then
+      print_bash_install
+   else
+      if [ -f "CMakeLists.txt" ]
+      then
+         print_cmake_install
+      fi
+   fi
+}
+
+
+print_PKGBUILD()
+{
+   log_entry "print_PKGBUILD" "$@"
+
+   print_name
+   print_version
+   printf "pkgrel=1\n"
+   print_description
+   print_homepage
+   print_license
+
+   local archive
+
+   archive="`get_archive`"
+   print_sources "${archive}"
+
+   # needed for embedded dependencies
+   #   printf "%s\n" "makedepends=('curl' 'git' 'tar')"
+
+   case "${LANGUAGE}" in
+      bash)
+         printf "arch=('any')\n"
+      ;;
+
+      *)
+         printf "arch=('i686' 'x86_64' 'ppc' aarm')\n"
+         printf "%s\n" "options=('staticlibs')"
+      ;;
+   esac
+
+   print_dependencies
+
+   print_prepare
+   print_build
+   print_install
+}
+
+
+
+
+main()
+{
+   local OPTION_OUTPUT_FILE="-"
+   local OPTION_CHECKSUM='YES'
+
+   #
+   # simple flag handling
+   #
+   while [ $# -ne 0 ]
+   do
+      if options_technical_flags "$1"
+      then
+         shift
+         continue
+      fi
+
+      case "$1" in
+         -f|--force)
+            MULLE_FLAG_MAGNUM_FORCE='YES'
+         ;;
+
+         -h*|--help|help)
+            usage
+         ;;
+
+         --no-checksum)
+            OPTION_CHECKSUM='NO'
+         ;;
+
+         -o|--output-file)
+            [ $# -eq 1 ] && fail "Missing argument to \"$1\""
+            shift
+
+            OPTION_OUTPUT_FILE="$1"
+         ;;
+
+         --version)
+            printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
+            exit 0
+         ;;
+
+
+         ##
+         ## ADD YOUR FLAGS HERE
+         ##
+
+         -*)
+            usage "Unknown flag \"$1\""
+         ;;
+
+         *)
+            break
+         ;;
+      esac
+
+      shift
+   done
+
+   options_setup_trace "${MULLE_TRACE}" && set -x
+
+   if [ -f  .mulle/etc/project/formula-info.sh ]
+   then
+      . .mulle/etc/project/formula-info.sh
+   fi
+
+   local text
+
+   if [ "${OPTION_OUTPUT_FILE}" = '-' ]
+   then
+      print_PKGBUILD
+   else
+      text="`print_PKGBUILD`" || return 1
+      redirect_exekutor "${OPTION_OUTPUT_FILE}" echo "${text}"
+   fi
+}
+
+call_with_flags "main" "${MULLE_PROJECT_PACMAN_FLAGS}" "$@"

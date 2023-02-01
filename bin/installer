@@ -153,11 +153,11 @@ main()
 
    if [ $# -ne 0 ]
    then
-      installer_fail "usage: install.sh [prefix] [mode]"
+      installer_fail "usage: installer [prefix] [mode]"
    fi
    case "${prefix}" in
       -h|--help|help)
-         installer_fail "usage: install.sh [prefix] [mode]"
+         installer_fail "usage: installer [prefix] [mode]"
       ;;
    esac
 
@@ -175,6 +175,13 @@ main()
 
    for i in mulle-project-*
    do
+      case "${i}" in
+         *.png)
+         # windows...
+         continue
+         ;;
+      esac
+
       if [ -x "${i}" ]
       then
          install -m "${mode}" "$i" "${bin}/$i" || exit 1
