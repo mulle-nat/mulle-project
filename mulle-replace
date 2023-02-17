@@ -30,9 +30,9 @@ usage()
 
    cat <<EOF >&2
 Usage:
-   mulle-replace [flags] <find> <replace> <file>
+   mulle-replace [flags] <find> <replace> <file> ...
 
-   Replace a string with another string in a file.
+   Replace a string with another string in a file (or multiple files).
 
    You will need to escape the '/' characters, if you choose the --regex
    option.

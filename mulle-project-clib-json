@@ -1,7 +1,7 @@
 #! /usr/bin/env mulle-bash
 # shellcheck shell=bash
 
-[ "${TRACE}" = 'YES' -o "${MULLE_PROJECT_PACKAGE_JSON_TRACE}" = 'YES' ] && set -x && : "$0" "$@"
+[ "${TRACE}" = 'YES' -o "${MULLE_PROJECT_CLIB_JSON_TRACE}" = 'YES' ] && set -x && : "$0" "$@"
 
 
 MULLE_EXECUTABLE_VERSION="0.0.2"
@@ -29,10 +29,9 @@ usage()
 
    cat <<EOF >&2
 Usage:
-   mulle-project-package-json [flags]
+   mulle-project-clib-json [flags]
 
-   Create a package.json file from .mulle/etc/project and
-   .mulle/etc/sourcetree/config contents.
+   Create a clib.json file for use with https://www.clibs.org.
 
    This script will query the GitHub API at least twice for each repository
    it lists in its dependencies. The GitHub limit is 60 requests per hours
@@ -72,92 +71,37 @@ read_project_environment()
 }
 
 
-get_url()
+get_repo()
 {
-   log_entry "get_url" "$@"
-
-   local known_domains
-
-   known_domains="`mulle-domain -s list`"
+   log_entry "get_repo" "$@"
 
    local scheme domain host scm user repo branch tag
    local remote
-   local url
 
    .for remote in `git remote 2> /dev/null`
    .do
       url="`git remote get-url "${remote}"`"
       # check if known domain
       eval "`mulle-domain parse-url "${url}"`"
-      if find_line "${known_domains}" "${domain}"
+      if [ "${domain}" = github ]
       then
-         mulle-domain compose-url --domain "${domain}" \
-                                  --scm "none" \
-                                  --user "${user}" \
-                                  --repo "${repo}" \
-                                  --tag "${tag}"
-         return
+         .break
       fi
+      repo=
    .done
 
-   r_basename "${PWD}"
-   repo="${RVAL}"
-   r_dirname "${PWD}"
-   r_basename "${RVAL}"
-   user="${RVAL}"
-
-   echo "https://github.com/${user}/${repo}"
-}
-
-
-get_repository()
-{
-   log_entry "get_repository" "$@"
-
-   if [ ! -z "${PROJECT_REPOSITORY}" ]
+   if [ -z "${repo}" ]
    then
-      echo "${PROJECT_REPOSITORY}"
-      return 0
+      r_basename "${PWD}"
+      repo="${RVAL}"
+      r_dirname "${PWD}"
+      r_basename "${RVAL}"
+      user="${RVAL}"
    fi
 
-   local scheme domain host scm user repo branch tag
-   local remote
-   local url
-
-   .for remote in `git remote 2> /dev/null`
-   .do
-      url="`git remote get-url "${remote}"`"
-      # check if known domain
-      eval "`mulle-domain parse-url "${url}"`"
-      if [ "${domain}" = "github" ]
-      then
-         echo "github:${user}/${repo}"
-         return
-      fi
-   .done
-
-   r_basename "${PWD}"
-   repo="${RVAL}"
-   r_dirname "${PWD}"
-   r_basename "${RVAL}"
-   user="${RVAL}"
-
-   echo "github:${user}/${repo}"
+   echo "${user}/${repo}"
 }
 
-
-get_homepage()
-{
-   log_entry "get_homepage" "$@"
-
-   if [ ! -z "${PROJECT_HOMEPAGE}" ]
-   then
-      echo "${PROJECT_HOMEPAGE}"
-      return 0
-   fi
-
-   get_url
-}
 
 
 print_version()
@@ -221,23 +165,11 @@ print_description()
 {
    log_entry "print_description" "$@"
 
-   printf "%s" "${INDENT}\"description\" : \"`get_description`\"";
-}
+   local text
 
-
-print_homepage()
-{
-   log_entry "print_homepage" "$@"
-
-   printf "%s" "${INDENT}\"homepage\" : \"`get_homepage`\"";
-}
-
-
-print_bugs()
-{
-   log_entry "print_bugs" "$@"
-
-   printf "%s" "${INDENT}\"bugs\" : \"`get_url`/issues\"";
+   text="`get_description | tr -d -c '[[:print:]]'`"
+   r_trim_whitespace "${text}"
+   printf "%s" "${INDENT}\"description\" : \"${RVAL}\"";
 }
 
 
@@ -296,22 +228,40 @@ print_license()
 }
 
 
-print_author()
+print_repo()
 {
-   log_entry "print_author" "$@"
+   log_entry "print_repo" "$@"
 
-   printf "%s" "${INDENT}\"author\" : \"Nat\!\""
+   printf "${INDENT}\"repo\" : \"%s\"" "`get_repo`"
 }
 
 
-print_repository()
+print_sources()
 {
-   log_entry "print_repository" "$@"
+   if [ -d .mulle/share/match ]
+   then
+      sources="`mulle-match list -tf '[hs][eo][au][dr][ec][re]' `"
+   else
+      # cheat and hack
+      sources="`find src -name "*.h" \
+                      -o -name "*.inc" \
+                      -o -name "*.c" \
+                      -o -name "*.cpp" \
+                      -o -name "*.aam" \
+                      -o -name "*.m" `"
+   fi
 
-   printf "%s\n" "${INDENT}\"repository\" : {"
-   printf "%s\n" "${INDENT}${INDENT}\"type\" : \"git\","
-   printf "%s\n" "${INDENT}${INDENT}\"url\" : \"`get_repository`\""
-   printf "%s"   "${INDENT}}"
+   local sep
+
+   sep="${INDENT}${INDENT}"
+
+   printf "%s\n" "${INDENT}\"src\" : ["
+   .foreachline line in ${sources}
+   .do
+      printf "%s\"%s\"" "${sep}" "${line}"
+      sep=","$'\n'"${INDENT}${INDENT}"
+   .done
+   printf "\n%s" "${INDENT}]"
 }
 
 
@@ -319,15 +269,18 @@ print_dependencies()
 {
    log_entry "print_dependencies" "$@"
 
+   local lines="$1"
+
    printf "${INDENT}\"dependencies\" : {"
 
    local sep
 
    sep="\\n${INDENT}${INDENT}"
 
+
    local url
    local name
-   local tag
+   local xtag
    local line
 
    local s
@@ -335,80 +288,45 @@ print_dependencies()
    local repo
    local print_tag
    local alias_tag
-
-   local lines
    local aliases
 
-   lines=`rexekutor mulle-sde ${MULLE_TECHNICAL_FLAGS} \
-                              ${MULLE_SDE_FLAGS} \
-                        dependency list -r -- \
-                           --dedupe-mode url-filename \
-                           --output-eval \
-                           --output-no-column \
-                           --output-no-header \
-                           --force-format "%a;%t;%u\\n"` || exit 1
 
    .foreachline line in ${lines}
    .do
       name="${line%%;*}"
       line="${line#*;}"
-      tag="${line%%;*}"
+      xtag="${line%%;*}"
       url="${line#*;}"
 
-      case "${url}" in
-         *github.com*/archive/*)
-            s="${url#*:}"
-            s="${s#//}"
-            s="${s#github.com/}"
+      local scheme
+      local domain
+      local host
+      local scm
+      local user
+      local repo
+      local branch
+      local tag
 
-            user="${s%%/*}"
-            s="${s#*/}"
-            repo="${s%/*}"
-            repo="${repo%%/*}"
+      eval "`mulle-domain parse "${url}"`"
+
+      case "${domain}" in
+         github)
             if [ ! -z "${user}" -a ! -z "${repo}" ]
             then
                printf "${sep}"
                sep=",\\n${INDENT}${INDENT}"
                # use repo instead of name
-               printf "\"%s\" : \"git://github.com/%s/%s" "${repo}" "${user}" "${repo}"
+               printf "\"%s/%s\"" "${user}" "${repo}"
+               case "${xtag}" in
+                  [0-9].*)
+                     printf ": \"%s\"" "${xtag}"
+                  ;;
+
+                  *)
+                     printf ": \"*\""
+                  ;;
+               esac
             fi
-         ;;
-
-         "")
-            .continue
-         ;;
-
-         *)
-            printf "${sep}"
-            sep=",\\n${INDENT}${INDENT}"
-            printf "\"%s\" : \"%s" "${name}" "${url}"
-         ;;
-      esac
-
-      print_tag=">=0.0.1"
-      # if it isn't numeric it won't show up on github
-      case "${tag}" in
-         [0-9].*)
-            print_tag="^${tag#[Vv]}"
-            printf "#semver:${print_tag}\""
-         ;;
-
-         *)
-#            aliases="`${MULLE_FETCH:-mulle-fetch} ${MULLE_TECHNICAL_FLAGS} \
-#                                                 ${MULLE_FETCH_FLAGS} \
-#                                             github "${user}" "${repo}"  \
-#                                             get-tag-aliases "${tag}" `"
-#
-#            .foreachline alias_tag in ${aliases}
-#            .do
-#               case "${alias_tag}" in
-#                  [vV][0-9]*\.[0-9]*\.[0-9]*|[0-9]*\.[0-9]*\.[0-9]*)
-#                     print_tag="^${alias_tag#[Vv]}"
-#                     .break
-#                  ;;
-#               esac
-#            .done
-            printf "\""
          ;;
       esac
    .done
@@ -429,17 +347,31 @@ print_json()
       printf ",\n"
       print_description
       printf ",\n"
-      print_homepage
-      printf ",\n"
-      print_bugs
-      printf ",\n"
       print_keywords
       printf ",\n"
       print_license
       printf ",\n"
-      print_repository
+      print_repo
       printf ",\n"
-      print_dependencies
+      print_sources
+
+      local dependencies
+
+      # also use embedded resources and let the user sort it out
+      dependencies="`rexekutor mulle-sde ${MULLE_TECHNICAL_FLAGS} \
+                              ${MULLE_SDE_FLAGS} \
+                        dependency list -- \
+                           --dedupe-mode url-filename \
+                           --output-eval \
+                           --output-no-column \
+                           --output-no-header \
+                           --force-format "%a;%t;%u\\n" `"
+
+      if [ ! -z "${dependencies}" ]
+      then
+         printf ",\n"
+         print_dependencies "${dependencies}"
+      fi
       echo
    echo "}"
 }
@@ -527,4 +459,4 @@ main()
    fi
 }
 
-call_with_flags "main" "${MULLE_PROJECT_PACKAGE_JSON_FLAGS}" "$@"
+call_with_flags "main" "${MULLE_PROJECT_CLIB_JSON_FLAGS}" "$@"

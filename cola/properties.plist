@@ -1,0 +1,12 @@
+{
+   project =
+   {
+      description="🤷🏾‍♀️ Manage project versions and releases";
+      domain="github";
+      name="mulle-project";
+      username="mulle-sde";
+      reponame="mulle-project";
+      homepage="https://github.com/mulle-nat/mulle-project";
+      license="BSD-3-Clause"
+   };
+}

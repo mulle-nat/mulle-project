@@ -29,7 +29,7 @@
 #   ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 #   POSSIBILITY OF SUCH DAMAGE.
 #
-MULLE_PROJECT_SOURCETREE_PARSER_SH="included"
+MULLE_PROJECT_SOURCETREE_PARSER_SH='included'
 
 
 project::sourcetree-parser::get_dependency_address_nodetype_branch_tag_url()

@@ -121,6 +121,44 @@ EOF
    exit 1
 }
 
+#############          1         2         3         4         5         6         7
+#############012345678901234567890123456789012345678901234567890123456789012345678901
+long_dashes="------------------------------------------------------------------------"
+long_spaces="                                                                        "
+
+##############0123456789012345678901234
+short_dashes="-------------------------"
+short_spaces="                     "
+
+dashes="${long_dashes}"
+spaces="${long_spaces}"
+
+log_title()
+{
+   local s="$1"
+   local len
+
+   if [ -z "${NO_COLOR:-}" -a "${MULLE_NO_COLOR:-}" != 'YES' ] && [ ! -f /dev/stderr ]
+   then
+      len=$(( ${#dashes} - ${#s} ))
+      if [ ${len} -lt 0 ]
+      then
+         len=0
+      fi
+      printf "%b%b%s%s%b\n" "\033[0;44m" "${C_BOLD}" "$s" "${spaces:0:${len}}" "${C_RESET}"
+   else
+      printf "%s\n" "$s"
+   fi
+}
+
+
+log_title_verbose()
+{
+   if [ "${MULLE_FLAG_LOG_VERBOSE}" = 'YES' ]
+   then
+      log_title "$@"
+   fi
+}
 
 
 shell_it()
@@ -154,7 +192,7 @@ shell_it()
          ;;
 
          *)
-            log_verbose "${C_RESET}---------------------"
+            log_title_verbose "${dashes}"
          ;;
       esac
 
@@ -167,7 +205,7 @@ shell_it()
          ;;
 
          *)
-            log_info "${C_RESET_BOLD}$1"
+            log_title "$1"
          ;;
       esac
 
@@ -176,7 +214,7 @@ shell_it()
          ;;
 
          *)
-            log_verbose "${C_RESET}---------------------"
+            log_title_verbose "${dashes}"
          ;;
       esac
 
@@ -536,6 +574,11 @@ main()
          --others)
             r_comma_concat "${OPTION_MODE}" "others"
             OPTION_MODE="${RVAL}"
+         ;;
+
+         --short-dashes)
+            dashes="${short_dashes}"
+            spaces="${short_spaces}"
          ;;
 
          --main-project|--project)

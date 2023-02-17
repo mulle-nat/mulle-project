@@ -29,7 +29,7 @@ usage()
 
    cat <<EOF >&2
 Usage:
-   mulle-project-pacman [flags]
+   ${MULLE_USAGE_NAME} [flags]
 
    Create a PKGBUILD file for the linux/arch pacman package manager.
    Run as mulle-project-man >> PKGBUILD in any mulle-sde project.
@@ -58,15 +58,28 @@ get_url()
    log_entry "get_url" "$@"
 
    local repository
-   local name
-   local user
+   local known_domains
 
-   if [ -f ".git/config" ]
-   then
-      repository="`rexekutor grep 'url\ =\ git@github.com:' .git/config \
-                 | sed 's|^.*github.com:\([^/]*\)/\([^/.]*\).*|https://github.com/\1/\2|' \
-                 | head -1`"
-   fi
+   known_domains="`mulle-domain -s list`"
+
+   local scheme domain host scm user repo branch tag
+   local remote
+
+   .for remote in `git remote 2> /dev/null`
+   .do
+      url="`git remote get-url "${remote}"`"
+      # check if known domain
+      eval "`mulle-domain -s parse-url "${url}"`"
+      if find_line "${known_domains}" "${domain}"
+      then
+         repository="`mulle-domain -s compose-url --domain "${domain}" \
+                                  --scm "git" \
+                                  --user "${user}" \
+                                  --repo "${repo}" \
+                                  --tag "${tag}" `"
+         .break
+      fi
+   .done
 
    if [ -z "${repository}" ]
    then
