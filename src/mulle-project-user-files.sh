@@ -41,7 +41,7 @@ if [ "${DO_GENERATE_FORMULA}" = 'YES' ]
 then
    if [ -f "${INFO_DIR}/generate-formula.sh" ]
    then
-      project::user-files-settings::source_file "${INFO_DIR}/generate-formula.sh"
+      project::user_files_settings::source_file "${INFO_DIR}/generate-formula.sh"
    fi
 fi
 
@@ -49,6 +49,6 @@ fi
 if [ -f "${INFO_DIR}/post-release.sh" ]
 then
    DO_POST_RELEASE='YES'
-   project::user-files-settings::source_file "${INFO_DIR}/post-release.sh"
+   project::user_files_settings::source_file "${INFO_DIR}/post-release.sh"
 fi
 

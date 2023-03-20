@@ -38,6 +38,7 @@ EOF
    --if-exists <file>  : ignore project if <file> does not exist
    --lenient           : lenient operation, errors don't preempt (default)
    --main-project      : also execute in main project
+   --sublime <file>    : create a "Sublime Text" project from REPOS
    --subprojects       : also execute in subprojects
    --only-others       : only execute in other projects, like demo
    --only-main-project : only execute in main project (default)
@@ -468,6 +469,100 @@ r_repos_contents()
 }
 
 
+#
+# hidden bonus code
+print_header()
+{
+   cat <<EOF
+{
+   "folders":
+   [
+EOF
+
+}
+
+print_footer()
+{
+   cat <<EOF
+   ],
+}
+EOF
+
+}
+
+
+print_ignore_stuff()
+{
+   cat <<EOF
+         "binary_file_patterns":
+         [
+            "*.o",
+            "*.lib",
+            "*.log",
+            "*.a",
+            "*.so",
+            "*.exe",
+            "*.zip",
+            "*.tgz",
+            "*.bz2",
+            "*.xz",
+            "*.gif",
+            "*.png",
+            "*.jpg",
+            "*.tiff"
+         ],
+         "file_exclude_patterns":
+         [
+            "*~",
+            "*~.*",
+            "*.chk",
+            ".DS_Store",
+            "._.DS_Store",
+            "*.sublime-workspace",
+            "tmp.*"
+         ],
+         "folder_exclude_patterns":
+         [
+            ".git",
+            ".mulle/var",
+            ".unison*",
+            "addiction",
+            "build",
+            "Build",
+            "kitchen",
+            "dependency",
+            "stash",
+            "var"
+         ],
+EOF
+
+}
+
+
+create_sublime_text_meta_project()
+{
+   local repos="$1"
+
+   print_header
+
+   .foreachline i in ${repos}
+   .do
+      cat <<EOF
+      {
+         "path": "$i",
+EOF
+         print_ignore_stuff
+         cat <<EOF
+
+      },
+EOF
+   .done
+
+   print_footer
+ }
+
+
+
 main()
 {
    local OPTION_ADORN
@@ -483,6 +578,7 @@ main()
    local OPTION_SKIP_FROM
    local OPTION_SKIP_UNTIL
    local OPTION_PRINT
+   local OPTION_SUBLIME
 
    #
    # simple flag handling
@@ -619,6 +715,13 @@ main()
             OPTION_LENIENT='NO'
          ;;
 
+         --sublime)
+            [ $# -eq 1 ] && usage "missing argument to $1"
+            shift
+
+            OPTION_SUBLIME="$1"
+         ;;
+
          --subprojects)
             r_comma_concat "${OPTION_MODE}" "subprojects"
             OPTION_MODE="${RVAL}"
@@ -669,6 +772,18 @@ main()
    then
       printf "%s\n" "${repos}"
       exit 0
+   fi
+
+   local text
+
+   if [ ! -z "${OPTION_SUBLIME}" ]
+   then
+      if text="`create_sublime_text_meta_project "${repos}"`"
+      then
+         redirect_exekutor "${OPTION_SUBLIME}"  printf "%s\n" "${text}"
+         exit 0
+      fi
+      exit 1
    fi
 
    if [ "${OPTION_PARALLEL}" = 'YES' ]

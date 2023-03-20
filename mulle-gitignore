@@ -73,22 +73,8 @@ EOF
 
 main()
 {
-   local MULLE_FLAG_MAGNUM_FORCE='NO'
-
-   # technical flags
-   local MULLE_TRACE
-   local MULLE_FLAG_EXEKUTOR_DRY_RUN='NO'
-   local MULLE_FLAG_LOG_LOCAL='NO'
-   local MULLE_FLAG_LOG_DEBUG='NO'
-   local MULLE_FLAG_LOG_EXEKUTOR='NO'
-   local MULLE_FLAG_LOG_FLUFF='NO'
-   local MULLE_FLAG_LOG_SCRIPTS='NO'
-   local MULLE_FLAG_LOG_SETTINGS='NO'
-   local MULLE_FLAG_LOG_VERBOSE='NO'
-   local MULLE_FLAG_LOG_MERGE='NO'
-   local MULLE_TRACE_POSTPONE='NO'
-
    local FLAG_STDIN='NO'
+
    #
    # simple flag handling
    #
@@ -152,7 +138,7 @@ main()
 
    [ $# -eq 0 ] && usage "Missing file"
 
-   .foreachline line in "$*"
+   .foreachline line in "$@"
    .do
       project::git::append_to_gitignore_if_needed "${line}"
    .done

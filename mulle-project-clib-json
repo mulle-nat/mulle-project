@@ -33,12 +33,6 @@ Usage:
 
    Create a clib.json file for use with https://www.clibs.org.
 
-   This script will query the GitHub API at least twice for each repository
-   it lists in its dependencies. The GitHub limit is 60 requests per hours
-   though for unauthenticated users. That means, if you have more than 30
-   dependencies, which you easily might have, that you'll run into errors. See
-   mulle-fetch github for help.
-
 Flags:
 EOF
    print_flags | LC_ALL=C sort >&2
@@ -238,9 +232,13 @@ print_repo()
 
 print_sources()
 {
+   local qualifier
+
    if [ -d .mulle/share/match ]
    then
-      sources="`mulle-match list -tf '[hs][eo][au][dr][ec][re]' `"
+      qualifier='(TYPE_MATCHES header OR TYPE_MATCHES source OR CATEGORY_MATCHES clib) AND NOT CATEGORY_MATCHES no_clib'
+      sources="`rexekutor mulle-match ${MULLE_TECHNICAL_FLAGS} \
+                                      ${MULLE_MATCH_FLAGS}list --qualifier  "${qualifier}" `"
    else
       # cheat and hack
       sources="`find src -name "*.h" \
@@ -277,19 +275,22 @@ print_dependencies()
 
    sep="\\n${INDENT}${INDENT}"
 
-
-   local url
-   local name
-   local xtag
-   local line
-
-   local s
-   local user
-   local repo
-   local print_tag
    local alias_tag
    local aliases
-
+   local branch
+   local domain
+   local host
+   local line
+   local name
+   local print_tag
+   local repo
+   local s
+   local scheme
+   local scm
+   local tag
+   local url
+   local user
+   local xtag
 
    .foreachline line in ${lines}
    .do
@@ -298,37 +299,32 @@ print_dependencies()
       xtag="${line%%;*}"
       url="${line#*;}"
 
-      local scheme
-      local domain
-      local host
-      local scm
-      local user
-      local repo
-      local branch
-      local tag
+      if [ ! -z "${url}" ]
+      then
+         eval "`rexekutor mulle-domain ${MULLE_TECHNICAL_FLAGS} \
+                                       ${MULLE_DOMAIN_FLAGS} parse "${url}"`"
 
-      eval "`mulle-domain parse "${url}"`"
+         case "${domain}" in
+            github)
+               if [ ! -z "${user}" -a ! -z "${repo}" ]
+               then
+                  printf "${sep}"
+                  sep=",\\n${INDENT}${INDENT}"
+                  # use repo instead of name
+                  printf "\"%s/%s\"" "${user}" "${repo}"
+                  case "${xtag}" in
+                     [0-9].*)
+                        printf ": \"%s\"" "${xtag}"
+                     ;;
 
-      case "${domain}" in
-         github)
-            if [ ! -z "${user}" -a ! -z "${repo}" ]
-            then
-               printf "${sep}"
-               sep=",\\n${INDENT}${INDENT}"
-               # use repo instead of name
-               printf "\"%s/%s\"" "${user}" "${repo}"
-               case "${xtag}" in
-                  [0-9].*)
-                     printf ": \"%s\"" "${xtag}"
-                  ;;
-
-                  *)
-                     printf ": \"*\""
-                  ;;
-               esac
-            fi
-         ;;
-      esac
+                     *)
+                        printf ": \"*\""
+                     ;;
+                  esac
+               fi
+            ;;
+         esac
+      fi
    .done
 
    printf "\n${INDENT}}"
@@ -411,7 +407,6 @@ main()
             printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
             exit 0
          ;;
-
 
          ##
          ## ADD YOUR FLAGS HERE

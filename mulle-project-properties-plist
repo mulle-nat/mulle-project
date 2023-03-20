@@ -107,7 +107,6 @@ get_url()
 }
 
 
-
 get_homepage()
 {
    log_entry "get_homepage" "$@"
@@ -340,8 +339,8 @@ project =
    description="${PROJECT_DESCRIPTION:-`get_description`}";
    domain="${PROJECT_DOMAIN:-github}";
    name="${PROJECT_NAME:-`get_projectname`}";
-   username="${PROJECT_ORGANIZATION:-`get_organization`}";
-   reponame="${PROJECT_NAME:-`get_projectname`}";
+   user="${PROJECT_ORGANIZATION:-`get_organization`}";
+   repo="${PROJECT_NAME:-`get_projectname`}";
 EOF
 print_homepage
    cat <<EOF
@@ -356,6 +355,7 @@ print_dependencies()
    log_entry "print_dependencies" "$@"
 
    local sep="$1"
+   local qualifier="$2"
 
 #   if search_plist "dependencies" "${sep}"
 #   then
@@ -374,7 +374,7 @@ print_dependencies()
                               ${MULLE_SDE_FLAGS} \
                         dependency list -- \
                            --dedupe-mode url-filename \
-                           --qualifier 'MATCHES share AND MATCHES build' \
+                           --qualifier "${qualifier}" \
                            --output-eval \
                            --output-no-column \
                            --output-no-header \
@@ -401,8 +401,6 @@ print_dependencies()
       name="${line%%;*}"
       url="${line#*;}"
 
-      r_escaped_doublequotes "${name}"
-      printf "      name=\"%s\";\n" "${RVAL}"
 
       eval "`mulle-domain -s parse-url "${url}"`"
       repo_url="`mulle-domain -s compose-url --domain "${domain}" \
@@ -410,15 +408,22 @@ print_dependencies()
                                              --user "${user}" \
                                              --repo "${repo}" `"
 
-      r_escaped_doublequotes "${repo_url:-${url}}"
-      printf "      url=\"%s\";\n" "${RVAL}"
-
       description="`find_description "${repo}" `"
       if [ ! -z "${description}" ]
       then
          r_escaped_doublequotes "${description}"
          printf "      description=\"%s\";\n" "${RVAL}"
       fi
+      r_escaped_doublequotes "${domain}"
+      printf "      domain=\"%s\";\n" "${RVAL}"
+      r_escaped_doublequotes "${name}"
+      printf "      name=\"%s\";\n" "${RVAL}"
+      r_escaped_doublequotes "${repo:-${name}}"
+      printf "      repo=\"%s\";\n" "${RVAL}"
+      r_escaped_doublequotes "${repo_url:-${url}}"
+      printf "      url=\"%s\";\n" "${RVAL}"
+      r_escaped_doublequotes "${user}"
+      printf "      user=\"%s\";\n" "${RVAL}"
 
       printf "   }"
       sep2=$',\n'
@@ -433,11 +438,12 @@ print_plist()
 {
    log_entry "print_plist" "$@"
 
+   local qualifier="$1"
 
    printf "{\n"
 
-   print_project ";"     | sed 's/^/   /'
-   print_dependencies "" | sed 's/^/   /'
+   print_project ";"                    | sed 's/^/   /'
+   print_dependencies "" "${qualifier}" | sed 's/^/   /'
 
    printf "}\n"
 }
@@ -448,6 +454,7 @@ main()
    local OPTION_OUTPUT_FILE="-"
    local OPTION_CHECKSUM='YES'
    local OPTION_MULLE='NO'
+   local OPTION_QUALIFIER='MATCHES share AND MATCHES build'
 
    MULLE_TEMPLATE_COMPOSER_SEARCHPATH="${MULLE_TEMPLATE_COMPOSER_SEARCHPATH:-\
 "includes\
@@ -497,6 +504,13 @@ main()
             OPTION_OUTPUT_FILE="$1"
          ;;
 
+         -q|--qualifier)
+            [ $# -eq 1 ] && fail "Missing argument to \"$1\""
+            shift
+
+            OPTION_QUALIFIER="$1"
+         ;;
+
          --version)
             printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
             exit 0
@@ -527,9 +541,9 @@ main()
 
    if [ "${OPTION_OUTPUT_FILE}" = '-' ]
    then
-      print_plist
+      print_plist "${OPTION_QUALIFIER}"
    else
-      text="`print_plist`" || return 1
+      text="`print_plist "${OPTION_QUALIFIER}"`" || return 1
       redirect_exekutor "${OPTION_OUTPUT_FILE}" echo "${text}"
    fi
 }

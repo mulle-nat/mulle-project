@@ -70,7 +70,7 @@ search_and_replace()
    #
    # uses mulle-sourcetree-parser.h library
    #
-   lines="`project::sourcetree-parser::get_dependency_address_nodetype_branch_tag_url`"
+   lines="`project::sourcetree_parser::get_dependency_address_nodetype_branch_tag_url`"
 
    local upcaseid
    local name
@@ -102,17 +102,17 @@ search_and_replace()
    .do
       [ -z "${line}" ] && .continue
 
-      if ! project::sourcetree-parser::parse_nodetype_branch_tag_url "${line}"
+      if ! project::sourcetree_parser::parse_nodetype_branch_tag_url "${line}"
       then
          .continue
       fi
 
-      if [ ! -z "${_user}" ] && ! project::sourcetree-parser::is_matching_wildcards "${matching_users}" "${_user}"
+      if [ ! -z "${_user}" ] && ! project::sourcetree_parser::is_matching_wildcards "${matching_users}" "${_user}"
       then
          log_fluff "\"${_user}\" does not match \"${matching_users}\""
          .continue
       fi
-      if [ ! -z "${_repo}" ] && ! project::sourcetree-parser::is_matching_wildcards "${matching_repos}" "${_repo}"
+      if [ ! -z "${_repo}" ] && ! project::sourcetree_parser::is_matching_wildcards "${matching_repos}" "${_repo}"
       then
          log_fluff "\"${_repo}\" does not match \"${matching_repos}\""
          .continue

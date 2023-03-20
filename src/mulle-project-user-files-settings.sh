@@ -36,7 +36,7 @@
 
 INFO_DIR="${INFO_DIR:-.mulle/etc/project}"
 
-project::user-files-settings::source_file()
+project::user_files_settings::source_file()
 {
    if [ "${VERBOSE}" = 'YES' ]
    then
@@ -50,7 +50,7 @@ project::user-files-settings::source_file()
 if [ -f "${INFO_DIR}/version-info.sh" ]
 then
    DO_GIT_RELEASE='YES'
-   project::user-files-settings::source_file "${INFO_DIR}/version-info.sh"
+   project::user_files_settings::source_file "${INFO_DIR}/version-info.sh"
 fi
 
 # if there is a formula-info.sh file read it
@@ -58,12 +58,12 @@ if [ -f "${INFO_DIR}/formula-info.sh" ]
 then
    DO_GENERATE_FORMULA='YES'
    DO_PUSH_FORMULA='YES'
-   project::user-files-settings::source_file "${INFO_DIR}/formula-info.sh"
+   project::user_files_settings::source_file "${INFO_DIR}/formula-info.sh"
 fi
 
 # if there is a formula-info.sh file read it
 if [ -f "${INFO_DIR}/publisher-info.sh" ]
 then
-   project::user-files-settings::source_file "${INFO_DIR}/publisher-info.sh"
+   project::user_files_settings::source_file "${INFO_DIR}/publisher-info.sh"
 fi
 
