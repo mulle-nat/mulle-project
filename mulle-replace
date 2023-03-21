@@ -7,13 +7,35 @@
 MULLE_EXECUTABLE_VERSION="0.0.0"
 
 
+         -1|--once)
+            OPTION_SED=""
+         ;;
+
+         --delete-line)
+            OPTION_DELETE_LINE="YES"
+         ;;
+
+         -g|--global)
+            OPTION_SED="g"
+         ;;
+
+         --regex|--regexp)
+            OPTION_ESCAPE='NO'
+         ;;
+
+         -w|--word)
+            OPTION_WORD='YES'
+         ;;
 
 print_flags()
 {
-   echo "   -f          : force operation on protected files"
-   echo "   -1          : replace only once per line"
-   echo "   --regex     : use sed regexp"
-   echo "   --          : skip options"
+   echo "   -f            : force operation on protected files"
+   echo "   -1            : replace only once per line"
+   echo "   --delete-line : instead of replacement, delete whole line"
+   echo "   --regex       : use sed regexp"
+   echo "   --word        : replace word"
+   echo "   --            : skip options"
+
 
    ##
    ## ADD YOUR FLAG DESCRIPTION HERE
@@ -35,7 +57,7 @@ Usage:
    Replace a string with another string in a file (or multiple files).
 
    You will need to escape the '/' characters, if you choose the --regex
-   option.
+   option. Use the dry-run option to see what will happen.
    
 Flags:
 EOF
@@ -63,19 +85,36 @@ delete_line()
       escaped_find="${find}"
    fi
 
-   local before
-   local after
-
-   if [ "${MULLE_FLAG_LOG_VERBOSE}" = 'YES' ]
+   if [ "${OPTION_WORD}" = 'NO' ]
    then
-      before="`rexekutor cat "${filename}"`"
+      sed_command="-e s/${escaped_find}/d"
+   else
+      sed_command="\
+-e s/^${escaped_find}\\([^[:alnum:]_]\\)/d \
+-e s/\\([^[:alnum:]_]\\)${escaped_find}\$/d \
+-e s/\\([^[:alnum:]_]\\)${escaped_find}\\([^[:alnum:]_]\\)/d \
+-e s/^${escaped_find}\$/${escaped_replace}/d "
    fi
 
-   if [ "${MULLE_FLAG_EXEKUTOR_DRY_RUN}" = 'YES' -a "${MULLE_FLAG_LOG_VERBOSE}" = 'YES' ]
+   local before
+   local after
+   local DIFF
+
+   if [ "${MULLE_FLAG_LOG_VERBOSE}" = 'YES' -o "${MULLE_FLAG_EXEKUTOR_DRY_RUN}" = 'YES' ]
    then
-      after="`rexekutor sed "/${escaped_find}/d" "${filename}" `" || return 1
-      log_verbose "Changes"
-      rexekutor diff -b <( echo "${before}") <( echo "${after}" ) >&2
+      before="`rexekutor cat "${filename}"`"
+
+      if ! DIFF="${DIFF:-"`command -v diff`"}"
+      then
+         log_warning "diff command not installed"
+      fi
+   fi
+
+   if [ "${MULLE_FLAG_EXEKUTOR_DRY_RUN}" = 'YES' ]
+   then
+      after="`rexekutor sed ${sed_command} "${filename}" `" || return 1
+      log_info "Changes"
+      rexekutor "${DIFF}" -b <( echo "${before}") <( echo "${after}" ) >&2
       return $?
    fi
 
@@ -94,7 +133,7 @@ delete_line()
       exekutor chmod +w "${filename}"
    fi
 
-   inplace_sed "/${escaped_find}/d" "${filename}" || return 1
+   inplace_sed ${sed_command} "${filename}" || return 1
 
    if [ "${unprotect}" = 'YES' ]
    then
@@ -104,7 +143,7 @@ delete_line()
    if [ "${MULLE_FLAG_LOG_VERBOSE}" = 'YES' ]
    then
       log_verbose "Changes"
-      rexekutor diff -b <( echo "${before}") "${filename}" >&2
+      rexekutor "${DIFF}" -b <( echo "${before}") "${filename}" >&2
    fi
 }
 
@@ -132,25 +171,37 @@ replace()
       escaped_replace="${replace}"
    fi
 
-   local DIFF
+   local sed_command
 
-   if ! DIFF="`command -v diff`"
+   if [ "${OPTION_WORD}" = 'NO' ]
    then
-      fail "diff command not installed"
+      sed_command="-e s/${escaped_find}/${escaped_replace}/${OPTION_SED}"
+   else
+      sed_command="\
+-e s/^${escaped_find}\\([^[:alnum:]_]\\)/${escaped_replace}\\1/${OPTION_SED} \
+-e s/\\([^[:alnum:]_]\\)${escaped_find}\$/\\1${escaped_replace}/${OPTION_SED} \
+-e s/\\([^[:alnum:]_]\\)${escaped_find}\\([^[:alnum:]_]\\)/\\1${escaped_replace}\\2/${OPTION_SED} \
+-e s/^${escaped_find}\$/${escaped_replace}/${OPTION_SED} "
    fi
 
    local before
    local after
+   local DIFF
 
-   if [ "${MULLE_FLAG_LOG_VERBOSE}" = 'YES' ]
+   if [ "${MULLE_FLAG_LOG_VERBOSE}" = 'YES' -o "${MULLE_FLAG_EXEKUTOR_DRY_RUN}" = 'YES' ]
    then
       before="`rexekutor cat "${filename}"`"
+
+      if ! DIFF="${DIFF:-"`command -v diff`"}"
+      then
+         log_warning "diff command not installed"
+      fi
    fi
 
-   if [ "${MULLE_FLAG_EXEKUTOR_DRY_RUN}" = 'YES' -a "${MULLE_FLAG_LOG_VERBOSE}" = 'YES' ]
+   if [ "${MULLE_FLAG_EXEKUTOR_DRY_RUN}" = 'YES' ]
    then
-      after="`rexekutor sed "s/${escaped_find}/${escaped_replace}/${OPTION_SED}" "${filename}" `" || return 1
-      log_verbose "Changes"
+      after="`rexekutor sed ${sed_command} "${filename}" `" || return 1
+      log_info "Changes"
       rexekutor "${DIFF}" -b <( echo "${before}") <( echo "${after}" ) >&2
       return 0
    fi
@@ -170,7 +221,7 @@ replace()
       exekutor chmod +w "${filename}"
    fi
 
-   inplace_sed "s/${escaped_find}/${escaped_replace}/${OPTION_SED}" "${filename}" || return 1
+   rexekutor inplace_sed ${sed_command} "${filename}" || return 1
 
    if [ "${unprotect}" = 'YES' ]
    then
@@ -189,23 +240,9 @@ replace()
 
 main()
 {
-   local MULLE_FLAG_MAGNUM_FORCE='NO'
-
-   # technical flags
-   local MULLE_TRACE
-   local MULLE_FLAG_EXEKUTOR_DRY_RUN='NO'
-   local MULLE_FLAG_LOG_LOCAL='NO'
-   local MULLE_FLAG_LOG_DEBUG='NO'
-   local MULLE_FLAG_LOG_EXEKUTOR='NO'
-   local MULLE_FLAG_LOG_FLUFF='NO'
-   local MULLE_FLAG_LOG_SCRIPTS='NO'
-   local MULLE_FLAG_LOG_SETTINGS='NO'
-   local MULLE_FLAG_LOG_VERBOSE='NO'
-   local MULLE_FLAG_LOG_MERGE='NO'
-   local MULLE_TRACE_POSTPONE='NO'
-
    local OPTION_SED="g"
    local OPTION_ESCAPE='YES'
+   local OPTION_WORD='NO'
    local OPTION_DELETE_LINE='NO'
 
    #
@@ -242,6 +279,10 @@ main()
 
          --regex|--regexp)
             OPTION_ESCAPE='NO'
+         ;;
+
+         -w|--word)
+            OPTION_WORD='YES'
          ;;
 
          --version)
