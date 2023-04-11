@@ -7,30 +7,11 @@
 MULLE_EXECUTABLE_VERSION="0.0.0"
 
 
-         -1|--once)
-            OPTION_SED=""
-         ;;
-
-         --delete-line)
-            OPTION_DELETE_LINE="YES"
-         ;;
-
-         -g|--global)
-            OPTION_SED="g"
-         ;;
-
-         --regex|--regexp)
-            OPTION_ESCAPE='NO'
-         ;;
-
-         -w|--word)
-            OPTION_WORD='YES'
-         ;;
-
 print_flags()
 {
    echo "   -f            : force operation on protected files"
    echo "   -1            : replace only once per line"
+   echo "   --global      : use global replace"
    echo "   --delete-line : instead of replacement, delete whole line"
    echo "   --regex       : use sed regexp"
    echo "   --word        : replace word"

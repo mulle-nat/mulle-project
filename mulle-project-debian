@@ -71,7 +71,7 @@ write_control()
       control_echo "Recommends" "${DEBIAN_RECOMMENDATIONS}"
    fi
    control_echo "Maintainer" "${PUBLISHER_EMAIL}" PUBLISHER_EMAIL
-   control_echo "Description" "${DESC}" DESC
+   control_echo "Description" "${DESC:-${PROJECT_DESCRIPTION}}" DESC
    control_echo "Homepage" "https://github.com/mulle-nat/${PROJECT}"
 }
 

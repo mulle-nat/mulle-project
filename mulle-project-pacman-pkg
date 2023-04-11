@@ -147,46 +147,15 @@ print_name()
 }
 
 
-get_description_4()
-{
-   rexekutor head -4 "README.md" \
-   | grep -E '^####' \
-   | sed -e 's/^####//' -e 's/^ //g'
-}
-
-
-get_description_2()
-{
-   rexekutor sed -e '/^[[:space:]]*$/d' "README.md" \
-   | head -2 \
-   | tail -1
-}
-
-
-get_description()
-{
-   log_entry "get_description" "$@"
-
-   if [ ! -z "${DESC}" ]
-   then
-      printf "%s\n" "${DESC}"
-   else
-      if [ -f "README.md" ]
-      then
-         if ! get_description_4
-         then
-            get_description_2
-         fi
-      fi
-   fi
-}
 
 
 print_description()
 {
    log_entry "print_description" "$@"
 
-   RVAL="`get_description`"
+   include "project::settings"
+
+   RVAL="`project::settings::get_description`"
    r_escaped_doublequotes "${RVAL}"
    printf "pkgdesc=\"%s\"\n" "${RVAL}"
 }

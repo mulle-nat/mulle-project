@@ -1,0 +1,429 @@
+#! /usr/bin/env mulle-bash
+#! MULLE_BASHFUNCTIONS_VERSION=<|MULLE_BASHFUNCTIONS_VERSION|>
+# shellcheck shell=bash
+#
+
+
+[ "${TRACE}" = 'YES' -o "${MULLE_PROJECT_RESOLVE_SYMLINKS_TRACE}" = 'YES' ] \
+&& set -x  \
+&& : "$0" "$@"
+
+#
+# Versioning of this script
+#
+MULLE_EXECUTABLE_VERSION="0.0.0"
+
+MULLE_KYBERNETIK_GITOLITE="${MULLE_KYBERNETIK_GITOLITE:-"/home/src/srcM/gitolite-admin"}"
+
+
+new_repo::print_flags()
+{
+   echo "   -f             : force operation"
+   echo "   --public       : make project public"
+   echo "   --private      : make project private (default)"
+   echo "   --provider <n> : add provider"
+   echo "   --mulle        : mulle default settings"
+
+   ##
+   ## ADD YOUR FLAGS DESCRIPTIONS HERE
+   ##
+
+   options_technical_flags_usage \
+           ": "
+}
+
+
+new_repo::usage()
+{
+   [ $# -ne 0 ] && log_error "$*"
+
+   cat <<EOF >&2
+Usage:
+   mulle-project-new-repo [flags] <user/repo>
+
+   Create a new repository on github, mulle-kybernetik (or other providers
+   in the future).
+
+Flags:
+EOF
+   new_repo::print_flags | LC_ALL=C sort >&2
+
+   exit 1
+}
+
+
+new_repo::check_remote()
+{
+   log_entry "new_repo::check_remote" "$@"
+
+   local remote="$1"
+
+   r_escaped_grep_pattern "${remote}"
+   if rexekutor grep -E '^\[remote[[:space:]]*\"'${RVAL}'\"\]([[:space:]]*|$)' \
+                ".git/config" > /dev/null
+   then
+      log_info "There is already a remote \"${remote}\" in this repository, skipping."
+      return 1
+   fi
+
+   return 0
+}
+
+
+new_repo::change_default_branch()
+{
+   log_entry "new_repo::change_default_branch" "$@"
+
+   local user="$1"
+   local repo="$2"
+   local remote="$3"
+   local branch="$4"
+   local master="${5:-master}"
+
+   if ! exekutor git pull --no-edit --allow-unrelated-histories "${remote}" "${master}"
+   then
+      if [ "${MULLE_FLAG_MAGNUM_FORCE}" != 'YES' ]
+      then
+         return 1
+      fi
+   fi
+
+   if [ "${branch}" != "${master}" ]
+   then
+      exekutor git checkout -b "${branch}" &&
+      exekutor git push github "${branch}" &&
+      exekutor "${GH}" api "repos/${user}/${repo}" --method PATCH \
+                                                   --field "default_branch=${branch}" \
+                                                   > /dev/null &&
+      exekutor git push github ":${master}"
+   fi
+}
+
+
+new_repo::github()
+{
+   log_entry "new_repo::github" "$@"
+
+   local user="$1"
+   local repo="$2"
+   local license="$3"
+   local description="$4"
+   local public_or_private="${5:-private}"
+   local branch="$6"
+   local push="$7"
+
+   local remote="github"
+
+   if ! new_repo::check_remote "${remote}" && [ "${MULLE_FLAG_MAGNUM_FORCE}" != 'YES' ]
+   then
+      return 1
+   fi
+
+   if ! GH="`command -v gh`"
+   then
+      fail "The github commandline command \"gh\" is not in PATH ($PATH)"
+   fi
+
+   local repos
+
+   repos="`rexekutor gh repo list "${user}" --json name -L 10000 --jq '.[].name' `"
+   if find_line "${repos}" "${repo}"
+   then
+      log_info "Repo already exists on github"
+   else
+      if ! exekutor "${GH}" repo create "${user}/${repo}" \
+                                        -l "${license}" \
+                                        --${public_or_private} \
+                                        -d "${description}"
+      then
+         log_error "Failed to create repo on github"
+         return 1
+      fi
+   fi
+
+   if ! exekutor git remote add "${remote}" "git@github.com:${user}/${repo}.git"
+   then
+      if [ "${MULLE_FLAG_MAGNUM_FORCE}" != 'YES' ]
+      then
+         return 1
+      fi
+   fi
+
+   if [ "${push}" = 'YES' ]
+   then
+      new_repo::change_default_branch "${user}" \
+                                      "${repo}" \
+                                      "${remote}" \
+                                      "${branch}" \
+                                      "master"
+   fi
+   # don't push
+}
+
+
+new_repo::mulle_kybernetik()
+{
+   log_entry "new_repo::mulle_kybernetik" "$@"
+
+   local user="$1"
+   local repo="$2"
+   local license="$3"
+   local description="$4"
+   local public_or_private="${5:-private}"
+   local branch="$6"
+   local push="$7"
+
+   local remote="origin"
+
+   if ! new_repo::check_remote "${remote}"
+   then
+      return 1
+   fi
+
+   if [ ! -d "${MULLE_KYBERNETIK_GITOLITE}" ]
+   then
+      fail "MULLE_KYBERNETIK_GITOLITE should contain the path to the gitolite-admin directory"
+   fi
+
+   local escaped
+   local memo
+
+   r_escaped_grep_pattern "${repo}"
+   if rexekutor grep -E '^repo[[:space:]]*'${RVAL}'([[:space:]]|$)' \
+                "${MULLE_KYBERNETIK_GITOLITE}/conf/gitolite.conf" > /dev/null
+   then
+      if [ -z "${user}" ]
+      then
+         fail "Repository \"${repo}\" already defined"
+      fi
+
+      memo="${repo}"
+      repo="${user}-${repo}"
+      r_escaped_grep_pattern "${repo}"
+
+      if rexekutor grep -E '^repo[[:space:]]*'${RVAL}'([[:space:]]|$)' \
+                   "${MULLE_KYBERNETIK_GITOLITE}/conf/gitolite.conf" > /dev/null
+      then
+         fail "Repository \"${memo}\" and \"${repo}\" already defined"
+      fi
+   fi
+
+   local email
+   local community
+
+   case "${user}" in
+      mulle-sde|mulle-c|mulle-objc)
+         email="${user}"
+         community="${user}-community"
+      ;;
+
+      *)
+         email="mulle-objc"
+         community="mulle-objc-community"
+      ;;
+   esac
+
+   local text
+
+   # initial lf is wanted
+   text="
+repo  ${repo}
+   RW+ = @${email}
+   R = @${community}
+   option hook.post-receive = mulle-slack-notify
+"
+
+   (
+      cd "${MULLE_KYBERNETIK_GITOLITE}" || exit 1
+      redirect_append_exekutor "${MULLE_KYBERNETIK_GITOLITE}/conf/gitolite.conf" \
+                                  printf "%s\n" "${text}" &&
+      exekutor git commit -m "Added \"${repo}\" to the repositories" \
+                    "${MULLE_KYBERNETIK_GITOLITE}/conf/gitolite.conf" &&
+      exekutor git push
+   ) || return 1
+
+   exekutor git remote add "${remote}" "gitolite.mulle-kybernetik.com:${repo}.git" || return 1
+
+   if [ "${push}" = 'YES' ]
+   then
+      exekutor git push origin master
+   fi
+}
+
+
+new_repo::main()
+{
+   #
+   # simple option/flag handling
+   #
+   local OPTION_PROVIDERS
+   local OPTION_LICENSE="BSD-3-Clause"
+   local OPTION_VISIBILITY="private"
+   local OPTION_DESCRIPTION
+   local OPTION_INIT='YES'
+   local OPTION_BRANCH='master'
+   local OPTION_PUSH='NO'
+
+   while [ $# -ne 0 ]
+   do
+      if options_technical_flags "$1"
+      then
+         shift
+         continue
+      fi
+
+      case "$1" in
+         -f|--force)
+            MULLE_FLAG_MAGNUM_FORCE='YES'
+         ;;
+
+         -h*|--help|help)
+            new_repo::usage
+         ;;
+
+         -l|--license)
+            [ $# -eq 1 ] && match_list_usage "missing argument to $1"
+            shift
+
+            OPTION_LICENSE="$1"
+         ;;
+
+         -m|--description)
+            [ $# -eq 1 ] && match_list_usage "missing argument to $1"
+            shift
+
+            OPTION_DESCRIPTION="$1"
+         ;;
+
+         --branch)
+            [ $# -eq 1 ] && match_list_usage "missing argument to $1"
+            shift
+
+            OPTION_BRANCH="$1"
+         ;;
+
+         --init)
+            OPTION_INIT='YES'
+         ;;
+
+         --no-init)
+            OPTION_INIT='NO'
+         ;;
+
+         --mulle)
+            OPTION_PROVIDERS='github,mulle-kybernetik'
+            OPTION_BRANCH='release'
+            OPTION_PUSH='YES'
+         ;;
+
+         --private)
+            OPTION_VISIBILITY='private'
+         ;;
+
+         --provider)
+            [ $# -eq 1 ] && match_list_usage "missing argument to $1"
+            shift
+
+            r_comma_concat "${OPTION_PROVIDERS}" "$1"
+            OPTION_PROVIDERS="${RVAL}"
+         ;;
+
+         --public)
+            OPTION_VISIBILITY='public'
+         ;;
+
+         --push)
+            OPTION_PUSH='YES'
+         ;;
+
+         --version)
+            printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
+            exit 0
+         ;;
+
+         -*)
+            new_repo::usage "Unknown flag \"$1\""
+         ;;
+
+         *)
+            break
+         ;;
+      esac
+
+      shift
+   done
+
+   options_setup_trace "${MULLE_TRACE}" && set -x
+
+   [ $# -eq 0 ] && new_repo::usage "Missing arguments"
+
+   local org_and_repo="$1" ; shift
+
+   local user
+   local repo
+
+   user="${org_and_repo%%/*}"
+   repo="${org_and_repo#*/}"
+
+   if [ -d "${repo}" ]
+   then
+      fail "There is already a repo \"${repo}\" here, enter it or move it aside"
+   fi
+
+   if [ -z "${OPTION_DESCRIPTION}" ]
+   then
+      include "project::settings"
+
+      OPTION_DESCRIPTION="`project::settings::get_description`"
+   fi
+
+   if [ ! -d .git ] && [ "${OPTION_INIT}" = 'YES' ]
+   then
+      exekutor git init
+   else
+      log_info "There is already a git repo in here, keeping it"
+
+      include "project::git"
+
+      log_verbose "Check clean state of project"
+      if ! rexekutor project::git::is_clean
+      then
+         fail "Repository is tainted with uncommitted files"
+      fi
+   fi
+
+   local provider
+   local functionname
+
+   .foreachitem provider in ${OPTION_PROVIDERS}
+   .do
+      r_identifier "${provider}"
+      functionname="new_repo::${RVAL}"
+
+      if ! shell_is_function "${functionname}"
+      then
+         fail "Provider \"${provider}\" is not supported"
+      fi
+
+      if ${functionname} "${user}" \
+                         "${repo}" \
+                         "${OPTION_LICENSE}" \
+                         "${OPTION_DESCRIPTION}" \
+                         "${OPTION_VISIBILITY}" \
+                         "${OPTION_BRANCH}" \
+                         "${OPTION_PUSH}"
+      then
+         .continue
+      fi
+   .done
+}
+
+
+#
+# You can also use the function `call_with_flags`, which has been defined
+# during mulle-boot. It lets you call 'new_repo::main'
+# with MULLE_PROJECT_RESOLVE_SYMLINKS_FLAGS interposed.
+#
+# call_with_flags "new_repo::main" "${MULLE_PROJECT_RESOLVE_SYMLINKS_FLAGS}" "$@"
+
+new_repo::main "$@"

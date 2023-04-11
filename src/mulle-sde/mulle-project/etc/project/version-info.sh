@@ -6,7 +6,7 @@
 #
 
 # VERSIONFILE="src/<|PROJECT_NAME|>.h"
-# VERSIONNAME="<|PROJECT_FILE_UPCASE_IDENTIFIER|>_VERSION"
+# VERSIONNAME="<|PROJECT_UPCASE_IDENTIFIER|>_VERSION"
 
 #
 # Other files that get the version written into. Write only. Linefeed separated.

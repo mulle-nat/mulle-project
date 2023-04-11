@@ -182,46 +182,14 @@ print_name()
 }
 
 
-get_description_4()
-{
-   rexekutor head -4 "README.md" \
-   | grep -E '^####' \
-   | sed -e 's/^####//' -e 's/^ //g'
-}
-
-
-get_description_2()
-{
-   rexekutor sed -e '/^[[:space:]]*$/d' "README.md" \
-   | head -2 \
-   | tail -1
-}
-
-
-get_description()
-{
-   log_entry "get_description" "$@"
-
-   if [ ! -z "${DESC}" ]
-   then
-      echo "${DESC}"
-   else
-      if [ -f "README.md" ]
-      then
-         if ! get_description_4
-         then
-            get_description_2
-         fi
-      fi
-   fi
-}
-
 
 print_description()
 {
    log_entry "print_description" "$@"
 
-   printf "%s" "${INDENT}\"description\" : \"`get_description`\"";
+   include "project::settings"
+
+   printf "%s" "${INDENT}\"description\" : \"`project::settings::get_description`\"";
 }
 
 

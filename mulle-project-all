@@ -146,7 +146,16 @@ log_title()
       then
          len=0
       fi
-      printf "%b%b%s%s%b\n" "\033[0;44m" "${C_BOLD}" "$s" "${spaces:0:${len}}" "${C_RESET}"
+
+      case "${MULLE_UNAME}" in 
+         darwin)      
+            printf "%b%b%s%s%b\n" "\033[1;106m" "${C_BOLD}" "$s" "${spaces:0:${len}}" "${C_RESET}"
+         ;;
+
+         *)
+            printf "%b%b%s%s%b\n" "\033[0;44m" "${C_BOLD}" "$s" "${spaces:0:${len}}" "${C_RESET}"
+         ;;
+      esac
    else
       printf "%s\n" "$s"
    fi

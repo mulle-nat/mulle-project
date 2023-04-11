@@ -4,6 +4,7 @@
 | `mulle-project-all`                | Execute commands in multiple projects
 | `mulle-project-ci-prerelease`      | Update `environment-host-ci-prerelease.sh`
 | `mulle-project-ci-settings`        | Create an environment-host-ci-prerelease file file for prerelease tests
+| `mulle-project-clib-json`          | Produce a `clib.json` file for a mulle-sde project
 | `mulle-project-commit`             | Commit "boring" changes automatically, amending if possible
 | `mulle-project-debian`             | Create and upload debian packages (own server)
 | `mulle-project-distcheck`          | Predicts if a `mulle-project-distribute` would fail
@@ -11,12 +12,14 @@
 | `mulle-project-extension-versions` | Maintain version of mulle-sde extensions
 | `mulle-project-gitignore`          | Add files to .gitignore, prevents duplicates
 | `mulle-project-git-prerelease`     | Push master into a prerelease branch on github
+| `mulle-project-github-description` | Fetch and set github repository description
 | `mulle-project-github-status`      | Poll github action status for CI state
 | `mulle-project-init`               | Initial setup and update
 | `mulle-project-latest-current-tag` | Produce a release blog version info entry
 | `mulle-project-local-travis`       | Test in a local travis-ci like docker
+| `mulle-project-new-repo`           | Conveniently create repositories on github and mulle-kybernetik with default values
 | `mulle-project-package-json`       | Create package.json file for github/npm
-| `mulle-project-pacman-PKGBUILD`    | Create a PKGBUILD file for arch package manager
+| `mulle-project-pacman-pkg`         | Create a PKGBUILD file for the linux arch package manager
 | `mulle-project-prerelease`         | Create a debian/git prerelease
 | `mulle-project-properties-plist`   | Create properties.plist file for mulle-template-composer
 | `mulle-project-redistribute`       | Hack
@@ -31,5 +34,6 @@
 | `mulle-project-version`            | Examine and change project versions
 | `mulle-project-versioncheck`       | Create version checks for the preprocessor from dependencies
 | `mulle-replace`                    | Simple string replacer
+| `mulle-strip-whitespace`           | Strip leading and trailing whitespace from lines
 | `mulle-gitignore`                  | Add files and directories to .gitgnore
 

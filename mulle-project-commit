@@ -20,6 +20,7 @@ print_flags()
    echo "   --always-amend     : always amend the commit [dangerous]"
    echo "   --boring           : all files are considered to be boring"
    echo "   --no-amend         : never amend, just create a new commit [most safe]"
+   echo "   --no-diff          : don't diff non-boring changes"
    echo "   --safe-amend       : amend if harmless, otherwise new commit (default)"
    echo "   --only-amend       : don't commit, if an amend is not possible"
    echo "   --ignore-untracked : ignore untracked files"
@@ -73,6 +74,8 @@ main()
    local OPTION_IGNORE_UNTRACKED
    local OPTION_AMEND='DEFAULT'
    local OPTION_STATUS
+   local OPTION_DIFF='YES'
+   local OPTION_BUMP
    local OPTION_BORING
 
    #
@@ -111,12 +114,24 @@ main()
             OPTION_AMEND='ONLY'
          ;;
 
+         --bump-if-needed)
+            OPTION_BUMP='YES'
+         ;;
+
          -u|--ignore-untracked)
             OPTION_IGNORE_UNTRACKED='YES'
          ;;
 
          --boring)
             OPTION_BORING='YES'
+         ;;
+
+         --diff)
+            OPTION_DIFF='YES'
+         ;;
+
+         --no-diff)
+            OPTION_DIFF='NO'
          ;;
 
          --status)
@@ -170,6 +185,8 @@ main()
                       */*/cmake/share \
                       */*/cmake/reflect \
                       */*/src/reflect \
+                      cola \
+                      overview.dot.svg \
                       .github/workflows \
                       .gitattributes \
                       .gitignore \
@@ -215,13 +232,14 @@ ${C_RESET}${bad_changes# }"
    then
       local ignore_patterns
 
-      ignore_patterns="/share/|/reflect/"
+      ignore_patterns="/share/|/reflect/|[[:space:]]cola/"
       ignore_patterns="${ignore_patterns}|/environment-host-.*\.sh"
       ignore_patterns="${ignore_patterns}|/environment-user-.*\.sh"
       ignore_patterns="${ignore_patterns}|\.github/workflows"
       ignore_patterns="${ignore_patterns}|\.gitignore|\.gitattributes"
       ignore_patterns="${ignore_patterns}|\.ackrc"
       ignore_patterns="${ignore_patterns}|README\.md"
+      ignore_patterns="${ignore_patterns}|overview\.dot\.svg"
 
       local interesting_changes
 
@@ -233,13 +251,32 @@ ${C_RESET}${bad_changes# }"
             MULLE_LOG_FAIL_ERROR_PREFIX=""
             MULLE_EXECUTABLE_FAIL_PREFIX=""
          fi
+
+         log_warning "There are possibly interesting changes that may need a commit message:
+${C_RESET}${interesting_changes# }"
+
+         if [ "${OPTION_DIFF}" = 'YES' ]
+         then
+            local line
+
+            .foreachline line in ${interesting_changes}
+            .do
+               r_trim_whitespace "${line#*\ }"
+               rexekutor git diff -r HEAD -- "${RVAL}"
+            .done
+         fi
+
          if [ "${MULLE_FLAG_MAGNUM_FORCE}" != 'YES' ]
          then
-            fail "There are possibly interesting changes that may need a commit message:
-${C_RESET}${interesting_changes# }"
+            fail "Not proceeding because of diffs (use -f to override)"
          fi
       fi
    fi
+
+
+#   if [ "${OPTION_BUMP}" = 'YES' ]
+#   then
+
 
    if [ "${OPTION_STATUS}" != 'YES' ]
    then

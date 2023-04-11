@@ -1,0 +1,162 @@
+#! /usr/bin/env mulle-bash
+#! MULLE_BASHFUNCTIONS_VERSION=<|MULLE_BASHFUNCTIONS_VERSION|>
+# shellcheck shell=bash
+#
+
+
+[ "${TRACE}" = 'YES' -o "${MULLE_PROJECT_RESOLVE_SYMLINKS_TRACE}" = 'YES' ] \
+&& set -x  \
+&& : "$0" "$@"
+
+#
+# Versioning of this script
+#
+MULLE_EXECUTABLE_VERSION="0.0.0"
+
+MULLE_KYBERNETIK_GITOLITE="${MULLE_KYBERNETIK_GITOLITE:-"/home/src/srcM/gitolite-admin"}"
+
+
+
+
+github_description::print_flags()
+{
+   echo "   -f             : force operation"
+
+   ##
+   ## ADD YOUR FLAGS DESCRIPTIONS HERE
+   ##
+
+   options_technical_flags_usage \
+           ": "
+}
+
+
+github_description::usage()
+{
+   [ $# -ne 0 ] && log_error "$*"
+
+   cat <<EOF >&2
+Usage:
+   mulle-project-github-description [flags] [remote]
+
+   Push the description of the project to the github repository description.
+   The default remote name for github is "github".
+
+Flags:
+EOF
+   github_description::print_flags | LC_ALL=C sort >&2
+
+   exit 1
+}
+
+
+github_description::main()
+{
+   #
+   # simple option/flag handling
+   #
+   local OPTION_DESCRIPTION
+   local OPTION_SET='NO'
+
+   while [ $# -ne 0 ]
+   do
+      if options_technical_flags "$1"
+      then
+         shift
+         continue
+      fi
+
+      case "$1" in
+         -f|--force)
+            MULLE_FLAG_MAGNUM_FORCE='YES'
+         ;;
+
+         -h*|--help|help)
+            github_description::usage
+         ;;
+
+         -m|--description)
+            [ $# -eq 1 ] && match_list_usage "missing argument to $1"
+            shift
+
+            OPTION_DESCRIPTION="$1"
+            OPTION_SET='YES'
+         ;;
+
+         --set|--push)
+            OPTION_SET='YES'
+         ;;
+
+         --version)
+            printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
+            exit 0
+         ;;
+
+         -*)
+            github_description::usage "Unknown flag \"$1\""
+         ;;
+
+         *)
+            break
+         ;;
+      esac
+
+      shift
+   done
+
+   options_setup_trace "${MULLE_TRACE}" && set -x
+
+   # unused!!
+   local remote="${1:-github}"
+
+   if ! GH="`command -v gh`"
+   then
+      fail "The github commandline command \"gh\" is not in PATH ($PATH)"
+   fi
+
+   local old_description
+
+   old_description="`rexekutor "${GH}" repo view --json description \
+   | jq -r '.description' `" || fail "Could not retrieve old description"
+
+   log_info "Github Description is:"
+   printf "%s\n" "${old_description}"
+
+   if [ -z "${OPTION_DESCRIPTION}" ]
+   then
+      include "project::settings"
+
+      OPTION_DESCRIPTION="`project::settings::get_description`" \
+      || fail "Could not get current description"
+   fi
+
+   case "${OPTION_DESCRIPTION}" in
+      ""|'null')
+         fail "Empty description"
+      ;;
+   esac
+
+   if [ "${OPTION_DESCRIPTION}" != "${old_description}" ]
+   then
+      if [ "${OPTION_SET}" = 'YES' ]
+      then
+         exekutor "${GH}" repo edit --description "${OPTION_DESCRIPTION}" || return 1
+         log_verbose "Changed description on github"
+      else
+         log_warning "Description differs from current description:"
+         printf "%s\n" "${OPTION_DESCRIPTION}"
+      fi
+   else
+      log_fluff "No change in description"
+   fi
+}
+
+
+#
+# You can also use the function `call_with_flags`, which has been defined
+# during mulle-boot. It lets you call 'github_description::main'
+# with MULLE_PROJECT_RESOLVE_SYMLINKS_FLAGS interposed.
+#
+# call_with_flags "github_description::main" "${MULLE_PROJECT_RESOLVE_SYMLINKS_FLAGS}" "$@"
+
+github_description::main "$@"
