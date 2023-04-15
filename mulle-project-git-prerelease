@@ -299,7 +299,9 @@ main()
 
       local commit_options
 
-      project::git::r_commit_options "${OPTION_AMEND}" ${OPTION_TOUCH}" "${OPTION_SLOPPY:-prerelease}"
+      project::git::r_commit_options "${OPTION_AMEND}" \
+                                     "${OPTION_TOUCH}" \
+                                     "${OPTION_SLOPPY:-prerelease}"
       commit_options="${RVAL}"
 
 

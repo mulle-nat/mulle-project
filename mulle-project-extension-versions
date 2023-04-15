@@ -148,9 +148,9 @@ unbump_extension()
       else
          log_verbose "\"${extension#"${MULLE_USER_PWD}/"}\" is unchanged"
       fi
+   else
+      log_verbose "\"${extension#"${MULLE_USER_PWD}/"}\" has changes"
    fi
-
-   log_verbose "\"${extension#"${MULLE_USER_PWD}/"}\" has changes"
 }
 
 

@@ -68,7 +68,7 @@ search_and_replace()
    local line
 
    #
-   # uses mulle-sourcetree-parser.h library
+   # uses mulle-sourcetree-parser library
    #
    lines="`project::sourcetree_parser::get_dependency_address_nodetype_branch_tag_url`"
 
@@ -275,6 +275,8 @@ main()
    done
 
    options_setup_trace "${MULLE_TRACE}" && set -x
+
+   include "project::sourcetree-parser" || exit 1
 
    search_and_replace "${OPTION_USERS}" "${OPTION_REPOS}"
 }

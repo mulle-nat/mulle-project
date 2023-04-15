@@ -1,3 +1,15 @@
+## 3.3.0
+
+* added mulle-project-new-rep and mulle-project-github-description
+* add --word replace option to mulle-replace
+* fix multiple files input in mulle-gitignore
+* mulle-project-all can now write a sublime text "meta" project file with --sublime
+* new tool **mulle-resolve-symlinks** resolves symlinks to files
+* new executable **mulle-project-clib-json** to support clib
+* new executable mulle-project-properties-plist to support mulle-readme-cms
+* mulle-project-pacman creates PKGBUILD files for linux/arch pacman
+
+
 ## 3.2.0
 
 * fix default homebrew formula

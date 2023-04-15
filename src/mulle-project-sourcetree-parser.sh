@@ -32,6 +32,7 @@
 MULLE_PROJECT_SOURCETREE_PARSER_SH='included'
 
 
+# TODO: The hard coded nodetypes are a "blemish".
 project::sourcetree_parser::get_dependency_address_nodetype_branch_tag_url()
 {
    log_entry "project::sourcetree_parser::get_dependency_address_nodetype_branch_tag_url" "$@"
@@ -55,6 +56,7 @@ project::sourcetree_parser::get_dependency_address_nodetype_branch_tag_url()
                     --nodetype tar \
                     --nodetype zip \
                     --nodetype git \
+                    --nodetype clib \
                     "$@"
 }
 
@@ -229,14 +231,33 @@ project::sourcetree_parser::parse_nodetype_branch_tag_url()
    # get _repo
    s="${_url_fallback}"
 
-   s="${s#*://}"     # remove scheme
-   _host="${s%%/*}"   # get _host
-   s="${s#${_host}}"  # remove _host
-   s="${s##/}"       # remove slash
-   _user="${s%%/*}"   # get _user
-   s="${s#${_user}}"  # remove _user
-   s="${s##/}"       # remove slash
-   _repo="${s%%/*}"   # get _repo (that's all we want)
+   case "${s}" in
+      *://*)
+         s="${s#*://}"     # remove scheme
+         _host="${s%%/*}"   # get _host
+         s="${s#${_host}}"  # remove _host
+         s="${s##/}"       # remove slash
+         _user="${s%%/*}"   # get _user
+         s="${s#${_user}}"  # remove _user
+         s="${s##/}"       # remove slash
+         _repo="${s%%/*}"   # get _repo (that's all we want)
+      ;;
+
+      *:*)
+         s="${s#*:}"        # remove scheme
+         _host=""
+         _user="${s%%/*}"   # get _user
+         s="${s#${_user}}"  # remove _user
+         s="${s##/}"       # remove slash
+         _repo="${s%%/*}"   # get _repo (that's all we want)
+      ;;
+
+      *)
+         _host=""
+         _user=""
+         _repo="${s}"   # get _repo (that's all we want)
+      ;;
+   esac
 
    log_setting "branch_fallback     : ${_branch_fallback}"
    log_setting "branch_identifier   : ${_branch_identifier}"

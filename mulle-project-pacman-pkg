@@ -60,23 +60,23 @@ get_url()
    local repository
    local known_domains
 
-   known_domains="`mulle-domain -s list`"
+   known_domains="`rexekutor mulle-domain -s list`"
 
    local scheme domain host scm user repo branch tag
    local remote
 
    .for remote in `git remote 2> /dev/null`
    .do
-      url="`git remote get-url "${remote}"`"
+      url="`rexekutor git remote get-url "${remote}"`"
       # check if known domain
-      eval "`mulle-domain -s parse-url "${url}"`"
+      eval "`rexekutor mulle-domain -s parse-url "${url}"`"
       if find_line "${known_domains}" "${domain}"
       then
-         repository="`mulle-domain -s compose-url --domain "${domain}" \
-                                  --scm "git" \
-                                  --user "${user}" \
-                                  --repo "${repo}" \
-                                  --tag "${tag}" `"
+         repository="`rexekutor mulle-domain -s compose-url --domain "${domain}" \
+                                                            --scm "git" \
+                                                            --user "${user}" \
+                                                            --repo "${repo}" \
+                                                            --tag "${tag}" `"
          .break
       fi
    .done
@@ -432,7 +432,7 @@ print_sources()
                                  ${MULLE_SDE_FLAGS} \
                            dependency list -- \
                               --dedupe-mode url-filename \
-                              --qualifier 'NOT MATCHES share AND NOT MATCHES build' \
+                              --qualifier 'NOT MATCHES share AND NOT MATCHES build AND MATCHES clobber' \
                               --output-eval \
                               --output-no-column \
                               --output-no-header \
@@ -492,7 +492,7 @@ print_prepare()
                               ${MULLE_SDE_FLAGS} \
                         dependency list -- \
                            --dedupe-mode url-filename \
-                           --qualifier 'NOT MATCHES share AND NOT MATCHES build' \
+                           --qualifier 'NOT MATCHES share AND NOT MATCHES build AND MATCHES clobber' \
                            --output-eval \
                            --output-no-column \
                            --output-no-header \
@@ -637,7 +637,7 @@ print_PKGBUILD()
       ;;
 
       *)
-         printf "arch=('i686' 'x86_64' 'ppc' aarm')\n"
+         printf "arch=('i686' 'x86_64' 'ppc' 'aarm')\n"
          printf "%s\n" "options=('staticlibs')"
       ;;
    esac

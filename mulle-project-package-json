@@ -86,12 +86,12 @@ get_url()
 
    .for remote in `git remote 2> /dev/null`
    .do
-      url="`git remote get-url "${remote}"`"
+      url="`rexekutor git remote get-url "${remote}"`"
       # check if known domain
-      eval "`mulle-domain parse-url "${url}"`"
+      eval "`rexekutor mulle-domain parse-url "${url}"`"
       if find_line "${known_domains}" "${domain}"
       then
-         mulle-domain compose-url --domain "${domain}" \
+         rexekutor mulle-domain compose-url --domain "${domain}" \
                                   --scm "none" \
                                   --user "${user}" \
                                   --repo "${repo}" \
@@ -124,11 +124,11 @@ get_repository()
    local remote
    local url
 
-   .for remote in `git remote 2> /dev/null`
+   .for remote in `rexekutor git remote 2> /dev/null`
    .do
-      url="`git remote get-url "${remote}"`"
+      url="`rexekutor git remote get-url "${remote}"`"
       # check if known domain
-      eval "`mulle-domain parse-url "${url}"`"
+      eval "`rexekutor mulle-domain parse-url "${url}"`"
       if [ "${domain}" = "github" ]
       then
          echo "github:${user}/${repo}"

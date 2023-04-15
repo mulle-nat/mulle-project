@@ -99,7 +99,7 @@ produce_environment()
    fi
 
    #
-   # uses mulle-sourcetree-parser.h library
+   # uses mulle-sourcetree-parser library
    #
    lines="`project::sourcetree_parser::get_dependency_address_nodetype_branch_tag_url -r --bequeath `"
 
@@ -134,13 +134,11 @@ produce_environment()
       fi
 
       [ -z "${_address}" ] && fail "Can't figure out address: ${line}"
-      [ -z "${_host}" ]    && fail "Can't figure out host from URL ${_url}: ${line}"
       [ -z "${_user}" ]    && fail "Can't figure out user from URL ${_url}: ${line}"
       [ -z "${_repo}" ]    && fail "Can't figure out repo from URL ${_url}: ${line}"
       #
       # we need it to set to git for prerelease
       #
-      [ -z "${_nodetype_identifier}" ] && fail "Can't figure out node identifier: ${line}"
       [ -z "${_url_identifier}" ] && fail "Can't figure out URL from URL ${_url}: ${line}"
       #
       # we need it to set prerelease branch
@@ -158,49 +156,52 @@ produce_environment()
          .continue
       fi
 
-      mapped_url="https://${_host}/${_user}/${_repo%.git}.git"
+      case "${_nodetype}" in
+         *clib*)
+            log_verbose "Mapped branch ${C_MAGENTA}${C_BOLD}${mapped_branch}${C_VERBOSE} for ${C_RESET_BOLD}${_url}"
 
-      log_verbose "Map ${mapped_url}"
+            exekutor mulle-env \
+                        ${MULLE_TECHNICAL_FLAGS} \
+                        ${MULLE_ENV_FLAGS} \
+                     environment  \
+                        --scope "${mapped_scope}" \
+                        set "${_branch_identifier}" "${mapped_branch}" "${_address} branch: ${_branch}"
+         ;;
 
-      exekutor mulle-env \
-                  ${MULLE_TECHNICAL_FLAGS} \
-                  ${MULLE_ENV_FLAGS} \
-               environment  \
-                  --scope "${mapped_scope}" \
-                  set "${_nodetype_identifier}" "git" "${_address} nodetype: ${_nodetype}" &&
-      exekutor mulle-env \
-                  ${MULLE_TECHNICAL_FLAGS} \
-                  ${MULLE_ENV_FLAGS} \
-               environment  \
-                  --scope "${mapped_scope}" \
-                  set "${_url_identifier}" "${mapped_url}" "${_address} url: ${_url}" &&
-      exekutor mulle-env \
-                  ${MULLE_TECHNICAL_FLAGS} \
-                  ${MULLE_ENV_FLAGS} \
-               environment  \
-                  --scope "${mapped_scope}" \
-                  set "${_branch_identifier}" "${mapped_branch}" "${_address} branch: ${_branch}"
+         *)
+            mapped_url="https://${_host}/${_user}/${_repo%.git}.git"
+
+            log_verbose "Map ${C_RESET_BOLD}${mapped_url}${C_VERBOSE} to ${C_RESET_BOLD}${_url}"
+
+            [ -z "${_nodetype_identifier}" ] && fail "Can't figure out node identifier: ${line}"
+            [ -z "${_host}" ]                && fail "Can't figure out host from URL ${_url}: ${line}"
+
+            exekutor mulle-env \
+                        ${MULLE_TECHNICAL_FLAGS} \
+                        ${MULLE_ENV_FLAGS} \
+                     environment  \
+                        --scope "${mapped_scope}" \
+                        set "${_nodetype_identifier}" "git" "${_address} nodetype: ${_nodetype}" &&
+            exekutor mulle-env \
+                        ${MULLE_TECHNICAL_FLAGS} \
+                        ${MULLE_ENV_FLAGS} \
+                     environment  \
+                        --scope "${mapped_scope}" \
+                        set "${_url_identifier}" "${mapped_url}" "${_address} url: ${_url}" &&
+            exekutor mulle-env \
+                        ${MULLE_TECHNICAL_FLAGS} \
+                        ${MULLE_ENV_FLAGS} \
+                     environment  \
+                        --scope "${mapped_scope}" \
+                        set "${_branch_identifier}" "${mapped_branch}" "${_address} branch: ${_branch}"
+         ;;
+      esac
    .done
 }
 
 
 main()
 {
-   local MULLE_FLAG_MAGNUM_FORCE='NO'
-
-   # technical flags
-   local MULLE_TRACE
-   local MULLE_FLAG_EXEKUTOR_DRY_RUN='NO'
-   local MULLE_FLAG_LOG_LOCAL='NO'
-   local MULLE_FLAG_LOG_DEBUG='NO'
-   local MULLE_FLAG_LOG_EXEKUTOR='NO'
-   local MULLE_FLAG_LOG_FLUFF='NO'
-   local MULLE_FLAG_LOG_SCRIPTS='NO'
-   local MULLE_FLAG_LOG_SETTINGS='NO'
-   local MULLE_FLAG_LOG_VERBOSE='NO'
-   local MULLE_FLAG_LOG_MERGE='NO'
-   local MULLE_TRACE_POSTPONE='NO'
-
    local OPTION_SCOPE
    local OPTION_BRANCH
    local OPTION_USERS
@@ -294,7 +295,7 @@ main()
 
    options_setup_trace "${MULLE_TRACE}" && set -x
 
-   . "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-project-sourcetree-parser.sh" || exit 1
+   include "project::sourcetree-parser" || exit 1
 
    produce_environment "${OPTION_BRANCH:-prerelease}" \
                        "${OPTION_SCOPE:-host-ci-${OPTION_BRANCH:-prerelease}}" \
