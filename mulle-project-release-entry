@@ -174,13 +174,14 @@ run()
    local timestamp2="$2"
    local suppress="$3"
    local boldmarker="$4"
+   local boring_distance="$5"
 
    local version
 
    version="`mulle-project-version -s`"
    if [ -z "${version}" ]
    then
-      fail "No project version found in \"${PWD}\""
+      fail "No project version found in \"${PWD#${MULLE_USER_PWD}/}\""
    fi
 
    #
@@ -192,6 +193,7 @@ run()
    latest_commit="`rexekutor git rev-list -n 1 latest --`"
    if [ -z "${latest_commit}" ]
    then
+      log_fluff "No \"latest\" commit found in \"${PWD#${MULLE_USER_PWD}/}\""
       emit_line "${version}" "" "${boldmarker}"
       return
    fi
@@ -228,9 +230,10 @@ run()
             include "version"
 
             r_version_distance "${tag}" "${version}"
-            if [ "$RVAL" -lt 256 ]
+            if [ "$RVAL" -lt "${boring_distance}" ]
             then
                # check that both are reasonably valid tags
+               log_fluff "Just a patch version distance ($RVAL) in \"${PWD#${MULLE_USER_PWD}/}\", skipping"
                return
             fi
 
@@ -250,6 +253,7 @@ main()
    local OPTION_PREVIOUS_RELEASE_DATE
    local OPTION_SUPPRESS_ONLY_PATCH_CHANGES
    local OPTION_BOLD_MARKER
+   local OPTION_BORING_DISTANCE=256
 
    #
    # simple flag handling
@@ -280,13 +284,19 @@ main()
             OPTION_SUPPRESS_ONLY_PATCH_CHANGES='YES'
          ;;
 
+         --boring-distance)
+            [ $# -eq 1 ] && fail "missing argument to $1"
+            shift
+
+            OPTION_BORING_DISTANCE="$1"
+         ;;
+
          -b|--bold-marker)
             [ $# -eq 1 ] && fail "missing argument to $1"
             shift
 
             OPTION_BOLD_MARKER="$1"
          ;;
-
 
          -p|--previous-release-date)
             [ $# -eq 1 ] && fail "missing argument to $1"
@@ -311,7 +321,11 @@ main()
 
    if [ -z "${OPTION_PREVIOUS_RELEASE_DATE}" ]
    then
-      run "" "" "${OPTION_SUPPRESS_ONLY_PATCH_CHANGES}" "${OPTION_BOLD_MARKER}"
+      run "" \
+          "" \
+          "${OPTION_SUPPRESS_ONLY_PATCH_CHANGES}" \
+          "${OPTION_BOLD_MARKER}"  \
+          "${OPTION_BORING_DISTANCE}"
       return $?
    fi
 
@@ -328,7 +342,11 @@ main()
    timestamp2=$(( timestamp1 + 7200 * 7 ))
 
    # we want to ignore commits after this timestamp
-   run "" "${timestamp2}" "${OPTION_SUPPRESS_ONLY_PATCH_CHANGES}" "${OPTION_BOLD_MARKER}"
+   run "" \
+       "${timestamp2}" \
+       "${OPTION_SUPPRESS_ONLY_PATCH_CHANGES}" \
+       "${OPTION_BOLD_MARKER}" \
+       "${OPTION_BORING_DISTANCE}"
 }
 
 call_with_flags "main" "${MULLE_PROJECT_RELEASE_ENTRY_FLAGS}" "$@"

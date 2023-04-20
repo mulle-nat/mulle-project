@@ -139,6 +139,11 @@ log_title()
    local s="$1"
    local len
 
+   if [ "${MULLE_FLAG_LOG_TERSE}" = 'YES' ]
+   then
+      return
+   fi
+
    if [ -z "${NO_COLOR:-}" -a "${MULLE_NO_COLOR:-}" != 'YES' ] && [ ! -f /dev/stderr ]
    then
       len=$(( ${#dashes} - ${#s} ))
