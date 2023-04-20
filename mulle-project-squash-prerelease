@@ -16,9 +16,10 @@ fi
 print_flags()
 {
    echo "   -f            : force operation"
+   echo "   --push        : force push squashed commits into prerelease"
    echo "   --mulle       : pass thru to mulle-project-git-prerelease"
-   echo "   --word <s>    : word to match for in commit message (prerelease)"
-   echo "   --message <s> : commit message (prerelease)"
+   echo "   --word <s>    : words to match commit message (prerelease,fix)"
+   echo "   --message <s> : commit message (squashed prerelease fixe)"
 
    ##
    ## ADD YOUR FLAGS DESCRIPTIONS HERE
@@ -38,8 +39,11 @@ usage()
 Usage:
    mulle-project-squash-prerelease [flags]
 
-   Squash all leading commits that contain the word "prerelease" in the
-   commit message into one commit. (Hint: use --mulle)
+   Squash all leading commits that only contain a single line commit message,
+   that isn't  prefixed by '*'. (Hint: use --mulle)
+   If no words are given, then the following words must exist in the
+   commit message to be squashable:
+      prerelease,fix,fixes,fixed,RELEASENOTES,version,CI
 
 Flags:
 EOF
@@ -52,25 +56,12 @@ EOF
 
 main()
 {
-   local MULLE_FLAG_MAGNUM_FORCE='NO'
-
-   # technical flags
-   local MULLE_TRACE
-   local MULLE_FLAG_EXEKUTOR_DRY_RUN='NO'
-   local MULLE_FLAG_LOG_LOCAL='NO'
-   local MULLE_FLAG_LOG_DEBUG='NO'
-   local MULLE_FLAG_LOG_EXEKUTOR='NO'
-   local MULLE_FLAG_LOG_FLUFF='NO'
-   local MULLE_FLAG_LOG_SCRIPTS='NO'
-   local MULLE_FLAG_LOG_SETTINGS='NO'
-   local MULLE_FLAG_LOG_VERBOSE='NO'
-   local MULLE_FLAG_LOG_MERGE='NO'
-   local MULLE_TRACE_POSTPONE='NO'
-
    local OPTION_WORDS=""
-   local OPTION_MESSAGE="prerelease"
+   local OPTION_MESSAGE="squashed prerelease fixes"
    local OPTION_REV="HEAD"
    local OPTION_MULLE="HEAD"
+   local OPTION_PUSH
+
 
    #
    # simple flag handling
@@ -112,8 +103,13 @@ main()
             OPTION_WORDS="${RVAL}"
          ;;
 
+         --push)
+            OPTION_PUSH='YES'
+         ;;
+
          --mulle)
             OPTION_MULLE="$1"
+            OPTION_PUSH='YES'
          ;;
 
          --)
@@ -133,6 +129,8 @@ main()
       shift
    done
 
+   options_setup_trace "${MULLE_TRACE}" && set -x
+
    include "project::git"
 
    if ! project::git::is_clean
@@ -147,19 +145,31 @@ main()
    local message
    local found
    local word
+   local n_lines
+   local all_messages
 
-   OPTION_WORDS="${OPTION_WORDS:-prerelease}"
+   OPTION_WORDS="${OPTION_WORDS:-prerelease,fix,fixes,fixed,RELEASENOTES,version,CI}"
 
    count=0
    .foreachline commit in `rexekutor git rev-list "${OPTION_REV}" `
    .do
-      message="`git log -1 --pretty='format:%s' "${commit}" `"
+      message="`git log -1 --pretty='format:%B' "${commit}" `"
+      log_debug "Commit \"${commit}\" message is \"${message}\""
+
+      n_lines="`wc -l <<< "${message}" `"
+
+      if [ "${n_lines}" -gt 1 ]
+      then
+         log_debug "Commit \"${commit}\" has a multiline commit messsage"
+         .continue
+      fi
 
       found='NO'
       .foreachitem word in ${OPTION_WORDS}
       .do
          if grep -q -s -w "${word}" <<< "${message}"
          then
+            log_verbose "Squashable commit \"${message}\""
             found='YES'
             .break
          fi
@@ -173,7 +183,12 @@ main()
    .done
 
    case "${count}" in 
-      0|1)
+      1)
+         log_info "Too little to squash"
+         return 0
+      ;;
+
+      0)
          log_info "Nothing to squash"
          return 0
       ;;
@@ -181,12 +196,16 @@ main()
 
    log_info "Squashing ${count} contiguous prerelease commits"
 
-   exekutor git reset --soft HEAD~${count} && 
-   exekutor git commit -m "${OPTION_MESSAGE}" || return 1
+   rexekutor mulle-project-squash-commits ${MULLE_TECHNICAL_FLAGS} \
+                                          -m "${OPTION_MESSAGE}" \
+                                          "HEAD~${count}" || exit 1
 
-   log_info "Pushing prerelease changes"
+   if [ "${OPTION_PUSH}" = 'YES' ]
+   then
+      log_info "Pushing prerelease changes"
 
-   exekutor mulle-project-git-prerelease -f --clobber ${OPTION_MULLE} "$@"
+      exekutor mulle-project-git-prerelease -f --clobber ${OPTION_MULLE} "$@"
+   fi
 }
 
 

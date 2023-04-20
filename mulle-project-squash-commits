@@ -1,0 +1,203 @@
+#! /usr/bin/env mulle-bash
+#! MULLE_BASHFUNCTIONS_VERSION=<|MULLE_BASHFUNCTIONS_VERSION|>
+# shellcheck shell=bash
+#
+
+
+
+[ "${TRACE}" = 'YES' -o "${MULLE_PROJECT_SQUASH_COMMITS_TRACE}" = 'YES' ] \
+&& set -x  \
+&& : "$0" "$@"
+
+#
+# Versioning of this script
+#
+MULLE_EXECUTABLE_VERSION="0.0.0"
+
+
+print_flags()
+{
+   echo "   -f     : force operation"
+   echo "   -m <s> : commit message"
+
+   ##
+   ## ADD YOUR FLAGS DESCRIPTIONS HERE
+   ##
+
+   options_technical_flags_usage \
+           "       : "
+}
+
+
+usage()
+{
+   [ $# -ne 0 ] && log_error "$*"
+
+
+   cat <<EOF >&2
+Usage:
+   mulle-project-squash-commits [flags] <tag|commit> [head]
+
+   Squash all recent commits up to but not including <tag>. This
+   operation will be refused, if there are commits with tags or branches
+   other than those, whose name end in "prerelease".
+
+Tip:
+   To get the number of commits between a tag and HEAD use
+
+      git rev-list <tag>..HEAD --count
+
+Flags:
+EOF
+   print_flags | LC_ALL=C sort >&2
+
+   exit 1
+}
+
+
+git_next_commit()
+{
+   local start="$1"
+   local end="${2:-HEAD}"
+
+   rexekutor git log --pretty='format:%H' --reverse "${start}..${end}" | head -1
+}
+
+
+git_cat_commit_texts()
+{
+   local start="$1"
+   local end="${2:-HEAD}"
+
+   rexekutor git log --pretty="%B" "${start}^{}..${end}"
+}
+
+
+
+git_count_commit_range()
+{
+   local start="$1"
+   local end="${2:-HEAD}"
+
+   rexekutor git log --pretty="%B" "${start}^{}..${end}"
+}
+
+
+
+git_tags_and_branches_between_commits()
+{
+   local start="$1"
+   local end="${2:-HEAD}"
+
+   rexekutor git log --simplify-by-decoration \
+                     --pretty='format:%D' \
+                     "${start}^{}..${end}" \
+   | grep -o 'tag: [^,)]\+' \
+   | sed 's/^tag: //'
+}
+
+
+main()
+{
+   #
+   # simple option/flag handling
+   #
+   local OPTION_MESSAGE
+
+   while [ $# -ne 0 ]
+   do
+      if options_technical_flags "$1"
+      then
+         shift
+         continue
+      fi
+
+      case "$1" in
+         -f|--force)
+            MULLE_FLAG_MAGNUM_FORCE='YES'
+         ;;
+
+         -h*|--help|help)
+            usage
+         ;;
+
+         -m|--message)
+            [ $# -eq 1 ] && match_list_usage "missing argument to $1"
+            shift
+
+            OPTION_MESSAGE="$1"
+         ;;
+
+         --version)
+            printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
+            exit 0
+         ;;
+
+
+         ##
+         ## ADD YOUR FLAGS HERE
+         ##
+
+         -*)
+            usage "Unknown flag \"$1\""
+         ;;
+
+         *)
+            break
+         ;;
+      esac
+
+      shift
+   done
+
+   options_setup_trace "${MULLE_TRACE}" && set -x
+
+   [ $# -lt 1 -o $# -gt 2 ] && usage
+
+   ##
+   ## ADD YOUR CODE HERE
+   ##
+   local tag="$1"
+   local end="${2:-}"
+
+   if [ "${MULLE_FLAG_MAGNUM_FORCE}" != 'YES' ]
+   then
+      local squashed_tags
+      local line
+
+      squashed_tags="`git_tags_and_branches_between_commits "${tag}" "${end}" `"
+      .foreachline line in ${squashed_tags}
+      .do
+         case "${line}" in
+            *prerelease)
+            ;;
+
+            *)
+               fail "Refuse to squash with tag/branch \"${line}\" in squash range"$'\n'"${C_INFO}Use -f to force"
+            ;;
+         esac
+      .done
+   fi
+
+#   local commit
+#
+#   commit="`git_next_commit "${tag}" `" &&
+#   log_setting "commit : ${commit}"
+
+   local text
+   local filtered
+
+   text="`git_cat_commit_texts "${tag}" "${end}" `" || fail "Could not get commit texts"
+   filtered="`grep -E '^\*' <<< "${text}" `"
+
+   log_setting "tag      : ${tag}"
+   log_setting "end      : ${end:-HEAD}"
+   log_setting "text     : ${text}"
+   log_setting "filtered : ${filtered}"
+
+   exekutor git reset --soft "${tag}" &&
+   exekutor git commit -m "${OPTION_MESSAGE:-"${filtered}"}"
+}
+
+
+main "$@"
