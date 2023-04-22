@@ -35,12 +35,15 @@ usage()
 Usage:
    mulle-project-github-status [flags]
 
+   **OBSOLETE** use \`gh workflow view <CI>\` instead.
+
    Check remotes for a github remote. For each branch, get the last github 
    action status. List failures only by default.
 
    Github severely rate limits scripts without API token! If you get
    curl: (22) The requested URL returned error: 403 
    Then you hit the rate limit!
+
 
 Flags:
 EOF
@@ -247,21 +250,6 @@ check_repo()
 
 main()
 {
-   local MULLE_FLAG_MAGNUM_FORCE='NO'
-
-   # technical flags
-   local MULLE_TRACE
-   local MULLE_FLAG_EXEKUTOR_DRY_RUN='NO'
-   local MULLE_FLAG_LOG_LOCAL='NO'
-   local MULLE_FLAG_LOG_DEBUG='NO'
-   local MULLE_FLAG_LOG_EXEKUTOR='NO'
-   local MULLE_FLAG_LOG_FLUFF='NO'
-   local MULLE_FLAG_LOG_SCRIPTS='NO'
-   local MULLE_FLAG_LOG_SETTINGS='NO'
-   local MULLE_FLAG_LOG_VERBOSE='NO'
-   local MULLE_FLAG_LOG_MERGE='NO'
-   local MULLE_TRACE_POSTPONE='NO'
-
    #
    # simple flag handling
    #

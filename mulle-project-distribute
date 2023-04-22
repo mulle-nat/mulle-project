@@ -703,23 +703,22 @@ main()
       DO_PUSH_FORMULA="${OPTION_DO_PUSH_FORMULA}"
    fi
 
-   if [ "${MULLE_FLAG_LOG_SETTINGS}" = 'YES' ]
-   then
-      log_trace2 "DO_GIT_RELEASE      = ${DO_GIT_RELEASE}"
-      log_trace2 "DO_GENERATE_FORMULA = ${DO_GENERATE_FORMULA}"
-      log_trace2 "DO_PRE_RELEASE      = ${DO_PRE_RELEASE}"
-      log_trace2 "DO_POST_RELEASE     = ${DO_POST_RELEASE}"
-      log_trace2 "DO_PUSH_FORMULA     = ${DO_PUSH_FORMULA}"
-   fi
-
    #
    # dial past options now as they have been parsed
    #
-   if [ "${DO_GIT_RELEASE}" = "DEFAULT" -a -f VERSION -a ! -d mulle-project ]
+   if [ -z "${DO_GIT_RELEASE}" -a ! -d .mulle/etc/project ]
    then
       # make most simplistic stuff work (nice for farmhash e.g.)
       DO_GIT_RELEASE='YES'
    fi
+
+
+   log_setting "DO_GIT_RELEASE      = ${DO_GIT_RELEASE}"
+   log_setting "DO_GENERATE_FORMULA = ${DO_GENERATE_FORMULA}"
+   log_setting "DO_PRE_RELEASE      = ${DO_PRE_RELEASE}"
+   log_setting "DO_POST_RELEASE     = ${DO_POST_RELEASE}"
+   log_setting "DO_PUSH_FORMULA     = ${DO_PUSH_FORMULA}"
+
 
    if [ "${DO_GIT_RELEASE}" != 'YES' -a  \
         "${DO_GENERATE_FORMULA}" != 'YES' -a  \

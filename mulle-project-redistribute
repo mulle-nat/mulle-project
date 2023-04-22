@@ -48,11 +48,15 @@ usage()
 
    cat <<EOF >&2
 Usage:
-   ${MULLE_USAGE_NAME} <message>
+   ${MULLE_USAGE_NAME} [flags] <message>
 
    A lazy way to push smallish commits out without changing the version
    number. Use mulle-project-sloppy-distribute if you want to change the
    version.
+
+Flags:
+   --if-uncommitted-files : skip if there are no added, deleted, modified files
+   --prerelease           : prerelease instead of distribute
 EOF
    exit 1
 }
@@ -68,6 +72,7 @@ source_file()
 main()
 {
    local OPTION_PRERELEASE='NO'
+   local OPTION_IF_UNCOMMITTED_FILES
 
    while [ $# -ne 0 ]
    do
@@ -80,6 +85,10 @@ main()
       case "$1" in
          -h|--help|help)
             usage
+         ;;
+
+         --if-uncommitted-files)
+            OPTION_IF_UNCOMMITTED_FILES='YES'
          ;;
 
          --prerelease)
@@ -107,11 +116,17 @@ main()
    then
       if [ $# -eq 0 ]
       then
-         log_error "Need a commit message for the outstandig commits"
+         log_error "Need a commit message for the outstanding commits"
          git status -s
          exit 1
       fi
       dogit='YES'
+   else
+      if [ "${OPTION_IF_UNCOMMITTED_FILES}" = 'YES' ]
+      then
+         log_verbose "Nothing to do"
+         return 0
+      fi
    fi
 
    project::git::assert_not_on_release_branch
