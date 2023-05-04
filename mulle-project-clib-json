@@ -106,7 +106,8 @@ print_version()
    local version
 
    # picks up our environment though
-   version="`PROJECT_UPCASE_IDENTIFIER= rexekutor mulle-project-version -s`" || _internal_fail "No project version found"
+   version="`PROJECT_UPCASE_IDENTIFIER= rexekutor mulle-project-version -s`" \
+   || _internal_fail "No project version found"
    printf "%s" "${INDENT}\"version\" : \"${version}\""
 }
 

@@ -84,6 +84,7 @@ new_repo::change_default_branch()
    then
       if [ "${MULLE_FLAG_MAGNUM_FORCE}" != 'YES' ]
       then
+         log_warning "Could not pull from \"${remote}/${master}"
          return 1
       fi
    fi
@@ -391,6 +392,8 @@ new_repo::main()
          fail "Repository is tainted with uncommitted files"
       fi
    fi
+
+   [ -z "${OPTION_PROVIDERS}" ] && fail "No providers given (use --provider or maybe --mulle option)"
 
    local provider
    local functionname

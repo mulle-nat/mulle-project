@@ -57,13 +57,16 @@ project::settings::get_description()
    else
       if [ -f "cola/properties.plist" ]
       then
-         if ! MULLE_PLIST_CONVERT="`command -v 'mulle-plist-convert'`"
+         if ! MULLE_PQ="`command -v 'mulle-pq'`"
          then
-            fail "The command \"mulle-plist-convert\" is not in PATH ($PATH)"
+            log_warning "The command \"mulle-pq\" is not in PATH ($PATH)"
          fi
+      fi
 
-         rexekutor "${MULLE_PLIST_CONVERT}" --in cola/properties.plist \
-                                            --jq .project.description \
+      if [ -f "cola/properties.plist" -a ! -z "${MULLE_PQ}" ]
+      then
+         rexekutor "${MULLE_PQ}" --in cola/properties.plist \
+                                 '.project.description' \
          | sed -e 's/^"\(.*\)".*$/\1/'
       else
          if [ -f "README.md" ]

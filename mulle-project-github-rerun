@@ -1,0 +1,364 @@
+#! /usr/bin/env mulle-bash
+# shellcheck shell=bash
+
+[ "${TRACE}" = 'YES' -o "${MULLE_PROJECT_GITHUB_RERUN_TRACE}" = 'YES' ] && set -x && : "$0" "$@"
+
+
+MULLE_EXECUTABLE_VERSION="0.0.0"
+
+if [ -z "${MULLE_PROJECT_LIBEXEC_DIR}" ]
+then
+   r_get_libexec_dir "${MULLE_EXECUTABLE}" "mulle-project" "mulle-project-git.sh"
+   MULLE_PROJECT_LIBEXEC_DIR="${RVAL}"
+fi
+
+
+print_flags()
+{
+   echo "   -f         : force operation"
+   echo "   -b <name>  : add to ignored branch names (imgbot)"
+   echo "   -c <n>     : consider most recent <n> runs only (3)"
+   echo "   --view     : current state, same as gh workflow view"
+   echo "   --delete-workflow-dispatch : delete workflow_dispatch runs"
+   ##
+   ## ADD YOUR FLAGS DESCRIPTIONS HERE
+   ##
+
+   options_technical_flags_usage \
+                "      : "
+}
+
+
+usage()
+{
+   [ $# -ne 0 ] && log_error "$*"
+
+
+   cat <<EOF >&2
+Usage:
+   mulle-project-github-rerun [flags] [CI]
+
+   Check last workflows of given name "CI" and rerun those, that failed. By
+   default the most recent three workflows are checked. Which in a default
+   mulle setup are usually: release, verion, latest (all pointing to the same
+   commit).
+
+   The gh github client must be installed!
+
+Tip:
+   To only restart a particular workflow use gh directly:
+      mulle-project-github-rerun --view
+      gh run rerun <jobid>
+
+Flags:
+EOF
+   print_flags | LC_ALL=C sort >&2
+
+   exit 1
+}
+
+
+r_get_projectname()
+{
+   if [ -z "${PROJECT_NAME}" ]
+   then
+      PROJECT_NAME="`mulle-sde -s env get PROJECT_NAME 2> /dev/null`"
+      if [ -z "${PROJECT_NAME}" ]
+      then
+         r_basename "${PWD}"
+         PROJECT_NAME="${RVAL}"
+      fi
+   fi
+
+   RVAL="${PROJECT_NAME:-unknown}"
+}
+
+
+
+r_get_github_url()
+{
+   local remote
+   local url
+
+   for remote in `git remote`
+   do
+      url="`rexekutor git remote get-url "${remote}" `"
+      case "${url}" in
+         *github.com:*)
+            RVAL="${url}"
+            return 0
+         ;;
+      esac
+   done
+
+   return 1
+}
+
+
+main()
+{
+   local OPTION_COUNT
+   local OPTION_BORING_BRANCHES="imgbot"
+   local OPTION_VIEW
+   local OPTION_RUN
+   local OPTION_DELETE
+   #
+   # simple flag handling
+   #
+   while [ $# -ne 0 ]
+   do
+      if options_technical_flags "$1"
+      then
+         shift
+         continue
+      fi
+
+      case "$1" in
+         -f|--force)
+            MULLE_FLAG_MAGNUM_FORCE='YES'
+         ;;
+
+         -h*|--help|help)
+            usage
+         ;;
+
+         -c|--count)
+            [ $# -eq 1 ] && usage "Missing argument to \"$1\""
+            shift
+
+            OPTION_COUNT="$1"
+         ;;
+
+         --delete)
+            [ $# -eq 1 ] && usage "Missing argument to \"$1\""
+            shift
+
+            r_comma_concat "${OPTION_DELETE}" "$1"
+            OPTION_DELETE="${RVAL}"
+         ;;
+
+         --delete-workflow-dispatch)
+            OPTION_DELETE='workflow_dispatch'
+         ;;
+
+         --run)
+            OPTION_RUN='YES'
+         ;;
+
+         --view)
+            OPTION_VIEW='YES'
+         ;;
+
+         -b|--boring|--boring-branch)
+            [ $# -eq 1 ] && usage "Missing argument to \"$1\""
+            shift
+
+            r_comma_concat "${OPTION_BORING_BRANCHES}" "$1"
+            OPTION_BORING_BRANCHES="${RVAL}"
+         ;;
+            
+         --version)
+            printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
+            exit 0
+         ;;
+
+         -*)
+            usage "Unknown flag \"$1\""
+         ;;
+
+         *)
+            break
+         ;;
+      esac
+
+      shift
+   done
+
+   local name
+
+   r_get_projectname
+   name="${RVAL}"
+
+   options_setup_trace "${MULLE_TRACE}" && set -x
+
+   if [ "${MULLE_FLAG_MAGNUM_FORCE}" != 'YES' -a ! -d ".github/workflows" ]
+   then
+      if [ ! -d test ]
+      then
+         log_info "No github workflows and no test folder in ${name}"
+      else
+         _log_warning "No github workflows ${name} though a test folder exists
+${C_INFO}Consider adding github actions with:
+${C_RESET_BOLD}   mulle-sde extension add github-actions"
+      fi
+      return 0
+   fi
+
+   if ! GH="`command -v gh`"
+   then
+      fail "The github commandline tool \"gh\" is not in PATH ($PATH)"
+   fi
+
+   local CI=${1:-CI}
+
+   if [ "${OPTION_VIEW}" = 'YES' ]
+   then
+      rexekutor "${GH}" workflow view "${CI}"
+      return $?
+   fi
+
+   local token
+
+   if ! token="`rexekutor "${GH}" auth token`"
+   then
+      log_warning "gh is not authorized yet, can't get token"
+   fi
+
+   local github_url
+
+   if ! r_get_github_url
+   then
+      log_info "No github repository seemingly configured"
+      return 0
+   fi
+   github_url="${RVAL}"
+
+   local scheme
+   local domain
+   local repo
+   local user
+   local branch
+   local scm
+   local tag
+
+   eval "`rexekutor "${MULLE_DOMAIN:-mulle-domain}" \
+                           ${MULLE_TECHNICAL_FLAGS} \
+                           ${MULLE_DOMAIN_FLAGS} \
+                         parse-url \
+                           "${github_url}" `" || exit 1
+
+   log_setting "scheme : \"${scheme}\""
+   log_setting "domain : \"${domain}\""
+   log_setting "repo   : \"${repo}\""
+   log_setting "user   : \"${user}\""
+   log_setting "branch : \"${branch}\""
+   log_setting "scm    : \"${scm}\""
+   log_setting "tag    : \"${tag}\""
+
+   local workflow_csv
+
+   workflow_csv="`rexekutor "${GH}" workflow view "${CI}" \
+   | awk -F'\t' '/completed/ { print $1 ";" $2 ";" $(NF-2) ";" $(NF-3) ";" $(NF) }' `"
+
+   if [ -z "${workflow_csv}" ]
+   then
+      fail "No runs found for ${name} workflow ${CI} in ${PWD#${MULLE_USER_PWD}/}"
+   fi
+
+   local line
+   local busy
+   local status
+   local tag_or_branch
+   local command
+   local jobid
+   local branches
+   local i
+   local rc
+
+   i=0
+   .foreachline line in ${workflow_csv}
+   .do
+      IFS=';' read -r busy status command tag_or_branch jobid <<< "${line}"
+
+      log_setting "busy          : \"${busy}\""
+      log_setting "status        : \"${status}\""
+      log_setting "command       : \"${command}\""
+      log_setting "tag_or_branch : \"${tag_or_branch}\""
+      log_setting "jobid         : \"${jobid}\""
+
+      if [ -z "${tag_or_branch}" -o -z "${busy}" -o -z "${status}" -o -z "${command}" -o -z "${jobid}"  ]
+      then
+         fail "Could not parse workflow output from gh output"
+      fi
+
+      if [ ! -z "${OPTION_DELETE}" ]
+      then
+         case ",${OPTION_DELETE}," in
+            *,${command},*)
+               log_fluff "Delete ${command} run ${jobid}"
+               if ! exekutor "${GH}" run delete "${jobid}"
+               then
+                  return 1
+               fi
+            ;;
+         esac
+         .continue
+      fi
+
+      if [ "${OPTION_RUN}" != 'YES' -a "${command}" != "push" ]
+      then
+         log_fluff "Only push runs are interesting, ${command} ${tag_or_branch} skipped"
+         .continue
+      fi
+
+      case ",${OPTION_BORING_BRANCHES}," in
+         *,${tag_or_branch},*)
+            log_fluff "Branch ${tag_or_branch} considered to be boring, skipped"
+            .continue
+         ;;
+      esac
+
+      #
+      # don't act on a branch twice
+      #
+      case ",${branches}," in
+         *,${tag_or_branch},*)
+            log_fluff "Branch ${tag_or_branch} already seen, skipped"
+            .continue
+         ;;
+      esac
+      r_comma_concat "${branches}" "${tag_or_branch}"
+      branches="${RVAL}"
+
+      if [ "${busy}" != "completed" ]
+      then
+         log_info "${name} ${CI} is still running, skipped"
+         return 0
+      fi
+
+      if [ "${status}" = "failure" ]
+      then
+         log_info "Rerun ${C_RESET_BOLD}${name}${C_VERBOSE} ${CI} for ${C_MAGENTA}${C_BOLD}${tag_or_branch}"
+
+         if [ "${OPTION_RUN}" != 'YES' ]
+         then
+            exekutor "${GH}" run rerun ${jobid}
+#            exekutor "${GH}" api \
+#                        --method POST \
+#                        -H "Accept: application/vnd.github+json" \
+#                        -H "X-GitHub-Api-Version: 2022-11-28" \
+#                        "/repos/${user}/${repo}/actions/jobs/${jobid}/rerun"
+            rc=$?
+         else
+            exekutor "${GH}" workflow run "${CI}" --ref "${tag_or_branch}" | head -1
+            rc=$?
+         fi
+
+         if [ $rc -ne 0 ]
+         then
+            return 1
+         fi
+      else
+         log_fluff "Nothing to do for ${name}/${tag_or_branch} as last run was a ${status}"
+      fi
+
+      i=$(( i + 1 ))
+      if [ $i -ge ${OPTION_COUNT:-3} ]
+      then
+         .break
+      fi
+   .done
+}
+
+
+call_with_flags "main" "${MULLE_PROJECT_GITHUB_RERUN_FLAGS}" "$@"

@@ -13,6 +13,7 @@
 | `mulle-project-gitignore`          | Add files to .gitignore, prevents duplicates
 | `mulle-project-git-prerelease`     | Push master into a prerelease branch on github
 | `mulle-project-github-description` | Fetch and set github repository description
+| `mulle-project-github-rerun`       | Rerun failed github CI tasks
 | `mulle-project-github-status`      | Poll github action status for CI state
 | `mulle-project-init`               | Initial setup and update
 | `mulle-project-latest-current-tag` | Produce a release blog version info entry
@@ -23,6 +24,7 @@
 | `mulle-project-prerelease`         | Create a debian/git prerelease
 | `mulle-project-properties-plist`   | Create properties.plist file for mulle-template-composer
 | `mulle-project-redistribute`       | Hack
+| `mulle-project-refresh-amalgamation`| Refresh an amalagamated library project and the constituents clib.jsons
 | `mulle-project-releasenotes`       | Create releasenotes from git logs
 | `mulle-project-reposfile`          | Combine multiple REPOS files into one
 | `mulle-project-sloppy-distribute`  | Commit current changes, up the version count and distribute with releasenotes given on commandline

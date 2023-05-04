@@ -1,3 +1,9 @@
+## 3.4.0
+
+* added mulle-project-github-rerun
+* fix mulle-plist-convert (now mulle-pq) be a hard requirement
+
+
 ## 3.3.0
 
 * added mulle-project-new-rep and mulle-project-github-description
