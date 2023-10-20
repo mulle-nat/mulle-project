@@ -17,7 +17,6 @@ MULLE_EXECUTABLE_VERSION="0.0.0"
 print_flags()
 {
    echo "   -f    : force operation"
-
    ##
    ## ADD YOUR FLAGS DESCRIPTIONS HERE
    ##
@@ -36,9 +35,9 @@ usage()
 Usage:
    mulle-project-refresh-amalgamation [flags]
 
-   ##
-   ## ADD YOUR USAGE DESCRIPTION HERE
-   ##
+   Calls mulle-project-clib-json -o clib.json in constituents. Then does a
+   mulle-sde clean all and mulle-sde fetch. In the end you have a new
+   amalgamated library.
 
 Flags:
 EOF
@@ -47,14 +46,175 @@ EOF
    exit 1
 }
 
+#
+# logfile is a lock free file based sync mechanism, that ensures that a
+#         specific task is not accidentally being run twice at a time
+#         system wide. Not tested under super heavy loads.
+#
+logfile_append()
+{
+   log_entry "logfile_append" "$@"
+
+   local logfile="$1" ; shift
+
+   echo "$*" >> "${logfile}"
+}
+
+
+logfile_start_or_end_after_wait()
+{
+   log_entry "logfile_start_or_end_after_wait" "$@"
+
+   local logfile="$1"
+   local now="$2"
+
+   sed -n -e "/w=${now}/,\$p" "${logfile}" \
+   | grep -E '^[se]='
+}
+
+
+logfile_get_last_start_or_end()
+{
+   log_entry "logfile_get_last_start_or_end" "$@"
+
+   local logfile="$1"
+
+   grep -E '^[se]=' "${logfile}" 2> /dev/null | tail -n 1
+}
+
+
+logfile_waits_between_start_and_end()
+{
+   log_entry "logfile_waits_between_start_and_end" "$@"
+
+   local logfile="$1"
+   local now="$2"
+
+   sed -n -e "/s=${now}/,\$p" "${logfile}"  \
+   | sed -n -e "/e=${now}/q;p"              \
+   | grep -E '^[w]='
+}
+
+
+
+# returns 0 : ok
+#         1 : other process is running
+logfile_start()
+{
+   log_entry "logfile_start" "$@"
+
+   local logfile="$1"
+   local now="$2"
+
+   local previous
+   local next
+   local previous_timestamp
+   local now_timestamp
+   local update
+   local lines
+   local oline
+
+   # if previous was an end, then we can start
+   previous="`logfile_get_last_start_or_end "${logfile}"`"
+   log_debug "previous: ${previous}"
+
+   if [ "${previous:0:1}" = 's' ]
+   then
+      # if the start was ancient, ignore it
+      previous_timestamp="${previous#??}"
+      previous_timestamp="${timestamp%%;*}"
+      now_timestamp="${now%%;*}"
+
+      if [ $(( now_timestamp - previous_timestamp )) -lt 60 ]
+      then
+         # otherwise add a "wait" so that the other process does it for us
+         logfile_append "${logfile}" "w=${now}"
+
+         # if other process didn't finish yet (or new one started)
+         update="`logfile_get_last_start_or_end "${logfile}"`"
+         log_debug "update: ${update}"
+         if [ "${update}" = "${previous}" ]
+         then
+            return 1
+         fi
+
+         # if the new start or end is after our wait, then thats fine
+         lines="`logfile_start_or_end_after_wait "${logfile}" "${now}" `"
+         log_debug "lines: ${lines}"
+         if [ ! -z "${lines}" ]
+         then
+            return 1
+         fi
+
+         # other process didn't notice our wait, so retry
+         # should exec for recursion, but can't
+         logfile_start "$@"
+      fi
+   fi
+
+   # so assume nothing is running, now we start a run (tentatively),
+   # but if we find another start after we started then we don't do anything
+
+   oline="s=${now}"
+   logfile_append "${logfile}" "${oline}"
+   log_debug "append: ${oline}"
+
+   next="`logfile_get_last_start_or_end "${logfile}"`"
+   log_debug "next: ${next}"
+   if [ "${oline}" != "${next}" ]
+   then
+      # mark as aborted for human consumption
+      oline="a=${now}"
+      logfile_append "${logfile}" "${oline}"
+      log_debug "append: ${oline}"
+      return 1
+   fi
+
+   return 0
+}
+
+
+# returns 0 : ok
+#         1 : other process is running
+logfile_end()
+{
+   log_entry "logfile_end" "$@"
+
+   local logfile="$1"
+   local now="$2"
+
+   local oline
+
+   oline="e=${now}"
+   logfile_append "${logfile}" "${oline}"
+   log_debug "append: ${oline}"
+
+   local waits
+   #
+   # if there are "waits" between our start and end, then
+   # we need to run again
+   waits="`logfile_waits_between_start_and_end "${logfile}" "${now}"`"
+   log_debug "waits: ${waits}"
+   if [ ! -z "${waits}" ]
+   then
+      return 1
+   fi
+
+   return 0
+}
+
+
+
 create_clib_json()
 {
    local constituent="$1"
 
+# calling reflect is bad, because sub-projects may very well build at the
+# same time
    log_info "Create clib.json for \"${constituent#${MULLE_USER_PWD}/}\""
    (
       cd "${constituent}" &&
-      rexekutor mulle-sde ${MULLE_TECHNICAL_FLAGS} reflect &&
+#      rexekutor mulle-sde ${MULLE_TECHNICAL_FLAGS} reflect &&
       rexekutor mulle-project-clib-json ${MULLE_TECHNICAL_FLAGS} -o "clib.json"
    ) || fail "Could not create \"clib.json\" for \"${constituent#${MULLE_USER_PWD}/}\""
 }
@@ -70,11 +230,18 @@ create_clib_json_in_constituents()
 }
 
 
+CLEAN_DOMAINS="graveyard sourcetree_share output monitor project"
+
+
 reamalgamate()
 {
    log_info "Reamalgamate"
 
-   rexekutor mulle-sde ${MULLE_TECHNICAL_FLAGS} clean -g &&
+   # if we clean .mulle/var/peschel/nat/sde here, we clean possibly
+   # parallel status reflects, which isn't food
+   rexekutor mulle-sde ${MULLE_TECHNICAL_FLAGS} clean --domain graveyard \
+                                                      --domain sourcetree_share \
+                                                      --domain project  &&
    rexekutor mulle-sde ${MULLE_TECHNICAL_FLAGS} fetch &&
    rexekutor mulle-sde ${MULLE_TECHNICAL_FLAGS} reflect
 }
@@ -90,6 +257,7 @@ search_local_repos()
 }
 
 
+
 refresh()
 {
    local nodes
@@ -97,7 +265,9 @@ refresh()
 
    log_verbose "Collecting nodes..."
 
-   nodes="`rexekutor mulle-sourcetree ${MULLE_TECHNICAL_FLAGS} list --marks Amalgamated --output-no-header \
+   nodes="`rexekutor mulle-sourcetree ${MULLE_TECHNICAL_FLAGS} list \
+                                       --marks Amalgamated \
+                                       --output-no-header \
           | grep -E '^src/' \
           | sed -e 's/^src//' `"
 
@@ -116,13 +286,69 @@ refresh()
 }
 
 
+refresh_if_needed()
+{
+   log_entry "refresh_if_needed" "$@"
+
+   [ $# -ne 0 ] && usage "superflous arguments $*"
+
+   local MULLE_AMALGAMATE_VAR_DIR
+   local MULLE_AMALGAMATE_ETC_DIR
+   local MULLE_AMALGAMATE_SHARE_DIR
+
+   eval `mulle-env mulle-tool-env amalgamate`
+
+   mkdir_if_missing "${MULLE_AMALGAMATE_VAR_DIR}"
+
+   local logfile="${MULLE_AMALGAMATE_VAR_DIR}/log"
+
+   now="`date '+%s'`;${BASHPID:-$$}"
+   if ! logfile_start "${logfile}" "${now}"
+   then
+      log_info "Reamalgamation of ${C_MAGENTA}${C_BOLD}${library_name}${C_INFO} is already running"
+      return
+   fi
+
+   refresh
+
+   if ! logfile_end "${logfile}" "${now}"
+   then
+      refresh_if_needed
+   fi
+}
+
+
+background()
+{
+   [ $# -eq 0 ] && usage "missing library argument"
+
+   local library_dir="$1"; shift
+
+   [ $# -ne 0 ] && usage "superflous arguments $*"
+
+   if [ ! -d "${library_dir}" ]
+   then
+      fail "${library_dir} is missing"
+   fi
+
+   local library_name
+
+   r_basename "${library_dir}"
+   library_name="${RVAL}"
+
+   log_info "Reamalgamate ${C_MAGENTA}${C_BOLD}${library_name}"
+   exekutor cd "${library_dir}" &&
+   exekutor mulle-project-refresh-amalgamation --name ${OPTION_NAME:-library_name} -s &
+}
+
 
 main()
 {
    #
    # simple option/flag handling
    #
-   local OPTION_VALUE
+   local OPTION_NAME  # used to distinguish in `ps -aux`!
+   local OPTION_BACKGROUND
 
    while [ $# -ne 0 ]
    do
@@ -141,18 +367,21 @@ main()
             usage
          ;;
 
-         --value)
-            [ $# -eq 1 ] && match_list_usage "missing argument to $1"
+         --background)
+            OPTION_BACKGROUND='YES'
+         ;;
+
+         --name)
+            [ $# -eq 1 ] && usage "missing argument to $1"
             shift
 
-            OPTION_VALUE="$1"
+            OPTION_NAME="$1"
          ;;
 
          --version)
             printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
             exit 0
          ;;
-
 
          ##
          ## ADD YOUR FLAGS HERE
@@ -172,8 +401,13 @@ main()
 
    options_setup_trace "${MULLE_TRACE}" && set -x
 
+   if [ "${OPTION_BACKGROUND}" = 'YES' ]
+   then
+      background "$@"
+      return $?
+   fi
 
-   refresh "$@"
+   refresh_if_needed "$@"
 }
 
 #

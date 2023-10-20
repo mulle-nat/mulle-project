@@ -1,0 +1,600 @@
+#! /usr/bin/env mulle-bash
+
+[ "${TRACE}" = 'YES' -o "${X_TRACE}" = 'YES' ] \
+&& set -x  \
+&& : "$0" "$@"
+
+#
+# Versioning of this script
+#
+MULLE_EXECUTABLE_VERSION="0.0.0"
+
+
+print_flags()
+{
+   cat <<EOF
+   --screenshot-x11     : take a screenshot (when running under X11)
+   --gif-x11            : take several screenshot and make an animated gif
+   --video-x11          : take several screenshots and make an movie
+   --resize-percent <n> : resize to n percent of window size (50)
+   --resize <wxh>       : resize to widthxheight pixels
+   --fps <fps>          : frames per second                 -- NYI
+   --duration <s>       : length of the animation / video   -- NYI
+   -d <dir>             : use <dir> to locate demo sources
+   --no-resize          : don't resize
+   --no-timeout         : keep demos running until they are closed by the user
+   --timeout <s>        : run a demo for <s> seconds, then kill it (10)
+   --prefix <name>      : prefix for demo source (main-)
+EOF
+   ##
+   ## ADD YOUR FLAGS DESCRIPTIONS HERE
+   ##
+
+   options_technical_flags_usage \
+       "            : "
+}
+
+
+usage()
+{
+   [ $# -ne 0 ] && log_error "$*"
+
+
+   cat <<EOF >&2
+Usage:
+   mulle-project-run-demos [flags] [demoname] ...
+
+   Run demos in a typical MulleUI "demo" directory. The "demo" directory will
+   usually be besides "test". It is a self-containd mulle-sde project, which
+   sources in "demo/src". Each demo is a sourcefile with a "main-" prefix and
+   a ".m" suffix.  The runner builds the demos with mulle-sde craft, then
+   runs each demo in sequence for a duration of 10 seconds. Optionally a
+   screenshot can be made of the running demo.
+
+   You can also target selective demos with <demoname>.
+
+Flags:
+EOF
+   print_flags | LC_ALL=C sort >&2
+
+   exit 1
+}
+
+
+scale_screenshots()
+{
+   local imagesdir="$1"
+   local option="$2"
+
+   local tmpfile
+
+   if [ -z "${option}" ]
+   then
+      return
+   fi
+
+   r_filepath_concat "${imagesdir}" ".tmp.png"
+   tmpfile="${RVAL}"
+
+   local filename
+
+   for filename in "${tmpdir}"/*.png
+   do
+      if ! exekutor "${CONVERT_EXE}" "${filename}" -resize "${option}" "${tmpfile}"
+      then
+         fail "Could not scale \"${filename}\""
+      fi
+      exekutor mv -f "${tmpfile}" "${filename}"
+   done
+}
+
+
+r_record_screenshots()
+{
+   local windowclass="$1"
+   local frames="$2"
+   local delay_us="$3"
+
+   include "parallel"
+
+   if [ "${frames}" -lt 1 ]
+   then
+      fail "Too few frames"
+   fi
+
+   if [ "${frames}" -ge 9999 ]
+   then
+      fail "Too many frames"
+   fi
+
+   if [ "${delay_us}" -lt 1000 ]
+   then
+      fail "Too small a delay"
+   fi
+
+   local tmpdir
+
+   r_make_tmp_directory "demos"
+   tmpdir="${RVAL}"
+
+   local count
+   local screenshotfile
+
+   (
+      count=0
+      while [ $count -lt $frames ]
+      do
+         printf -v screenshotfile "screeny-%05d.png" "${count}"
+         r_filepath_concat "${tmpdir}" "${screenshotfile}"
+         screenshotfile="${RVAL}"
+
+         # fork it and hope it ends quickly
+         "${SCROT_EXE}" -k -C "${windowclass}" -o -F "${screenshotfile}" &
+         very_short_sleep "${delay_us}"
+         count=$(( count + 1 ))
+         # so here we wait for the screenshot to finish
+         wait
+      done
+   )
+
+   RVAL="${tmpdir}"
+}
+
+
+take_video_with_delay()
+{
+   local windowclass="$1"
+   local filename="$2"
+   local delay="${3:-1}"
+   local scale="$4"
+   local seconds="${5:-5}"
+   local fps="${6:-30}"
+
+   rexekutor sleep ${delay}
+
+   local delay_us
+
+   delay_us=$(( 1000000 / fps ))
+
+   local delay_cs
+
+   delay_cs=$(( 100 / fps ))
+
+   local frames
+
+   frames=$(( seconds * fps))
+
+   if r_record_screenshots "${windowclass}" "${frames}" "${delay_us}"
+   then
+      local tmpdir
+
+      set -x
+      tmpdir="${RVAL}"
+      scale_screenshots "${tmpdir}" "${scale}"
+
+      # -y overwrite
+      # -crf quality setting (28 is worse than 20)
+      if exekutor "${FFMPEG_EXE}" -framerate "${fps}" \
+                                  -y \
+                                  -loglevel error \
+                                  -i "${tmpdir}/screeny-%05d.png" \
+                                  -c:v libx264 \
+                                  -profile:v high \
+                                  -crf 28 \
+                                  -pix_fmt yuv420p \
+                                  "${filename}.mp4"
+      then
+         : # rmdir_safer "${tmpdir}"
+      else
+         fail "Could not create a video from \"${tmpdir}\""
+      fi
+      exit 0
+   fi
+}
+
+
+
+take_gif_with_delay()
+{
+   local windowclass="$1"
+   local filename="$2"
+   local delay="${3:-1}"
+   local scale="$4"
+   local seconds="${5:-3}"
+   local fps="${6:-5}"
+
+   rexekutor sleep ${delay}
+
+   local delay_us
+
+   delay_us=$(( 1000000 / fps ))
+
+   local delay_cs
+
+   delay_cs=$(( 100 / fps ))
+
+   local frames
+
+   frames=$(( seconds * fps))
+
+   if r_record_screenshots "${windowclass}" "${frames}" "${delay_us}"
+   then
+      local tmpdir
+
+      tmpdir="${RVAL}"
+      scale_screenshots "${tmpdir}" "${scale}"
+      if exekutor "${CONVERT_EXE}" -quiet \
+                                   -delay ${delay_cs} \
+                                   -loop 0 \
+                                   -- \
+                                   "${tmpdir}"/*.png \
+                                   "${filename}.gif"
+      then
+         : # rmdir_safer "${tmpdir}"
+      else
+         fail "Could not create a GIF from \"${tmpdir}\""
+      fi
+      exit 0
+   fi
+}
+
+
+
+take_screenshot_with_delay()
+{
+   local windowclass="$1"
+   local filename="$2"
+   local delay="${3:-1}"
+   local scale="$4"
+
+   rexekutor sleep ${delay}
+
+   local window
+
+   window=$(rexekutor xdotool search --onlyvisible --class "${windowclass}")
+   if [ -z "${window}" ]
+   then
+      fail "Could not find window \"${windowclass}\" to take snapshot  \"${filename}\""
+   fi
+
+#   exekutor import -window  "${window}" "${filename}.png"
+   exekutor "${SCROT_EXE}" -k -C "${windowclass}" -o -F "${filename}"
+   if [ ! -z "${scale}" ]
+   then
+      local tmpdir
+
+      r_make_tmp_file "demos"
+      tmpfile="${RVAL}"
+
+      if ! exekutor "${CONVERT_EXE}" "${filename}" -resize "${scale}" "${tmpfile}"
+      then
+         fail "Could not scale \"${filename}\""
+      fi
+      exekutor mv -f "${tmpfile}" "${filename}"
+   fi
+}
+
+
+main()
+{
+   #
+   # simple option/flag handling
+   #
+   local OPTION_TIMEOUT=10
+   local OPTION_DIRECTORY_NAME='src'
+   local OPTION_PREFIX='main-'
+   local OPTION_SCREENSHOT_X11
+   local OPTION_DEMO_NAME
+   local OPTION_GIF_X11
+   local OPTION_VIDEO_X11
+   local OPTION_SCREENSHOT_TIMEOUT
+   local OPTION_RESIZE="50%"
+
+   while [ $# -ne 0 ]
+   do
+      if options_technical_flags "$1"
+      then
+         shift
+         continue
+      fi
+
+      case "$1" in
+         -f|--force)
+            MULLE_FLAG_MAGNUM_FORCE='YES'
+         ;;
+
+         -h*|--help|help)
+            usage
+         ;;
+
+         -d|--directory-name)
+            [ $# -eq 1 ] && match_list_usage "missing argument to $1"
+            shift
+
+            OPTION_DIRECTORY_NAME="$1"
+         ;;
+
+         --demo-name)
+            [ $# -eq 1 ] && match_list_usage "missing argument to $1"
+            shift
+
+            OPTION_DEMO_NAME="$1"
+         ;;
+
+         --prefix)
+            [ $# -eq 1 ] && match_list_usage "missing argument to $1"
+            shift
+
+            OPTION_PREFIX="$1"
+         ;;
+
+         --gif-x11)
+            OPTION_GIF_X11='YES'
+         ;;
+
+         --screenshot-x11)
+            OPTION_SCREENSHOT_X11='YES'
+         ;;
+
+         --video-x11)
+            OPTION_VIDEO_X11='YES'
+         ;;
+
+         --no-resize)
+            OPTION_RESIZE=
+         ;;
+
+         --no-timeout)
+            OPTION_TIMEOUT=0
+         ;;
+         
+         --resize-percent)
+            [ $# -eq 1 ] && match_list_usage "missing argument to $1"
+            shift
+
+            OPTION_RESIZE="$1%"
+         ;;
+
+         --resize)
+            [ $# -eq 1 ] && match_list_usage "missing argument to $1"
+            shift
+
+            OPTION_RESIZE="$1"
+         ;;
+
+         -t|--timeout)
+            [ $# -eq 1 ] && match_list_usage "missing argument to $1"
+            shift
+
+            OPTION_TIMEOUT="$1"
+         ;;
+
+         --version)
+            printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
+            exit 0
+         ;;
+
+         -*)
+            usage "Unknown flag \"$1\""
+         ;;
+
+         *)
+            break
+         ;;
+      esac
+
+      shift
+   done
+
+   options_setup_trace "${MULLE_TRACE}" && set -x
+
+   if [ "${OPTION_GIF_X11}" = 'YES' -o ! -z "${OPTION_RESIZE}" ]
+   then
+      if ! CONVERT_EXE="`command -v convert`"
+      then
+         fail "Need convert (ImageMagick) command in PATH for gif and resize"
+      fi
+   fi
+
+   if [ "${OPTION_VIDEO_X11}" = 'YES' ]
+   then
+      if ! FFMPEG_EXE="`command -v ffmpeg`"
+      then
+         fail "Need ffmpeg command in PATH for video"
+      fi
+   fi
+
+   if ! SCROT_EXE="`command -v scrot`"
+   then
+      # MEMO: could use imagemagic import in many cases as well.
+      fail "Need scrot command in PATH for screenshots"
+   fi
+
+   if [ \
+        "${OPTION_SCREENSHOT_X11}" = 'YES' -o \
+        "${OPTION_GIF_X11}" = 'YES' -o \
+        "${OPTION_VIDEO_X11}" = 'YES' \
+      ]
+   then
+      OPTION_SCREENSHOT_TIMEOUT=$(( OPTION_TIMEOUT / 3))
+      if [ "${OPTION_SCREENSHOT_TIMEOUT}" -lt 2 ]
+      then
+         OPTION_SCREENSHOT_TIMEOUT=2
+         OPTION_TIMEOUT=6
+      fi
+   fi
+
+   if ! TIMEOUT_EXE="`command -v timeout`"
+   then
+      fail "Need timeout command in PATH"
+   fi
+
+   if [ -d "demo/${OPTION_DIRECTORY_NAME}" ]
+   then
+      rexekutor cd "demo"
+   else
+      if [ ! -d "${OPTION_DIRECTORY_NAME}" ]
+      then
+         if [ ! -d ../${OPTION_DIRECTORY_NAME} ]
+         then
+            fail "${OPTION_DIRECTORY_NAME} directory not found"
+         fi
+         rexekutor cd ..
+      fi
+   fi
+
+   if ! DEMOPATH="`mulle-sde product searchpath binary`"
+   then
+      exit 1
+   fi
+
+   local src 
+   local exe
+   local name
+   local match
+
+   for src in ${OPTION_DIRECTORY_NAME}/${OPTION_PREFIX}*.m
+   do
+      r_basename "${src}"
+      exe="${RVAL%.m}"
+      exe="${exe#${OPTION_PREFIX}}"
+
+      log_debug "Derived demo executable \"${exe}\" from \"${src}\""
+
+      if [ $# -ne 0 ]
+      then
+         match='NO'
+         for name in "$@"
+         do
+            if [ "${exe}" = "${name}" ]
+            then
+               match='YES'
+               break
+            fi
+         done
+
+         [ "${match}" = 'NO' ] && continue
+      fi
+
+      if [ ! -z "${OPTION_DEMO_NAME}" -a "${OPTION_DEMO_NAME}" != "${exe}" ]
+      then
+         log_fluff "Skipping \"${exe}\""
+         continue
+      fi
+
+      (
+         exe_path="`PATH="${DEMOPATH}" command -v "${exe}"`"
+         if [ -z "${exe_path}" ]
+         then
+            fail "No executable found for demo \"${exe}\" in $DEMOPATH"
+         fi
+
+         if [ "${OPTION_GIF_X11}" = 'YES' ]
+         then
+            take_gif_with_delay "Demo" \
+                                "x-${exe}" \
+                                "${OPTION_SCREENSHOT_DELAY}" \
+                                "${OPTION_RESIZE}"  &
+         fi
+
+         if [ "${OPTION_VIDEO_X11}" = 'YES' ]
+         then
+            take_video_with_delay "Demo" \
+                                  "x-${exe}" \
+                                  "${OPTION_SCREENSHOT_DELAY}" \
+                                  "${OPTION_RESIZE}" &
+         fi
+
+         if [ "${OPTION_SCREENSHOT_X11}" = 'YES' ]
+         then
+            take_screenshot_with_delay "Demo" \
+                                       "x-${exe}" \
+                                       "${OPTION_SCREENSHOT_DELAY}" \
+                                       "${OPTION_RESIZE}"  &
+         fi
+
+         local text
+
+         if [ ${OPTION_TIMEOUT} -eq 0 ]
+         then
+            text="ever"
+         else
+            text=" ${OPTION_TIMEOUT}s"
+         fi
+         log_info "Running ${C_RESET_BOLD}${exe} ${C_INFO}for${text}"
+         log_verbose "Path: \"${exe_path}\""
+
+         local rc
+
+         if [ "${MULLE_FLAG_LOG_VERBOSE}" = 'YES' ]
+         then
+            exekutor "${TIMEOUT_EXE}" "${OPTION_TIMEOUT}s" "${exe_path}"
+            rc=$?
+         else
+            exekutor "${TIMEOUT_EXE}" "${OPTION_TIMEOUT}s" "${exe_path}" > /dev/null 2>&1
+            rc=$?
+         fi
+
+         if [ \
+              "${OPTION_SCREENSHOT_X11}" = 'YES' -o \
+              "${OPTION_GIF_X11}" = 'YES' -o \
+              "${OPTION_VIDEO_X11}" = 'YES' \
+            ]
+         then
+            wait # wait on screenshot
+         fi
+
+         if [ $rc -ne 124 ]
+         then
+            if [ $rc -eq 0 ]
+            then
+               log_verbose "Demo ran successfully, but under ${OPTION_TIMEOUT} seconds"
+            else
+               log_warning "Demo ${C_RESET_BOLD}${exe_path}${C_WARNING} failed or crashed ($rc)"
+            fi
+         fi
+         exit 0
+      ) || return 1
+   done
+}
+
+
+main "$@"
+
+
+#
+#                           ,╓≤æKª╨╙╙▓█D"╙╙╙*╨¥W▄╓,
+#                      ╓▄ª╙└╧▓        █           ⁿ▓▓ª╦w
+#                  ╓#╜^*█⌐   `╕       █           ╓▌    `╙%w
+#               ╓ΦΓ      █    ╙⌐     ,█,,,Φ      ╓▌         ╙¥▄
+#            ,▄▀ █▄       █µ,╓╝,╓≤╗≡≡ª╨╨╨¥≡∞╗w╓,ª█,  ,       ]▄▀V,
+#          ,Φ└   ║"▀▄     ,▄▀╨"                 "╙¥▓▓       ▄▀  º▄¥,
+#        ,#▌Φ▓▄╓  Φ `█Q▄M╙                           ╙¥▄ ,▄▀ ╙▄⌐`  `Φ
+#       ▄▀   `V,"▀▀¼╓╩└                                 ╙¥▓╗ ,       ╙▄
+#      Φ       `¥═▄▀                            ╒          ▀▄          ▓
+#    .▓         ╓▓]V▄H       ▓                 ,Å            ▀,         ▀
+#    █      ,-ª▓╛  `██▀½      "▄  ,╓╓╓╓;╓▄▄▄▄╗▄█,             ╙▄         ▀
+#   █  `██▄   ▓. - Φ█═.~     ,≤█▄▀-      `   █└"▀▀▀▀▄╓╓╓╓       ▌    ██▄, █
+#  ║⌐  " ▀   ▓╨⌐   }▀`      ,█  `           █      .█▀▄▄███▄     ▌  ` ▀    ▌
+#  ▌        ▐M A   '┴      ▌                ▀        ╙█▌████▌    ╙▄        ║⌐
+# ║⌐        █⌐'║▄ Γr2«    ║▀                 ▄▄▄      ╙▌▄███      █         ▌
+# █]     ,▄▐H  ██████═ª  ╓` ▄█▀▀▀▀█▄        ████     ╓███` `╙╙║█  ▐H        █
+# █ "% ,▄▀ ║░╠K█═╣███^   ╛╓█▀      ▐█         ,╓╓═ª╙└   █      ╙█▄▐▌▓######▌╫
+# █║▄▄▄█▄▄▄║H:  "╙▀███▄╓▄,█▌╓▄,,▄∩  ██p$ΦΦ▀▀▀▀▀ΦΦΦR≡≥▄╓ ║▄       ╙j▌` ▄▀╙╗ `╫
+# █"      ╙▐H-═M ▄███████¥█H "^╙    '█, ,«^``     `     ║▌        ▐M▄▀    "Φ█
+# ║        !█▄▄████≤═^`╓█ █▌╓▀╦▄▀█   ╙█⌐               ╓█▌        ▓ `       █
+#  ▌      ,▄██╫██ ▄█═╜" █▌▐█╣Hj⌐ █    █▌╙¥w,           ██▄       ╓▌        ▐M
+#  ╢"▄▄#▀▀╙╟█Ü███▀`▀█  ║██J█▄▌jH █    ██    ╙▀W▄;    ,██  `╙w,   █▄     ,╓ █
+#   █╙     ▐███▌▀█w ▀█ ╠██████j▌║█▌   ▀██▄       `╙▓██▀w,     ╙╗█'`"▀█▀╙"`║`
+#   ╙▌     Φ████████▄██ ███████████    ═██▀W▄,   ╓█▀└         ╓▀ "    ╙▄ ╓▀
+#    ╙▄     ╙▀███╙█▄▐██▄,╙▀█████▄▀▄▀▄   ,█M╗ ▀▄██▀╙""*ⁿ═─≈-,,▄▌,        ▄▀
+#     `▌╙µ,▄Φ▀x███▄██████████▀V███▀╙└ ,▄#▌████▀`"*«,      .█▀▄▀▄,      ▄╛
+#       ▀Ö█  ;▓████████▄▄█▀▄╙W "V▄██▀▀│▄███▀└ ▀╦     "*═╥▄▀ ║,  ║▀▄  ,▓
+#        ╙W▀ '█████╨▀▀█████████   "▀▀████└      ╙▄   ,▄▀'   `▀▀╣H ▐▀▄▀
+#          ╙▄  ▀▀Γ╓▌  ▄▀ⁿ`╙▀███      ██▌         ╓█R▀▄A█        ▀▀▄▀
+#            ╙W,Φ╙  ║█        ▄╙╙ª%≡╦██≤≤╗╗≡≡╜▀▀   ╣▌   █╕     ,▄▀
+#              `▀▄M█┘        ║▀▌   ╫"    *Φ▄  █       Φ` ▀▌, ▄M╙
+#                 "▀╦,       M ╙▌  ▀       `█W▐▌       wæQ▄▀╙
+#                     ╙▀W╥,╓╣   ╙█║        ╫M  █    ,╓▄╝╙`
+#                          ╙╙▀%▄▄▄▌,≤▄_▄≡,▐▓▓▄▄#ª▀"`
+

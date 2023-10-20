@@ -212,12 +212,12 @@ print_sources()
                                       ${MULLE_MATCH_FLAGS}list --qualifier "${qualifier}" `"
    else
       # cheat and hack
-      sources="`find src -name "*.h" \
-                      -o -name "*.inc" \
-                      -o -name "*.c" \
-                      -o -name "*.cpp" \
-                      -o -name "*.aam" \
-                      -o -name "*.m" `"
+      sources="`rexekutor find src -name "*.h" \
+                                -o -name "*.inc" \
+                                -o -name "*.c" \
+                                -o -name "*.cpp" \
+                                -o -name "*.aam" \
+                                -o -name "*.m" `"
    fi
 
    .foreachline line in ${aux_sources}

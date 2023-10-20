@@ -29,7 +29,7 @@ new_repo::print_flags()
    ##
 
    options_technical_flags_usage \
-           ": "
+           "          : "
 }
 
 
@@ -196,6 +196,8 @@ new_repo::mulle_kybernetik()
       if [ -z "${user}" ]
       then
          fail "Repository \"${repo}\" already defined"
+      else
+         log_info "Repository \"${repo}\" already defined, will prefix with user"
       fi
 
       memo="${repo}"

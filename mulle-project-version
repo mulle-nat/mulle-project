@@ -172,8 +172,18 @@ get_version()
          else
             include "case"
 
-            r_smart_upcase_identifier "${PROJECT}"
-            VERSIONNAME="${RVAL}_VERSION"
+            # hacky hack for mulle-objc
+            case "${PROJECT}" in
+               mulle-objc*)
+                  r_smart_upcase_identifier "${PROJECT}"
+                  VERSIONNAME="${RVAL}_VERSION"
+               ;;
+
+               *)
+                  r_smart_file_upcase_identifier "${PROJECT}"
+                  VERSIONNAME="${RVAL}_VERSION"
+               ;;
+            esac
          fi
       fi
 
@@ -208,6 +218,7 @@ VERSIONFILE=\"${VERSIONFILE}\".
 Hint: specify VERSIONNAME, VERSIONFILE in .mulle/etc/project/version-info.sh"
    else
       log_fluff "Versionfile: ${VERSIONFILE}"
+      log_fluff "Versionname: ${VERSIONNAME}"
    fi
 }
 

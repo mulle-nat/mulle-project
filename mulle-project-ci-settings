@@ -134,8 +134,6 @@ produce_environment()
       fi
 
       [ -z "${_address}" ] && fail "Can't figure out address: ${line}"
-      [ -z "${_user}" ]    && fail "Can't figure out user from URL ${_url}: ${line}"
-      [ -z "${_repo}" ]    && fail "Can't figure out repo from URL ${_url}: ${line}"
       #
       # we need it to set to git for prerelease
       #
@@ -158,6 +156,9 @@ produce_environment()
 
       case "${_nodetype}" in
          *clib*)
+            [ -z "${_url}" ]    && fail "Can't figure out URL: ${line}"
+            [ -z "${_branch}" ] && fail "Can't figure out branch: ${line}"
+
             log_verbose "Mapped branch ${C_MAGENTA}${C_BOLD}${mapped_branch}${C_VERBOSE} for ${C_RESET_BOLD}${_url}"
 
             exekutor mulle-env \
@@ -169,6 +170,9 @@ produce_environment()
          ;;
 
          *)
+            [ -z "${_user}" ]    && fail "Can't figure out user from URL ${_url}: ${line}"
+            [ -z "${_repo}" ]    && fail "Can't figure out repo from URL ${_url}: ${line}"
+
             mapped_url="https://${_host}/${_user}/${_repo%.git}.git"
 
             log_verbose "Map ${C_RESET_BOLD}${mapped_url}${C_VERBOSE} to ${C_RESET_BOLD}${_url}"

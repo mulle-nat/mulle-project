@@ -174,12 +174,12 @@ main()
       shift
    done
 
+   options_setup_trace "${MULLE_TRACE}" && set -x
+
    local name
 
    r_get_projectname
    name="${RVAL}"
-
-   options_setup_trace "${MULLE_TRACE}" && set -x
 
    if [ "${MULLE_FLAG_MAGNUM_FORCE}" != 'YES' -a ! -d ".github/workflows" ]
    then

@@ -122,7 +122,8 @@ __doctor_archive_nodeline()
             fi
 
             case "${user}" in
-               mulle-c|mulle-cc|mulle-objc|mulle-core|mulle-concurrent|MulleEOF|MulleWeb|MulleFoundation|MulleUI)
+               mulle-c|mulle-cc|mulle-gfx|mulle-objc|mulle-core|\
+mulle-concurrent|MulleEOF|MulleWeb|MulleFoundation|MulleUI)
                ;;
 
                codeon-gmbh)

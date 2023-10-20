@@ -237,6 +237,11 @@ check_repo()
                log_verbose "Success for ${branch}"
             ;;
 
+            '')
+               log_warning "${branch} failed"
+               rval=2
+            ;;
+
             *)
                log_warning "${branch} failed with ${conclusion}"
                rval=2

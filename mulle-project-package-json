@@ -16,7 +16,8 @@ fi
 
 print_flags()
 {
-   echo "   -o <file>   : output JSON to file"
+   echo "   -o <file>     : output JSON to file"
+   echo "   --update-only : only run if output file exists"
 
    options_technical_flags_usage "       : "
 }
@@ -416,6 +417,8 @@ print_json()
 main()
 {
    local OPTION_OUTPUT_FILE="-"
+   local OPTION_UPDATE_ONLY
+
    #
    # simple flag handling
    #
@@ -441,6 +444,10 @@ main()
             shift
 
             OPTION_OUTPUT_FILE="$1"
+         ;;
+
+         --update-only)
+            OPTION_UPDATE_ONLY='YES'
          ;;
 
          --version)
@@ -490,8 +497,14 @@ main()
    then
       print_json
    else
-      text="`print_json`" || return 1
-      redirect_exekutor "${OPTION_OUTPUT_FILE}" echo "${text}"
+      if [ "${OPTION_UPDATE_ONLY}" != 'YES' ] || [ -f "${OPTION_OUTPUT_FILE}" ]
+      then
+         log_info "Updating ${C_RESET_BOLD}${OPTION_OUTPUT_FILE#${MULLE_USER_PWD}/}"
+         text="`print_json`" || return 1
+         redirect_exekutor "${OPTION_OUTPUT_FILE}" echo "${text}"
+      else
+         log_verbose "No update, as \"${OPTION_OUTPUT_FILE}\" does not exist"
+      fi
    fi
 }
 
