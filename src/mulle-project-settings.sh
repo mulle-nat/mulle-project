@@ -57,17 +57,15 @@ project::settings::get_description()
    else
       if [ -f "cola/properties.plist" ]
       then
-         if ! MULLE_PQ="`command -v 'mulle-pq'`"
+         if MULLE_PQ="`command -v 'mulle-pq'`"
          then
-            log_warning "The command \"mulle-pq\" is not in PATH ($PATH)"
+            rexekutor "${MULLE_PQ}" --in cola/properties.plist \
+                                    '.project.description' \
+            | sed -e 's/^"\(.*\)".*$/\1/'
+         else
+            rexekutor grep -E '^[[:space:]]*description=' cola/properties.plist \
+            | sed -n -e 's/^.*description="\(.*\)";/\1/p;q'
          fi
-      fi
-
-      if [ -f "cola/properties.plist" -a ! -z "${MULLE_PQ}" ]
-      then
-         rexekutor "${MULLE_PQ}" --in cola/properties.plist \
-                                 '.project.description' \
-         | sed -e 's/^"\(.*\)".*$/\1/'
       else
          if [ -f "README.md" ]
          then
