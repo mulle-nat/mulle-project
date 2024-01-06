@@ -34,14 +34,17 @@
 [ "${TRACE}" = 'YES' -o "${MULLE_PROJECT_GITIGNORE_TRACE}" = 'YES' ] && set -x && : "$0" "$@"
 
 
-MULLE_EXECUTABLE_VERSION="0.0.0"
+### >> START OF mulle-boot.sh >>
+### << END OF mulle-boot.sh <<
+
+#
+# Versioning of this script
+#
+MULLE_EXECUTABLE_VERSION="0.0.1"
 
 
-if [ -z "${MULLE_PROJECT_LIBEXEC_DIR}" ]
-then
-   r_get_libexec_dir "${MULLE_EXECUTABLE}" "mulle-project" "mulle-project-git.sh"
-   MULLE_PROJECT_LIBEXEC_DIR="${RVAL}"
-fi
+### >> START OF mulle-bashfunctions-minimal-embed.sh >>
+### << END OF mulle-bashfunctions-minimal-embed.sh <<
 
 
 print_flags()
@@ -61,12 +64,102 @@ Usage:
    mulle-gitignore [flags] <file>
 
    Add a file or directory to the .gitignore file, if it's not already present.
+   Add patterns in single quotes like for example \`*.old\`.
 
 Flags:
 EOF
    print_flags | LC_ALL=C sort >&2
 
    exit 1
+}
+
+
+append_to_gitignore_if_needed()
+{
+   local file="$1"
+
+   r_trim_whitespace "${file}"
+   file="${RVAL}"
+
+   case "${file}" in
+      ""|\#*)
+         # log_warning 'Fool! Don''t add comments this way!'
+         return
+      ;;
+   esac
+
+   local line
+
+   if [ -f ".gitignore" ]
+   then
+      case "${file}" in
+         */*)
+            local directory
+
+            directory="${file##/}"
+            directory="${directory%%/}"
+
+            local pattern0
+            local pattern1
+            local pattern2
+            local pattern3
+
+            # variations with leading and trailing slashes
+            pattern0="${directory}"
+            pattern1="${directory}/"
+            pattern2="/${directory}"
+            pattern3="/${directory}/"
+
+            if rexekutor grep -F -q -s -x -e "${pattern0}" .gitignore
+            then
+               log_verbose "Duplicate ${C_RESET_BOLD}${pattern0}${C_VERBOSE} found"
+               return
+            fi
+            if rexekutor grep -F -q -s -x -e "${pattern1}" .gitignore
+            then
+               log_verbose "Duplicate ${C_RESET_BOLD}${pattern1}${C_VERBOSE} found"
+               return
+            fi
+            if rexekutor grep -F -q -s -x -e "${pattern2}" .gitignore
+            then
+               log_verbose "Duplicate ${C_RESET_BOLD}${pattern2}${C_VERBOSE} found"
+               return
+            fi
+            if rexekutor grep -F -q -s -x -e "${pattern3}" .gitignore
+            then
+               log_verbose "Duplicate ${C_RESET_BOLD}${pattern3}${C_VERBOSE} found"
+               return
+            fi
+         ;;
+
+         *)
+            if rexekutor grep -F -q -s -x -e "${file}" .gitignore
+            then
+               log_verbose "Duplicate ${C_RESET_BOLD}${file}${C_VERBOSE} found"
+               return
+            fi
+         ;;
+      esac
+   fi
+
+   #
+   # prepend \n because it is safer, in case .gitignore has no trailing
+   # LF which it often seems to not have
+   # grep -F is bugged on at least OS X 10.x, so can't use -e chaining
+
+   local terminator
+   local line
+
+   line="${file}"
+   terminator="`rexekutor tail -c 1 ".gitignore" 2> /dev/null | tr '\012' '|'`"
+
+   if [ ! -z "${terminator}" -a "${terminator}" != "|" ]
+   then
+      line=$'\n'"${line}"
+   fi
+
+   log_info "Adding \"${file}\" to \".gitignore\""
+   redirect_append_exekutor .gitignore printf "%s\n" "${line}" || fail "Couldn't append to .gitignore"
 }
 
 
@@ -122,8 +215,6 @@ main()
 
    options_setup_trace "${MULLE_TRACE}" && set -x
 
-   include "project::git"
-
    local line
 
    if [ "${FLAG_STDIN}" = 'YES' ]
@@ -131,7 +222,7 @@ main()
       IFS=$'\n'
       while read -r line
       do
-         project::git::append_to_gitignore_if_needed "${line}"
+         append_to_gitignore_if_needed "${line}"
       done
       return 0
    fi
@@ -140,7 +231,7 @@ main()
 
    .foreachline line in "$@"
    .do
-      project::git::append_to_gitignore_if_needed "${line}"
+      append_to_gitignore_if_needed "${line}"
    .done
 }
 

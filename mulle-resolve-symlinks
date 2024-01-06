@@ -8,10 +8,17 @@
 && set -x  \
 && : "$0" "$@"
 
+### >> START OF mulle-boot.sh >>
+### << END OF mulle-boot.sh <<
+
 #
 # Versioning of this script
 #
-MULLE_EXECUTABLE_VERSION="0.0.0"
+MULLE_EXECUTABLE_VERSION="0.0.1"
+
+
+### >> START OF mulle-bashfunctions-embed.sh >>
+### << END OF mulle-bashfunctions-embed.sh <<
 
 
 resolve_symlinks::print_flags()

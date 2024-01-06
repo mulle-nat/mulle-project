@@ -7,11 +7,18 @@
 MULLE_EXECUTABLE_VERSION='0.0.2'
 
 
-if [ -z "${MULLE_PROJECT_LIBEXEC_DIR}" ]
-then
-   r_get_libexec_dir "${MULLE_EXECUTABLE}" "mulle-project" "mulle-project-git.sh"
-   MULLE_PROJECT_LIBEXEC_DIR="${RVAL}"
-fi
+### >> START OF mulle-boot.sh >>
+### << END OF mulle-boot.sh <<
+
+#
+# Versioning of this script
+#
+MULLE_EXECUTABLE_VERSION="0.0.1"
+
+
+### >> START OF mulle-bashfunctions-minimal-embed.sh >>
+### << END OF mulle-bashfunctions-minimal-embed.sh <<
+
 
 
 print_flags()

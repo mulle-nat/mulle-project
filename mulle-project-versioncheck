@@ -39,10 +39,10 @@ Usage:
 
    #if defined( FOO_VERSION)
    # ifndef FOO_VERSION_MIN
-   #  define FOO_VERSION_MIN  ((1 << 20) | (2 << 8) | 3)
+   #  define FOO_VERSION_MIN  ((1UL << 20) | (2 << 8) | 3)
    # endif
    # ifndef FOO_VERSION_MAX
-   #  define FOO_VERSION_MAX  ((2 << 20) | (0 << 8) | 0)
+   #  define FOO_VERSION_MAX  ((2UL << 20) | (0 << 8) | 0)
    # endif
    # if FOO_VERSION < FOO_VERSION_MIN"
    #  error "foo is too old"
@@ -122,10 +122,10 @@ emit_version_check()
    cat <<EOF
 #if defined( ${identifier}_VERSION)
 # ifndef ${identifier}_VERSION_MIN
-#  define ${identifier}_VERSION_MIN  ((${major} << 20) | (${minor} << 8) | ${patch})
+#  define ${identifier}_VERSION_MIN  ((${major}UL << 20) | (${minor} << 8) | ${patch})
 # endif
 # ifndef ${identifier}_VERSION_MAX
-#  define ${identifier}_VERSION_MAX  ((${max_major} << 20) | (${max_minor} << 8) | 0)
+#  define ${identifier}_VERSION_MAX  ((${max_major}UL << 20) | (${max_minor} << 8) | 0)
 # endif
 # if ${identifier}_VERSION < ${identifier}_VERSION_MIN
 #  error "${name} is too old"
@@ -136,7 +136,6 @@ emit_version_check()
 #endif
 
 EOF
-
 }
 
 
@@ -159,9 +158,14 @@ emit_include_file()
    # also we don't do TreePrivate (would need to generate a
    # <name>-versioncheck-private.h header)
    #
-   dependencies="`mulle-sde dependency list --qualifier "MATCHES build AND MATCHES bequeath" -- \
-                                            --output-no-header \
-                                            --force-format '%a\n' | sort`"
+   dependencies="`rexekutor mulle-sde dependency list --qualifier "MATCHES build AND MATCHES bequeath" -- \
+                                                      --output-no-header \
+                                                      --force-format '%a\n' | sort`"
+   if [ -z "${dependencies}" ]
+   then
+      log_warning "No dependencies were found"
+   fi
+
    .foreachline name in ${dependencies}
    .do
       r_basename "${name}"
@@ -249,8 +253,6 @@ main()
    options_setup_trace "${MULLE_TRACE}" && set -x
 
 
-   local main_identifier
-
    PROJECT_NAME="`rexekutor mulle-sde environment get PROJECT_NAME`" || fail "failed to get project name"
    if [ -z "${PROJECT_NAME}" ]
    then
@@ -329,7 +331,6 @@ ${C_INFO}Run mulle-sde fetch if this is unexpected."
       r_mkdir_parent_if_missing "${dstfile}"
    fi
 
-
    local text
    local shield_identifier
 
@@ -352,6 +353,7 @@ ${text}
 
       redirect_exekutor "${dstfile}" printf "%s\n" "${text}"
    else
+      log_info "No version checks were created for \"${stashdir}\""
       log_info "Remove ${C_RESET_BOLD}${dstfile#"${MULLE_USER_PWD}/"}${C_INFO} in ${C_MAGENTA}${C_BOLD}${PROJECT_NAME}"
       remove_file_if_present "${dstfile}"
    fi

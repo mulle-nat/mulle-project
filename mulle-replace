@@ -3,9 +3,17 @@
 
 [ "${TRACE}" = 'YES' -o "${MULLE_REPLACE_TRACE}" = 'YES' ] && set -x && : "$0" "$@"
 
+### >> START OF mulle-boot.sh >>
+### << END OF mulle-boot.sh <<
 
-MULLE_EXECUTABLE_VERSION="0.0.0"
+#
+# Versioning of this script
+#
+MULLE_EXECUTABLE_VERSION="0.0.1"
 
+
+### >> START OF mulle-bashfunctions-embed.sh >>
+### << END OF mulle-bashfunctions-embed.sh <<
 
 print_flags()
 {
@@ -68,13 +76,13 @@ delete_line()
 
    if [ "${OPTION_WORD}" = 'NO' ]
    then
-      sed_command="-e s/${escaped_find}/d"
+      sed_command="-e 's/${escaped_find}/d'"
    else
       sed_command="\
--e s/^${escaped_find}\\([^[:alnum:]_]\\)/d \
--e s/\\([^[:alnum:]_]\\)${escaped_find}\$/d \
--e s/\\([^[:alnum:]_]\\)${escaped_find}\\([^[:alnum:]_]\\)/d \
--e s/^${escaped_find}\$/${escaped_replace}/d "
+-e 's/^${escaped_find}\\([^[:alnum:]_]\\)/d' \
+-e 's/\\([^[:alnum:]_]\\)${escaped_find}\$/d' \
+-e 's/\\([^[:alnum:]_]\\)${escaped_find}\\([^[:alnum:]_]\\)/d' \
+-e 's/^${escaped_find}\$/${escaped_replace}/d' "
    fi
 
    local before
@@ -83,6 +91,7 @@ delete_line()
 
    if [ "${MULLE_FLAG_LOG_VERBOSE}" = 'YES' -o "${MULLE_FLAG_EXEKUTOR_DRY_RUN}" = 'YES' ]
    then
+      # TODO check file size
       before="`rexekutor cat "${filename}"`"
 
       if ! DIFF="${DIFF:-"`command -v diff`"}"
@@ -93,7 +102,7 @@ delete_line()
 
    if [ "${MULLE_FLAG_EXEKUTOR_DRY_RUN}" = 'YES' ]
    then
-      after="`rexekutor sed ${sed_command} "${filename}" `" || return 1
+      after="`eval_rexekutor sed "${sed_command}" "'${filename}'" `" || return 1
       log_info "Changes"
       rexekutor "${DIFF}" -b <( echo "${before}") <( echo "${after}" ) >&2
       return $?
@@ -114,7 +123,7 @@ delete_line()
       exekutor chmod +w "${filename}"
    fi
 
-   inplace_sed ${sed_command} "${filename}" || return 1
+   eval_rexekutor inplace_sed "${sed_command}" "${filename}" || return 1
 
    if [ "${unprotect}" = 'YES' ]
    then
@@ -156,13 +165,13 @@ replace()
 
    if [ "${OPTION_WORD}" = 'NO' ]
    then
-      sed_command="-e s/${escaped_find}/${escaped_replace}/${OPTION_SED}"
+      sed_command="-e 's/${escaped_find}/${escaped_replace}/${OPTION_SED}'"
    else
       sed_command="\
--e s/^${escaped_find}\\([^[:alnum:]_]\\)/${escaped_replace}\\1/${OPTION_SED} \
--e s/\\([^[:alnum:]_]\\)${escaped_find}\$/\\1${escaped_replace}/${OPTION_SED} \
--e s/\\([^[:alnum:]_]\\)${escaped_find}\\([^[:alnum:]_]\\)/\\1${escaped_replace}\\2/${OPTION_SED} \
--e s/^${escaped_find}\$/${escaped_replace}/${OPTION_SED} "
+-e 's/^${escaped_find}\\([^[:alnum:]_]\\)/${escaped_replace}\\1/${OPTION_SED}' \
+-e 's/\\([^[:alnum:]_]\\)${escaped_find}\$/\\1${escaped_replace}/${OPTION_SED}' \
+-e 's/\\([^[:alnum:]_]\\)${escaped_find}\\([^[:alnum:]_]\\)/\\1${escaped_replace}\\2/${OPTION_SED}' \
+-e 's/^${escaped_find}\$/${escaped_replace}/${OPTION_SED}' "
    fi
 
    local before
@@ -181,7 +190,7 @@ replace()
 
    if [ "${MULLE_FLAG_EXEKUTOR_DRY_RUN}" = 'YES' ]
    then
-      after="`rexekutor sed ${sed_command} "${filename}" `" || return 1
+      after="`eval_rexekutor sed "${sed_command}" "'${filename}'" `" || return 1
       log_info "Changes"
       rexekutor "${DIFF}" -b <( echo "${before}") <( echo "${after}" ) >&2
       return 0
@@ -202,7 +211,7 @@ replace()
       exekutor chmod +w "${filename}"
    fi
 
-   rexekutor inplace_sed ${sed_command} "${filename}" || return 1
+   eval_rexekutor inplace_sed "${sed_command}" "${filename}" || return 1
 
    if [ "${unprotect}" = 'YES' ]
    then

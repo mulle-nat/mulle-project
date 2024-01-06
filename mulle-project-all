@@ -1,17 +1,55 @@
 #! /usr/bin/env mulle-bash
 # shellcheck shell=bash
+#
+#  mulle-project-all
+#  mulle-project
+#
+#  Copyright (c) 2021 Nat! - Mulle kybernetiK.
+#  Copyright (c) 2021 Codeon GmbH.
+#  All rights reserved.
+#
+#
+#  Redistribution and use in source and binary forms, with or without
+#  modification, are permitted provided that the following conditions are met:
+#
+#  Redistributions of source code must retain the above copyright notice, this
+#  list of conditions and the following disclaimer.
+#
+#  Redistributions in binary form must reproduce the above copyright notice,
+#  this list of conditions and the following disclaimer in the documentation
+#  and/or other materials provided with the distribution.
+#
+#  Neither the name of Mulle kybernetiK nor the names of its contributors
+#  may be used to endorse or promote products derived from this software
+#  without specific prior written permission.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+#  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+#  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+#  ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+#  LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+#  CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+#  SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+#  INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+#  CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+#  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+#  POSSIBILITY OF SUCH DAMAGE.
+#
 
 [ "${TRACE}" = 'YES' -o "${SHELL_ALL_TRACE}" = 'YES' ] && set -x && : "$0" "$@"
 
 
-MULLE_EXECUTABLE_VERSION="0.0.0"
+### >> START OF mulle-boot.sh >>
+### << END OF mulle-boot.sh <<
+
+#
+# Versioning of this script
+#
+MULLE_EXECUTABLE_VERSION="0.0.1"
 
 
-if [ -z "${MULLE_PROJECT_LIBEXEC_DIR}" ]
-then
-   r_get_libexec_dir "${MULLE_EXECUTABLE}" "mulle-project" "mulle-project-git.sh"
-   MULLE_PROJECT_LIBEXEC_DIR="${RVAL}"
-fi
+### >> START OF mulle-bashfunctions-all-embed.sh >>
+### << END OF mulle-bashfunctions-all-embed.sh <<
 
 
 print_flags()
@@ -21,25 +59,25 @@ print_flags()
    cat <<EOF
    --all               : execute in all projects,subprojects,tests
    --directory <dir>   : enter subdirectory, before executing project command
-   --eval              : evaluate command line, requires tricky quoting though
+   --exec ...          : evaluate command line in the project
    --if <expr>         : ignore project if shell expression evaluates to false
    --ignore <name>     : ignore a project from REPOS, multiples are possible
    --others            : also execute in other projects, like demo
-   --sde               : only execute in mulle-sde projects
    --output-no-header  : don't visually separate command output
    --parallel          : execute operations in parallel
    --repos-file <f>    : REPOS file to use
+   --sde               : only execute in mulle-sde projects
    --strict            : errors preempt
    --tests             : also execute in test directories
 EOF
    if [ ! -z "${MULLE_TRACE}" ]
    then
       cat <<EOF
+   --eval ...          : a less convenient legacy variant of exec
    --if-exists <file>  : ignore project if <file> does not exist
    --lenient           : lenient operation, errors don't preempt (default)
    --main-project      : also execute in main project
-   --sublime <file>    : create a "Sublime Text" project from REPOS
-   --subprojects       : also execute in subprojects
+   --no-cd             : do not change to project directory
    --only-others       : only execute in other projects, like demo
    --only-main-project : only execute in main project (default)
    --only-tests        : only execute in tests directories
@@ -47,6 +85,8 @@ EOF
    --skip-from <s>     : skip projects in REPOS starting with <s>
    --skip-until <s>    : skip projects in REPOS until <s>
    --skip-past <s>     : skip projects in REPOS until and including <s>
+   --sublime <file>    : create a "Sublime Text" project from REPOS
+   --subprojects       : also execute in subprojects
 EOF
    fi
 
@@ -68,27 +108,21 @@ Usage:
    mulle-project-all [flags] ...
 
    Execute a command in all projects that are defined by the file "REPOS"
-   in the current directory. If there is no "REPOS" file, mulle-project-all
-   will look for mulle-sde projects that reside in the current working
-   directory (excluding the working directory itself) . Specialities like
-   --tests, --subprojects, --others will only work with mulle-sde projects.
-   With a REPOS file, mulle-project-all will work with non-mulle-sde projects
-   as well.
+   in the current directory.  mulle-project-all can execute commands in
+   parallel on all repositories with the --parallel option.
 
-   mulle-project-all can execute commands in parallel on all repositories with
-   the --parallel option.
-
-   mulle-project-all in --eval mode, will define a couple of environment
+   mulle-project-all in --exec mode, will define a couple of environment
    variables for evaluation use:
 
       NAME            : basename of the directory
+      DIRECTORY       : path of the directory
       PROJECT_NAME    : name of the main project
 
       SUBPROJECT_NAME : set if its a subproject
       OTHER_NAME      : set if its an other project test
       TEST_NAME       : set if its a test
 
-   These values are alsot available in the --if expression.
+   These values are also available in the --if expression.
 
 Examples:
    List git status of all projects:
@@ -97,8 +131,13 @@ Examples:
    Create a .gitattributes file for projects under git control:
       mulle-project-all --if "[ -d .git ]" cp /tmp/.gitattributes .
 
-   Generate hacky include statements for all projects:
-      mulle-project-all -s --eval printf '%s\\\\n' '\#include\ \<\${NAME}.h\>'
+   Generate include statements for all projects:
+      mulle-project-all -s --exec printf '%s\\n' '#include <\${NAME}.h>'
+
+   If there is no "REPOS" file, mulle-project-all will look for mulle-sde
+   projects that reside in the current working directory (excluding the working
+   directory itself) . Specialities like --tests, --subprojects, --others will
+   likely only make sense with mulle-sde projects.
 
 Flags:
 EOF
@@ -114,8 +153,8 @@ EOF
 
    cat <<EOF >&2
 Tip:
-   It's convenient and conventional to put an \`alias mpa=mulle-project-all\`
-   into your .bash_profile.
+   It's convenient to put an \`alias mpa=mulle-project-all\` into your
+   .bash_profile.
 
 EOF
 
@@ -133,6 +172,7 @@ short_spaces="                     "
 
 dashes="${long_dashes}"
 spaces="${long_spaces}"
+
 
 log_title()
 {
@@ -180,17 +220,29 @@ shell_it()
 {
    log_entry "shell_it" "$@"
 
-   [ -z "$1" ] && return
+   DIRECTORY="$1"
+
+   [ -z "${DIRECTORY}" ] && return
 
    (
-      rexekutor cd "$1" || exit 1
+      if [ "${OPTION_CD}" = 'YES' ]
+      then
+         rexekutor cd "${DIRECTORY}" || exit 1
+      else
+         rexekutor [ -d "${DIRECTORY}" ] || exit 1
+      fi
 
-      r_basename "$1"
+      r_dirname "${DIRECTORY}"
+      DIRNAME="${RVAL}"
+
+      r_basename "${DIRECTORY}"
       NAME="$RVAL"
 
       if [ ! -z "${OPTION_IF}" ]
       then
          if ! NAME="'${NAME}'" \
+              DIRECTORY="'${DIRECTORY}'" \
+              DIRNAME="'${DIRNAME}'" \
               PROJECT_NAME="'${PROJECT_NAME}'" \
               SUBPROJECT_NAME="'${SUBPROJECT_NAME}'" \
               OTHER_NAME="'${OTHER_NAME}'" \
@@ -243,12 +295,43 @@ shell_it()
             log_warning "Warning \"${OPTION_DIRECTORY}\" is missing (skipped)"
             exit 0
          fi
-         cd "${OPTION_DIRECTORY}" || exit 1
+         if [ "${OPTION_CD}" = 'YES' ]
+         then
+            rexekutor cd "${OPTION_DIRECTORY}" || exit 1
+         fi
       fi
 
-      if [ "${OPTION_EVAL}" = 'YES' ]
+      if [ "${OPTION_EVAL}" = 'YES' -o "${OPTION_EXEC}" = 'YES' ]
       then
+         if [ "${OPTION_EXEC}" = 'YES' ]
+         then
+            local cmd
+            local args
+            local arg
+
+            args=("$@")
+
+            set --
+            for arg in "${args[@]}"
+            do
+               r_expanded_string "${arg}"
+               set -- "$@" "${RVAL}"
+            done
+            # printf with an array does funny things
+
+            printf -v cmd '%q ' "$@"
+
+            set -- "${cmd}"
+            log_debug "exec command: $*"
+         else
+            set -- eval "$@"
+            log_debug "eval command: $*"
+         fi
+
+
          eval_exekutor NAME="'${NAME}'" \
+                       DIRECTORY="'${DIRECTORY}'" \
+                       DIRNAME="'${DIRNAME}'" \
                        PROJECT_NAME="'${PROJECT_NAME}'" \
                        SUBPROJECT_NAME="'${SUBPROJECT_NAME}'" \
                        OTHER_NAME="'${OTHER_NAME}'" \
@@ -511,6 +594,8 @@ print_ignore_stuff()
          "binary_file_patterns":
          [
             "*.o",
+            "*.gcda",
+            "*.gcno",
             "*.lib",
             "*.log",
             "*.a",
@@ -541,6 +626,7 @@ print_ignore_stuff()
             ".mulle/var",
             ".unison*",
             "addiction",
+            "cmake-build-*",
             "build",
             "Build",
             "kitchen",
@@ -580,6 +666,7 @@ EOF
 main()
 {
    local OPTION_ADORN
+   local OPTION_CD='YES'
    local OPTION_LENIENT='YES'
    local OPTION_MODE="main-project"
    local OPTION_REPOSFILE
@@ -587,6 +674,7 @@ main()
    local OPTION_PARALLEL
    local OPTION_SDE_TEST='NO'
    local OPTION_EVAL
+   local OPTION_EXEC
    local OPTION_IF
    local OPTION_IGNORE
    local OPTION_SKIP_FROM
@@ -622,8 +710,12 @@ main()
             OPTION_DIRECTORY="$1"
          ;;
 
-         -e|--eval)
+         --eval)
             OPTION_EVAL='YES'
+         ;;
+
+         --exec|--eval2)
+            OPTION_EXEC='YES'
          ;;
 
          -i|--ignore)
@@ -642,7 +734,7 @@ main()
             OPTION_IF="${RVAL}"
          ;;
 
-         --if-exists|--if-file|--if-exists-file)
+         -e|--if-exists|--if-file|--if-exists-file)
             [ $# -eq 1 ] && fail "missing parameter for \"$1\""
             shift
 
@@ -656,6 +748,10 @@ main()
 
          -m|--main-project-only|--only-main-project)
             OPTION_MODE="main-project"
+         ;;
+
+         --no-cd)
+            OPTION_CD='NO'
          ;;
 
          -p|--parallel)

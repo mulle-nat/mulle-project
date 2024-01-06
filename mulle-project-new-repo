@@ -4,7 +4,7 @@
 #
 
 
-[ "${TRACE}" = 'YES' -o "${MULLE_PROJECT_RESOLVE_SYMLINKS_TRACE}" = 'YES' ] \
+[ "${TRACE}" = 'YES' -o "${MULLE_PROJECT_NEW_REPO_TRACE}" = 'YES' ] \
 && set -x  \
 && : "$0" "$@"
 
@@ -316,6 +316,7 @@ new_repo::main()
          --mulle)
             OPTION_PROVIDERS='github,mulle-kybernetik'
             OPTION_BRANCH='release'
+            OPTION_MASTER='master'
             OPTION_PUSH='YES'
          ;;
 
@@ -382,7 +383,7 @@ new_repo::main()
 
    if [ ! -d .git ] && [ "${OPTION_INIT}" = 'YES' ]
    then
-      exekutor git init
+      exekutor git init --initial-branch=master
    else
       log_info "There is already a git repo in here, keeping it"
 
@@ -427,8 +428,8 @@ new_repo::main()
 #
 # You can also use the function `call_with_flags`, which has been defined
 # during mulle-boot. It lets you call 'new_repo::main'
-# with MULLE_PROJECT_RESOLVE_SYMLINKS_FLAGS interposed.
+# with MULLE_PROJECT_NEW_REPO_FLAGS interposed.
 #
-# call_with_flags "new_repo::main" "${MULLE_PROJECT_RESOLVE_SYMLINKS_FLAGS}" "$@"
+# call_with_flags "new_repo::main" "${MULLE_PROJECT_NEW_REPO_FLAGS}" "$@"
 
 new_repo::main "$@"

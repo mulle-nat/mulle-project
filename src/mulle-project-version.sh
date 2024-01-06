@@ -108,10 +108,11 @@ project::version::get_project_version()
          fi
 
          printf "%s\n" "${match}" | \
-         sed -e 's|( *\([0-9]* *\) *<< *[0-9]* *)|\1|g' | \
+         sed -e 's|( *\([0-9UL]* *\) *<< *[0-9]* *)|\1|g' | \
          sed -e 's|^.*(\(.*\))|\1|' | \
          sed -e 's/ *| */./g' |
-         sed -e 's/ *$//'
+         sed -e 's/ *$//' |
+         tr -d 'LU'
       ;;
 
       "")
@@ -395,7 +396,7 @@ project::version::set()
    project::version::get_major_minor_patch_custom "${version}"
 
    # not lenient for setting at all!
-   # // ((0 << 20) | (4 << 8) | 9)
+   # // ((0UL << 20) | (4 << 8) | 9)
    # // or 0.4.9
 
    local value
@@ -419,14 +420,14 @@ project::version::set()
 
    case "${scheme}" in
       "<<")
-         value="(($major << 20) | ($minor << 8) | $patch)"
+         value="((${major}UL << 20) | ($minor << 8) | $patch)"
 
          r_escaped_sed_replacement "${value}"
          escaped_value="${RVAL}"
 
          RVAL='s/^\(.*\)'
          r_append "${RVAL}" "${escaped_versionname_pattern}"
-         r_append "${RVAL}" '\([^0-9()]*\)( *( *[0-9][0-9]* *<< *20 *) *| *( *[0-9][0-9]* *<< *8 *) *| *[0-9][0-9]* *)\(.*\)$/'
+         r_append "${RVAL}" '\([^0-9()]*\)( *( *[0-9][0-9UL]* *<< *20 *) *| *( *[0-9][0-9UL]* *<< *8 *) *| *[0-9][0-9UL]* *)\(.*\)$/'
          r_append "${RVAL}" '\1'
          r_append "${RVAL}" "${escaped_versionname_value}"
          r_append "${RVAL}" '\2'

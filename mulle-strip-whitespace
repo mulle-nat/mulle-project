@@ -98,17 +98,19 @@ r_trim_whitespace()
    RVAL="${RVAL%"${RVAL##*[![:space:]]}"}"
 }
 
+trimmer()
+{
+   while IFS= read -r line
+   do
+      r_trim_whitespace "${line}"
+      printf "%s\n" "${RVAL}"
+   done
+}
+
 #
 # This script merely strips off leading and trailing spaces from
 # the input. It may add an additional linefeed at the end if the input has
 # none.
 #
-text="`cat "$@"`"
-
-IFS=$'\n'
-while read -r line
-do
-   r_trim_whitespace "${line}"
-   printf "%s\n" "${RVAL}"
-done <<< "${text}"
+cat "$@" | trimmer
 

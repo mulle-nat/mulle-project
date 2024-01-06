@@ -33,14 +33,17 @@
 [ "${TRACE}" = 'YES' -o "${MULLE_PROJECT_TAG_TRACE}" = 'YES' ] && set -x && : "$0" "$@"
 
 
-MULLE_EXECUTABLE_VERSION="0.0.0"
+### >> START OF mulle-boot.sh >>
+### << END OF mulle-boot.sh <<
 
-if [ -z "${MULLE_PROJECT_LIBEXEC_DIR}" ]
-then
-   r_get_libexec_dir "${MULLE_EXECUTABLE}" "mulle-project" "mulle-project-git.sh"
-   MULLE_PROJECT_LIBEXEC_DIR="${RVAL}"
-fi
+#
+# Versioning of this script
+#
+MULLE_EXECUTABLE_VERSION="0.0.1"
 
+
+### >> START OF mulle-bashfunctions-embed.sh >>
+### << END OF mulle-bashfunctions-embed.sh <<
 
 
 usage()

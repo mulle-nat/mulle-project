@@ -34,7 +34,7 @@ various unshifted forms:
 `version.h`:
 
 ```
-#define MY_VERSION  ((1 << 20) | (7 << 8) | 10)
+#define MY_VERSION  ((1UL << 20) | (7 << 8) | 10)
 #define MY_VERSION  1.7.10
 MY_VERSION="1.7.10"
 set MY_VERSION '1.7.10'

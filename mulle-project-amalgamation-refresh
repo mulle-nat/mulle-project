@@ -4,7 +4,7 @@
 #
 
 
-[ "${TRACE}" = 'YES' -o "${MULLE_PROJECT_REFRESH_AMALGAMATION_TRACE}" = 'YES' ] \
+[ "${TRACE}" = 'YES' -o "${MULLE_PROJECT_AMALGAMATION_REFRESH_TRACE}" = 'YES' ] \
 && set -x  \
 && : "$0" "$@"
 
@@ -33,7 +33,7 @@ usage()
 
    cat <<EOF >&2
 Usage:
-   mulle-project-refresh-amalgamation [flags]
+   ${MULLE_EXECUTABLE_NAME} [flags]
 
    Calls mulle-project-clib-json -o clib.json in constituents. Then does a
    mulle-sde clean all and mulle-sde fetch. In the end you have a new
@@ -224,9 +224,18 @@ create_clib_json_in_constituents()
 {
    local constituents="$1"
 
-   include "parallel"
+   if [ "${OPTION_SERIAL}" = "YES" ]
+   then
+      .foreachline constituent in  ${constituents}
+      .do
+         create_clib_json "${constituent}" 
+      .done
+   else
 
-   parallel_execute "${constituents}" create_clib_json
+      include "parallel"
+
+      parallel_execute "${constituents}" create_clib_json
+   fi
 }
 
 
@@ -338,7 +347,7 @@ background()
 
    log_info "Reamalgamate ${C_MAGENTA}${C_BOLD}${library_name}"
    exekutor cd "${library_dir}" &&
-   exekutor mulle-project-refresh-amalgamation --name ${OPTION_NAME:-library_name} -s &
+   exekutor "${MULLE_EXECUTABLE_NAME}" -s --name "${OPTION_NAME:-${library_name}}"
 }
 
 
@@ -349,6 +358,7 @@ main()
    #
    local OPTION_NAME  # used to distinguish in `ps -aux`!
    local OPTION_BACKGROUND
+   local OPTION_SERIAL
 
    while [ $# -ne 0 ]
    do
@@ -376,6 +386,10 @@ main()
             shift
 
             OPTION_NAME="$1"
+         ;;
+
+         --serial)
+            OPTION_SERIAL='YES'
          ;;
 
          --version)
@@ -413,8 +427,8 @@ main()
 #
 # You can also use the function `call_with_flags`, which has been defined
 # during mulle-boot. It lets you call 'main'
-# with MULLE_PROJECT_REFRESH_AMALGAMATION_FLAGS interposed.
+# with MULLE_PROJECT_AMALGAMATION_REFRESH_FLAGS interposed.
 #
-# call_with_flags "main" "${MULLE_PROJECT_REFRESH_AMALGAMATION_FLAGS}" "$@"
+# call_with_flags "main" "${MULLE_PROJECT_AMALGAMATION_REFRESH_FLAGS}" "$@"
 
 main "$@"

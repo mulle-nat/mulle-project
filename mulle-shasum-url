@@ -8,10 +8,18 @@
 && set -x  \
 && : "$0" "$@"
 
+### >> START OF mulle-boot.sh >>
+### << END OF mulle-boot.sh <<
+
 #
 # Versioning of this script
 #
-MULLE_EXECUTABLE_VERSION="0.0.0"
+MULLE_EXECUTABLE_VERSION="0.0.1"
+
+
+### >> START OF mulle-bashfunctions-minimal-embed.sh >>
+### << END OF mulle-bashfunctions-minimal-embed.sh <<
+
 
 
 shasum_url::print_flags()
@@ -52,7 +60,6 @@ shasum_url::main()
    #
    # simple option/flag handling
    #
-   local OPTION_VALUE
    local OPTION_ALGORITHM=256
 
    while [ $# -ne 0 ]
@@ -74,13 +81,6 @@ shasum_url::main()
 
          -[0-9]*)
             OPTION_ALGORITHM="${1#-}"
-         ;;
-
-         --value)
-            [ $# -eq 1 ] && match_list_usage "missing argument to $1"
-            shift
-
-            OPTION_VALUE="$1"
          ;;
 
          --version)

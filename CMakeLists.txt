@@ -2,6 +2,9 @@ cmake_minimum_required (VERSION 3.0)
 
 project( mulle-project NONE)
 
+option( MULLE_PROJECT_EMBED_BASHFUNCTIONS "Make some scripts independent from mulle-bash" ON)
+
+
 set( TEMPLATES
 README.md
 formula-info.sh.template
@@ -21,7 +24,7 @@ src/mulle-project-version.sh
 
 set( SCRIPTS
 mulle-project-add-missing-branch-identifier
-mulle-project-all
+mulle-project-amalgamation-refresh
 mulle-project-ci-settings
 mulle-project-cmake-graphviz
 mulle-project-commit
@@ -34,6 +37,7 @@ mulle-project-git-prerelease
 mulle-project-git-submodules
 mulle-project-init
 mulle-project-local-travis
+mulle-project-new-demos
 mulle-project-package-json
 mulle-project-prerelease
 mulle-project-redistribute
@@ -49,10 +53,47 @@ mulle-project-travis-ci-prerelease
 mulle-project-untag
 mulle-project-version
 mulle-project-versioncheck
-mulle-shasum-url
-mulle-gitignore
-mulle-replace
+mulle-strip-whitespace
 )
+
+
+set( EMBEDDING_SCRIPTS
+mulle-find-symbol
+mulle-gitignore
+mulle-project-all
+mulle-replace
+mulle-resolve-symlinks
+mulle-shasum-url
+)
+
+
+if( MULLE_PROJECT_EMBED_BASHFUNCTIONS)
+   foreach( SCRIPT ${EMBEDDING_SCRIPTS})
+     add_custom_command(
+       OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${SCRIPT}"
+       COMMAND mulle-bashfunctions embed < "${CMAKE_CURRENT_SOURCE_DIR}/${SCRIPT}" > "${CMAKE_CURRENT_BINARY_DIR}/${SCRIPT}"
+       DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${SCRIPT}"
+     )
+
+     string( REPLACE "-" "_" TARGET_NAME "${SCRIPT}")
+
+     add_custom_target(
+       ${TARGET_NAME} ALL
+       DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/${SCRIPT}"
+     )
+
+     INSTALL(
+       FILES "${CMAKE_CURRENT_BINARY_DIR}/${SCRIPT}"
+       PERMISSIONS OWNER_EXECUTE OWNER_WRITE OWNER_READ
+               GROUP_EXECUTE GROUP_READ
+               WORLD_EXECUTE WORLD_READ
+       DESTINATION "bin"
+       COMPONENT "${TARGET_NAME}"
+     )
+   endforeach()
+else()
+   list( APPEND SCRIPTS ${EMBEDDING_SCRIPTS})
+endif()
 
 
 INSTALL( FILES ${SCRIPTS}
