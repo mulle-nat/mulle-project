@@ -130,7 +130,7 @@ print_description()
 
    include "project::settings"
 
-   text="`project::settings::get_description | tr -d -c '[[:print:]]'`"
+   text="`project::settings::get_description`"
    r_trim_whitespace "${text}"
    printf "%s" "${INDENT}\"description\" : \"${RVAL}\"";
 }

@@ -35,7 +35,8 @@ project::settings::_get_description_4()
 {
    rexekutor head -4 "$1" \
    | grep -E '^####' \
-   | sed -e 's/^####//' -e 's/^ //g'
+   | sed -e 's/^####//' -e 's/^ //g' \
+   | tr -d -c '[[:print:]]'
 }
 
 
@@ -43,7 +44,8 @@ project::settings::_get_description_2()
 {
    rexekutor sed -e '/^[[:space:]]*$/d' "$1" \
    | head -2 \
-   | tail -1
+   | tail -1 \
+   | tr -d -c '[[:print:]]'
 }
 
 
@@ -53,22 +55,26 @@ project::settings::get_description()
 
    if [ ! -z "${DESC:-"${PROJECT_DESCRIPTION}"}" ]
    then
+      log_verbose "Got description from environment"
       printf "%s\n" "${DESC:-"${PROJECT_DESCRIPTION}"}"
    else
       if [ -f "cola/properties.plist" ]
       then
          if MULLE_PQ="`command -v 'mulle-pq'`"
          then
+            log_verbose "Got description from cola/properties.plist via pq"
             rexekutor "${MULLE_PQ}" --in cola/properties.plist \
                                     '.project.description' \
             | sed -e 's/^"\(.*\)".*$/\1/'
          else
+            log_verbose "Got description from cola/properties.plist"
             rexekutor grep -E '^[[:space:]]*description=' cola/properties.plist \
             | sed -n -e 's/^.*description="\(.*\)";/\1/p;q'
          fi
       else
          if [ -f "README.md" ]
          then
+            log_verbose "Got description from README.md"
             if ! project::settings::_get_description_4 "README.md"
             then
                project::settings::_get_description_2 "README.md"
