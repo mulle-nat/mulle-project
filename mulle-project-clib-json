@@ -166,6 +166,13 @@ get_license()
 
    local line
 
+   if [ -f "cola/properties.plist" ]
+   then
+      grep -E "license.*=" "cola/properties.plist" \
+      |  sed -n 's/.*"\([^"]*\)".*/\1/p'
+      return
+   fi
+
    # grep LICENSE.txt
    line="`get_license_text`"
    case "${line}" in
@@ -333,12 +340,14 @@ print_json()
       # also use embedded resources and let the user sort it out
       dependencies="`rexekutor mulle-sde ${MULLE_TECHNICAL_FLAGS} \
                               ${MULLE_SDE_FLAGS} \
-                        dependency list -- \
-                           --dedupe-mode url-filename \
-                           --output-eval \
-                           --output-no-column \
-                           --output-no-header \
-                           --force-format "%a;%t;%u\\n" `"
+                        dependency list \
+                           --columnar \
+                           -- \
+                              --dedupe-mode url-filename \
+                              --output-eval \
+                              --output-no-column \
+                              --output-no-header \
+                              --force-format "%a;%t;%u\\n" `"
 
       if [ ! -z "${dependencies}" ]
       then

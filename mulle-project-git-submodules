@@ -5,12 +5,14 @@
 #
 
 IFS=$'\n'
-for line in `mulle-sde dependency list -r -- "$@" \
-                                             --dedupe-mode url-filename \
-                                             --output-no-column \
-                                             --output-no-header \
-                                             --output-eval \
-                                             --format '%n;%u\n' `
+for line in `mulle-sde dependency list -r \
+                                       --columnar \
+                                       -- "$@" \
+                                          --dedupe-mode url-filename \
+                                          --output-no-column \
+                                          --output-no-header \
+                                          --output-eval \
+                                          --format '%n;%u\n' `
 do
    nodetype="${line%;*}"
    url="${line##*;}"

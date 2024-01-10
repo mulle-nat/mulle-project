@@ -310,12 +310,14 @@ print_dependencies()
 
    lines=`rexekutor mulle-sde ${MULLE_TECHNICAL_FLAGS} \
                               ${MULLE_SDE_FLAGS} \
-                        dependency list -r -- \
-                           --dedupe-mode url-filename \
-                           --output-eval \
-                           --output-no-column \
-                           --output-no-header \
-                           --force-format "%a;%t;%u\\n"` || exit 1
+                        dependency list -r \
+                                        --columnar \
+                                        -- \
+                                           --dedupe-mode url-filename \
+                                           --output-eval \
+                                           --output-no-column \
+                                           --output-no-header \
+                                           --force-format "%a;%t;%u\\n"` || exit 1
 
    .foreachline line in ${lines}
    .do

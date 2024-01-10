@@ -229,11 +229,19 @@ find_description()
    fi
    log_debug "MULLE_FETCH_SEARCH_PATH: ${MULLE_FETCH_SEARCH_PATH}"
 
+   # hack (?) for amalgamated clib dependencies
+   case "${projectname}" in
+      *@*)
+         projectname="${projectname%%@*}"
+      ;;
+   esac
+
    .foreachpath item in ${MULLE_FETCH_SEARCH_PATH}
    .do
       r_filepath_concat "${item}" "${projectname}" "README.md"
       filename="${RVAL}"
 
+      # MEMO: too oldschool, should look into properties
       if get_readme_description "${filename}"
       then
          .break
@@ -354,8 +362,9 @@ print_dependencies()
 {
    log_entry "print_dependencies" "$@"
 
-   local sep="$1"
-   local qualifier="$2"
+   local title="$1"
+   local sep="$2"
+   local qualifier="$3"
 
 #   if search_plist "dependencies" "${sep}"
 #   then
@@ -372,19 +381,20 @@ print_dependencies()
    # ignore embedded
    lines=`rexekutor mulle-sde ${MULLE_TECHNICAL_FLAGS} \
                               ${MULLE_SDE_FLAGS} \
-                        dependency list -- \
-                           --dedupe-mode url-filename \
-                           --qualifier "${qualifier}" \
-                           --output-eval \
-                           --output-no-column \
-                           --output-no-header \
-                           --force-format "%a;%u\\n"` || exit 1
+                        dependency list --columnar \
+                                        -- \
+                                           --dedupe-mode url-filename \
+                                           --qualifier "${qualifier}" \
+                                           --output-eval \
+                                           --output-no-column \
+                                           --output-no-header \
+                                           --force-format "%a;%u\\n"` || exit 1
    if [ -z "${lines}" ]
    then
       return
    fi
 
-   printf "dependencies =\n("
+   printf "${title} =\n("
 
    local name
    local url
@@ -397,7 +407,7 @@ print_dependencies()
    sep2=$'\n'
    .foreachline line in ${lines}
    .do
-      printf "${sep2}   {\n" "${sep}"
+      printf "${sep2}   {\n"
       name="${line%%;*}"
       url="${line#*;}"
 
@@ -434,18 +444,38 @@ print_dependencies()
 
 
 
+_print_plist()
+{
+   log_entry "_print_plist" "$@"
+
+   local qualifier="$1"
+   local amalgamated_qualifier="$2"
+   local embedded_qualifier="$3"
+
+   print_project ';'
+   print_dependencies 'dependencies' ';' "${qualifier}"
+   if [ ! -z "${amalgamated_qualifier}" ]
+   then
+      print_dependencies 'amalgamated' ';' "${amalgamated_qualifier}"
+   fi
+   if [ ! -z "${embedded_qualifier}" ]
+   then
+      print_dependencies 'embedded' ';' "${embedded_qualifier}"
+   fi
+
+
+}
+
+
 print_plist()
 {
    log_entry "print_plist" "$@"
 
-   local qualifier="$1"
+   printf '{\n'
 
-   printf "{\n"
+   _print_plist "$@" | sed 's/^/   /'
 
-   print_project ";"                    | sed 's/^/   /'
-   print_dependencies "" "${qualifier}" | sed 's/^/   /'
-
-   printf "}\n"
+   printf '}\n'
 }
 
 
@@ -455,6 +485,8 @@ main()
    local OPTION_CHECKSUM='YES'
    local OPTION_MULLE='NO'
    local OPTION_QUALIFIER='MATCHES share AND MATCHES build'
+   local OPTION_AMALGAMATED_QUALIFIER='NOT MATCHES share-shirk AND NOT MATCHES build'
+   local OPTION_EMBEDDED_QUALIFIER='MATCHES share-shirk AND NOT MATCHES build'
 
    MULLE_TEMPLATE_COMPOSER_SEARCHPATH="${MULLE_TEMPLATE_COMPOSER_SEARCHPATH:-\
 "includes\
@@ -511,6 +543,28 @@ main()
             OPTION_QUALIFIER="$1"
          ;;
 
+         --amalgamated-qualifier)
+            [ $# -eq 1 ] && fail "Missing argument to \"$1\""
+            shift
+
+            OPTION_AMALGAMATED_QUALIFIER="$1"
+         ;;
+
+         --embedded-qualifier)
+            [ $# -eq 1 ] && fail "Missing argument to \"$1\""
+            shift
+
+            OPTION_EMBEDDED_QUALIFIER="$1"
+         ;;
+
+         --no-amalgamated)
+            OPTION_AMALGAMATED_QUALIFIER=""
+         ;;
+
+         --no-embedded)
+            OPTION_EMBEDDED_QUALIFIER=""
+         ;;
+
          --version)
             printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
             exit 0
@@ -541,9 +595,13 @@ main()
 
    if [ "${OPTION_OUTPUT_FILE}" = '-' ]
    then
-      print_plist "${OPTION_QUALIFIER}"
+      print_plist "${OPTION_QUALIFIER}" \
+                  "${OPTION_AMALGAMATED_QUALIFIER}" \
+                  "${OPTION_EMBEDDED_QUALIFIER}"
    else
-      text="`print_plist "${OPTION_QUALIFIER}"`" || return 1
+      text="`print_plist "${OPTION_QUALIFIER}" \
+                         "${OPTION_AMALGAMATED_QUALIFIER}" \
+                         "${OPTION_EMBEDDED_QUALIFIER}" `" || return 1
       redirect_exekutor "${OPTION_OUTPUT_FILE}" echo "${text}"
    fi
 }

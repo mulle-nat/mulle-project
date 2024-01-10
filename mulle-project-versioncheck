@@ -107,6 +107,8 @@ emit_version_check()
    r_smart_file_upcase_identifier "${name}"
    identifier="${RVAL}"
 
+   log_verbose "Derived \"${identifier}\" from \${name}\""
+
    local max_major
    local max_minor
 
@@ -158,9 +160,12 @@ emit_include_file()
    # also we don't do TreePrivate (would need to generate a
    # <name>-versioncheck-private.h header)
    #
-   dependencies="`rexekutor mulle-sde dependency list --qualifier "MATCHES build AND MATCHES bequeath" -- \
-                                                      --output-no-header \
-                                                      --force-format '%a\n' | sort`"
+   dependencies="`rexekutor mulle-sde dependency list \
+                              --columnar \
+                              --qualifier "MATCHES build AND MATCHES bequeath" \
+                              -- \
+                                 --output-no-header \
+                                 --force-format '%a\n' | sort`"
    if [ -z "${dependencies}" ]
    then
       log_warning "No dependencies were found"
@@ -234,10 +239,6 @@ main()
             exit 0
          ;;
 
-         ##
-         ## ADD YOUR FLAGS HERE
-         ##
-
          -*)
             usage "Unknown flag \"$1\""
          ;;
@@ -252,8 +253,7 @@ main()
 
    options_setup_trace "${MULLE_TRACE}" && set -x
 
-
-   PROJECT_NAME="`rexekutor mulle-sde environment get PROJECT_NAME`" || fail "failed to get project name"
+   PROJECT_NAME="`rexekutor mulle-sde environment get PROJECT_NAME`"
    if [ -z "${PROJECT_NAME}" ]
    then
       fail "failed to get project name"
@@ -354,7 +354,7 @@ ${text}
       redirect_exekutor "${dstfile}" printf "%s\n" "${text}"
    else
       log_info "No version checks were created for \"${stashdir}\""
-      log_info "Remove ${C_RESET_BOLD}${dstfile#"${MULLE_USER_PWD}/"}${C_INFO} in ${C_MAGENTA}${C_BOLD}${PROJECT_NAME}"
+      log_info "Removing ${C_RESET_BOLD}${dstfile#"${MULLE_USER_PWD}/"}${C_INFO} in ${C_MAGENTA}${C_BOLD}${PROJECT_NAME}"
       remove_file_if_present "${dstfile}"
    fi
 }

@@ -27,6 +27,7 @@ Usage:
    There is no signing involved.
 
    Options:
+      --no-mulle       : do not assume did-update.sh uses mulle-bash
       --root <path>    : default is /usr
       --debname <name> : repository name parameter for did-update.sh (main)
       --no-update      : don't execute did-update.sh in the taps directory
@@ -126,6 +127,7 @@ main()
    local OPTION_UPDATE='YES'
    local OPTION_PUBLISH='YES'
    local OPTION_REMOVE_TMP='YES'
+   local OPTION_MULLE='YES'
 
    VERSION="`mulle-project-version --no-tag-warning`"
 
@@ -159,6 +161,10 @@ main()
             shift
 
             DEBIAN_REPOSITORY="$1"
+         ;;
+
+         --no-mulle)
+            OPTION_MULLE='NO'
          ;;
 
          --no-update)
@@ -295,8 +301,14 @@ main()
               #
               r_basename "${debianfile}"
 
-              exekutor cd "${DEBIAN_DISTS}" && \
-              exekutor ./did-update.sh "${DEBIAN_REPOSITORY}" "${RVAL}"
+              if [ "${OPTION_MULLE}" = 'YES' ]
+              then
+                 rexekutor cd "${DEBIAN_DISTS}" && \
+                 rexekutor ./did-update.sh ${MULLE_TECHNICAL_FLAGS} "${DEBIAN_REPOSITORY}" "${RVAL}"
+              else
+                 exekutor cd "${DEBIAN_DISTS}" && \
+                 exekutor ./did-update.sh "${DEBIAN_REPOSITORY}" "${RVAL}"
+              fi
             ) || exit 1
          fi
       else

@@ -237,13 +237,14 @@ print_sourcetree_dependencies()
    # ignore embedded
    lines=`rexekutor mulle-sde ${MULLE_TECHNICAL_FLAGS} \
                               ${MULLE_SDE_FLAGS} \
-                        dependency list -- \
-                           --dedupe-mode url-filename \
-                           --qualifier 'MATCHES share AND MATCHES build' \
-                           --output-eval \
-                           --output-no-column \
-                           --output-no-header \
-                           --force-format "%a;%t;%u\\n"` || exit 1
+                        dependency list --columnar \
+                                        -- \
+                                           --dedupe-mode url-filename \
+                                           --qualifier 'MATCHES share AND MATCHES build' \
+                                           --output-eval \
+                                           --output-no-column \
+                                           --output-no-header \
+                                           --force-format "%a;%t;%u\\n"` || exit 1
 
    .foreachline line in ${lines}
    .do
@@ -430,13 +431,14 @@ print_sources()
       # also directly embedded
       lines=`rexekutor mulle-sde ${MULLE_TECHNICAL_FLAGS} \
                                  ${MULLE_SDE_FLAGS} \
-                           dependency list -- \
-                              --dedupe-mode url-filename \
-                              --qualifier 'NOT MATCHES share AND NOT MATCHES build AND MATCHES clobber' \
-                              --output-eval \
-                              --output-no-column \
-                              --output-no-header \
-                              --force-format "%a;%u\\n"` || exit 1
+                           dependency list --columnar \
+                                           -- \
+                                              --dedupe-mode url-filename \
+                                              --qualifier 'NOT MATCHES share AND NOT MATCHES build AND MATCHES clobber' \
+                                              --output-eval \
+                                              --output-no-column \
+                                              --output-no-header \
+                                              --force-format "%a;%u\\n"` || exit 1
 
       local name
       local line
@@ -490,13 +492,14 @@ print_prepare()
    # only flat embedded
    lines=`rexekutor mulle-sde ${MULLE_TECHNICAL_FLAGS} \
                               ${MULLE_SDE_FLAGS} \
-                        dependency list -- \
-                           --dedupe-mode url-filename \
-                           --qualifier 'NOT MATCHES share AND NOT MATCHES build AND MATCHES clobber' \
-                           --output-eval \
-                           --output-no-column \
-                           --output-no-header \
-                           --force-format "%a\\n"` || exit 1
+                        dependency list --columnar \
+                                        -- \
+                                           --dedupe-mode url-filename \
+                                           --qualifier 'NOT MATCHES share AND NOT MATCHES build AND MATCHES clobber' \
+                                           --output-eval \
+                                           --output-no-column \
+                                           --output-no-header \
+                                           --force-format "%a\\n"` || exit 1
    if [ -z "${lines}" ]
    then
       return

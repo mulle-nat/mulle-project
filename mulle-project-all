@@ -60,13 +60,14 @@ print_flags()
    --all               : execute in all projects,subprojects,tests
    --directory <dir>   : enter subdirectory, before executing project command
    --exec ...          : evaluate command line in the project
+   --if-exists <file>  : ignore project if <file> does not exist
    --if <expr>         : ignore project if shell expression evaluates to false
    --ignore <name>     : ignore a project from REPOS, multiples are possible
    --others            : also execute in other projects, like demo
-   --output-no-header  : don't visually separate command output
    --parallel          : execute operations in parallel
    --repos-file <f>    : REPOS file to use
    --sde               : only execute in mulle-sde projects
+   --skip-until <s>    : skip projects in REPOS until <s>
    --strict            : errors preempt
    --tests             : also execute in test directories
 EOF
@@ -74,7 +75,6 @@ EOF
    then
       cat <<EOF
    --eval ...          : a less convenient legacy variant of exec
-   --if-exists <file>  : ignore project if <file> does not exist
    --lenient           : lenient operation, errors don't preempt (default)
    --main-project      : also execute in main project
    --no-cd             : do not change to project directory
@@ -82,8 +82,8 @@ EOF
    --only-main-project : only execute in main project (default)
    --only-tests        : only execute in tests directories
    --only-subprojects  : only execute in subprojects project
+   --output-no-header  : don't visually separate command output
    --skip-from <s>     : skip projects in REPOS starting with <s>
-   --skip-until <s>    : skip projects in REPOS until <s>
    --skip-past <s>     : skip projects in REPOS until and including <s>
    --sublime <file>    : create a "Sublime Text" project from REPOS
    --subprojects       : also execute in subprojects
@@ -117,6 +117,7 @@ Usage:
       NAME            : basename of the directory
       DIRECTORY       : path of the directory
       PROJECT_NAME    : name of the main project
+      GITHUB_NAME     : basename of parent directory / basename directory
 
       SUBPROJECT_NAME : set if its a subproject
       OTHER_NAME      : set if its an other project test
@@ -131,7 +132,7 @@ Examples:
    Create a .gitattributes file for projects under git control:
       mulle-project-all --if "[ -d .git ]" cp /tmp/.gitattributes .
 
-   Generate include statements for all projects:
+   Generate include statements for all projects (expansion only with \${}):
       mulle-project-all -s --exec printf '%s\\n' '#include <\${NAME}.h>'
 
    If there is no "REPOS" file, mulle-project-all will look for mulle-sde
@@ -225,6 +226,9 @@ shell_it()
    [ -z "${DIRECTORY}" ] && return
 
    (
+      r_physicalpath "${DIRECTORY}"
+      DIRNAME="${RVAL}"
+
       if [ "${OPTION_CD}" = 'YES' ]
       then
          rexekutor cd "${DIRECTORY}" || exit 1
@@ -232,11 +236,14 @@ shell_it()
          rexekutor [ -d "${DIRECTORY}" ] || exit 1
       fi
 
-      r_dirname "${DIRECTORY}"
+      r_dirname "${DIRNAME}"
       DIRNAME="${RVAL}"
 
       r_basename "${DIRECTORY}"
       NAME="$RVAL"
+
+      r_basename "${DIRNAME}"
+      GITHUB_NAME="${RVAL}/${NAME}"
 
       if [ ! -z "${OPTION_IF}" ]
       then
@@ -247,6 +254,7 @@ shell_it()
               SUBPROJECT_NAME="'${SUBPROJECT_NAME}'" \
               OTHER_NAME="'${OTHER_NAME}'" \
               TEST_NAME="'${TEST_NAME}'" \
+              GITHUB_NAME="'${GITHUB_NAME}'" \
               eval_exekutor "${OPTION_IF}"
          then
             log_info "Skip ${C_RESET_BOLD}$1"
@@ -336,6 +344,7 @@ shell_it()
                        SUBPROJECT_NAME="'${SUBPROJECT_NAME}'" \
                        OTHER_NAME="'${OTHER_NAME}'" \
                        TEST_NAME="'${TEST_NAME}'" \
+                       GITHUB_NAME="'${GITHUB_NAME}'" \
                        "$@"
          return $?
       fi
@@ -542,6 +551,10 @@ r_repos_contents()
 
    if [ ! -z "${skipfrom}" ]
    then
+      if ! grep -q -F -x "${skipfrom}" <<< "${repos}"
+      then
+         fail "--skip-from \"${skipfrom}\", repository not found"
+      fi
       r_escaped_sed_pattern "${skipfrom}"
       skipfrom="/^${RVAL}\$/"
    fi
@@ -550,6 +563,11 @@ r_repos_contents()
 
    if [ ! -z "${skipuntil}" ]
    then
+      if ! grep -q -F -x "${skipuntil}" <<< "${repos}"
+      then
+         fail "--skip-until \"${skipuntil}\", repository not found"
+      fi
+
       first="${skipuntil}"
       r_escaped_sed_pattern "${skipuntil}"
       skipuntil="/^${RVAL}\$/"
@@ -557,6 +575,11 @@ r_repos_contents()
 
    if [ ! -z "${skippast}" ]
    then
+      if ! grep -q -F -x "${skippast}" <<< "${repos}"
+      then
+         fail "--skip-past \"${skippast}\", repository not found"
+      fi
+
       first=
       r_escaped_sed_pattern "${skippast}"
       skipuntil="/^${RVAL}\$/"  # sic
@@ -877,6 +900,11 @@ main()
                     "${OPTION_SKIP_UNTIL}" \
                     "${OPTION_SKIP_PAST}"
    repos="${RVAL}"
+
+   if [ -z "${REPOS}" ]
+   then
+      log_info "Nothing to do"
+   fi
 
    if [ "${OPTION_PRINT}" = 'YES' ]
    then

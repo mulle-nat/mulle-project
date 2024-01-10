@@ -407,7 +407,9 @@ merged_releasenotes()
 
    new_header="`head -1 <<< "${notes}" | sed 's/^#*[[:space:]]*//'`"
 
-   tmpfile="`mktemp "tmp.XXXXXXXX"`"
+   r_make_tmp
+   tmpfile="${RVAL}"
+   
    if [ "${old_header}" = "${new_header}" ]
    then
       if [ "${OPTION_APPEND}" = 'YES' ]

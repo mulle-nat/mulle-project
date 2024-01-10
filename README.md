@@ -25,7 +25,7 @@ Later on `mulle-project-sourcetree-doctor` and
 
 | Release Version                                       | Release Notes
 |-------------------------------------------------------|--------------
-| ![Mulle kybernetiK tag](https://img.shields.io/github/tag/mulle-sde/mulle-project.svg?branch=release) | [RELEASENOTES](RELEASENOTES.md) |
+| ![Mulle kybernetiK tag](https://img.shields.io/github/tag/mulle-sde/mulle-project.svg?branch=release)  | [RELEASENOTES](RELEASENOTES.md) |
 
 | Command                            | Description
 | -----------------------------------|-----------------------
@@ -97,6 +97,7 @@ one-liner:
 ``` bash
 mulle-project-distribute
 ```
+
 
 
 

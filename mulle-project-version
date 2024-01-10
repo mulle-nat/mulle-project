@@ -129,6 +129,8 @@ get_version()
    then
       if [ -z "${ACTUAL_XCODEPROJ}" ]
       then
+         log_verbose "Checking for existing Xcode project"
+
          ACTUAL_XCODEPROJ="`ls -1d *.xcodeproj | head -1`" 2> /dev/null
          if [ -z "${ACTUAL_XCODEPROJ}" ]
          then
@@ -175,6 +177,7 @@ get_version()
             # hacky hack for mulle-objc
             case "${PROJECT}" in
                mulle-objc*)
+                  log_verbose "VERSIONNAME: Use special hack for mulle-objc- prefixed projects "
                   r_smart_upcase_identifier "${PROJECT}"
                   VERSIONNAME="${RVAL}_VERSION"
                ;;
@@ -731,24 +734,34 @@ main()
    r_basename "${PWD}"
    DIRECTORY_NAME="${RVAL}"
 
+   log_setting "DIRECTORY_NAME=${DIRECTORY_NAME}"
+
    if [ -z "${PROJECT}" ]
    then
       PROJECT="${1:-${DIRECTORY_NAME}}"
       [ $# -ne 0 ] && shift
    fi
 
+   log_setting "PROJECT=${PROJECT}"
+
    if [ "${OPTION_READ_INFO}" = 'YES' ]
    then
       if [ -f "./.mulle/etc/project/version-info.sh" ]
       then
+         log_debug "Reading \".mulle/etc/project/version-info.sh\""
+
          . ./.mulle/etc/project/version-info.sh
       fi
       if [ -f "./.mulle/etc/project/release-info.sh" ]
       then
+         log_debug "Reading \".mulle/etc/project/release-info.sh\""
+
          . ./.mulle/etc/project/release-info.sh
       fi
       if [ -f "./.mulle/etc/project/formula-info.sh" ]
       then
+         log_debug "Reading \".mulle/etc/project/formula-info.sh\""
+
          . ./.mulle/etc/project/formula-info.sh
       fi
    fi

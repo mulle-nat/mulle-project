@@ -67,12 +67,14 @@ print_commands()
    local tag
    local version
 
-   .foreachline line in `rexekutor mulle-sde dependency list -- \
-                                                    --dedupe-mode url-filename \
-                                                    --output-eval \
-                                                    --output-no-column \
-                                                    --output-no-header \
-                                                    --force-format "%a;%t;%u\\n"`
+   .foreachline line in `rexekutor mulle-sde dependency list \
+                                       --columnar \
+                                       -- \
+                                          --dedupe-mode url-filename \
+                                          --output-eval \
+                                          --output-no-column \
+                                          --output-no-header \
+                                          --force-format "%a;%t;%u\\n"`
    .do
       name="${line%%;*}"
       line="${line#*;}"
