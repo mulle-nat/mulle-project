@@ -81,6 +81,15 @@ produce_environment()
    local matching_repos="$4"
    local clobber="$5"
 
+   if [ -z "${MULLE_VIRTUAL_ROOT}" ]
+   then
+      if [ ! -e .mulle/share/env/environment.sh ]
+      then
+         fail "Not a mulle environment"
+      fi
+      . ".mulle/share/env/environment.sh"
+   fi
+
    [ -z "${mapped_branch}" ] && _internal_fail "mapped_branch is empty"
    [ -z "${mapped_scope}" ]  && _internal_fail "mapped_scope is empty"
 
@@ -101,7 +110,8 @@ produce_environment()
    #
    # uses mulle-sourcetree-parser library
    #
-   lines="`project::sourcetree_parser::get_dependency_address_nodetype_branch_tag_url -r --bequeath `"
+   # ignore amalgamated
+   lines="`project::sourcetree_parser::get_dependency_address_nodetype_branch_tag_url -r --bequeath --qualifier "MATCHES share-shirk"`"
 
    local _address
    local _nodetype
