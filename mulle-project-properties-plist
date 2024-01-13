@@ -80,7 +80,11 @@ get_url()
    .do
       url="`git remote get-url "${remote}"`"
       # check if known domain
-      eval "`mulle-domain -s parse-url "${url}"`"
+      if ! eval "`mulle-domain -s parse-url "${url}"`"
+      then
+         .continue
+      fi
+
       if find_line "${known_domains}" "${domain}"
       then
          repository="`mulle-domain -s compose-url --domain "${domain}" \
@@ -173,6 +177,8 @@ get_description_4()
 {
    rexekutor head -4 "$1" \
    | grep -E '^####' \
+   | head -1 \
+   | tr -d $'\r' \
    | sed -e 's/^####//' -e 's/^ //g'
 }
 
@@ -181,6 +187,7 @@ get_description_2()
 {
    rexekutor sed -e '/^[[:space:]]*$/d' "$1" \
    | head -2 \
+   | tr -d $'\r' \
    | tail -1
 }
 
@@ -352,7 +359,7 @@ project =
 EOF
 print_homepage
    cat <<EOF
-   license="${PROJECT_LICENSE:-`get_license`}"
+   license="${PROJECT_LICENSE:-`get_license`}";
 }${sep}
 EOF
 }
