@@ -35,7 +35,9 @@ Usage:
    ${MULLE_USAGE_NAME} [flags] [command]
 
    Figure out which extension versions need to be bumped, because they
-   have changes from last commit.
+   have changes from last commit. This script has trouble if the current
+   version is exactily like the project version, if that happens just
+   bump the project version to get rid of the warnings.
 
 Commands:
    bump   : set all extension versions to mulle-project-version, that need it
@@ -66,9 +68,9 @@ list_extension()
 
    if [ "${changed}" = 'NO' ]
    then
-      if [ "${version}" = "${project_version}" ]
+      if [ "${version}" = "${project_version}" -a "${version}" != "0.0.1" ]
       then
-         log_warning "\"${extension#"${MULLE_USER_PWD}/"}\" has been needlessly bumped"
+         log_warning "\"${extension#"${MULLE_USER_PWD}/"}\" has been needlessly bumped to ($version, ${project_version})"
       else
          log_info "\"${extension#"${MULLE_USER_PWD}/"}\" is unchanged"
       fi

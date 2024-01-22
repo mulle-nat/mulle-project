@@ -12,4 +12,4 @@ ${MULLE_SDE_TAP}mulle-sde'
 
 
 
-DEBIAN_DEPENDENCIES="mulle-bashfunctions (>= 5.0.0), mulle-sde"
+DEBIAN_DEPENDENCIES="mulle-bashfunctions (>= 6.0.0), mulle-sde"

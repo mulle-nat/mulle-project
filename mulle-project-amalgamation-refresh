@@ -262,7 +262,7 @@ search_local_repos()
 
    include "parallel"
 
-   parallel_execute "${repos}" mulle-sde run mulle-fetch search-local
+   parallel_execute "${repos}" mulle-sde exec mulle-fetch search-local
 }
 
 
@@ -414,6 +414,13 @@ main()
    done
 
    options_setup_trace "${MULLE_TRACE}" && set -x
+
+#   if [ ! -z "${MULLE_PROJECT_ALL}" -a "${MULLE_FLAG_MAGNUM_FORCE}" != 'YES' ]
+#   then
+#      # doesn't work inside mulle-sde though, shucks
+#      log_info "Not running reamalgamation because a mulle-project-all is in progress (override with -f)"
+#      return
+#   fi
 
    if [ "${OPTION_BACKGROUND}" = 'YES' ]
    then

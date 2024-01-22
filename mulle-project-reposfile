@@ -1,7 +1,7 @@
 #! /usr/bin/env mulle-bash
 # shellcheck shell=bash
 
-[ "${TRACE}" = 'YES' -o "${SHELL_ALL_TRACE}" = 'YES' ] && set -x && : "$0" "$@"
+[ "${TRACE}" = 'YES' -o "${MULLE_PROJECT_REPOSFILE_TRACE}" = 'YES' ] && set -x && : "$0" "$@"
 
 
 MULLE_EXECUTABLE_VERSION="0.0.0"

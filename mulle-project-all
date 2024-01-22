@@ -36,7 +36,7 @@
 #  POSSIBILITY OF SUCH DAMAGE.
 #
 
-[ "${TRACE}" = 'YES' -o "${SHELL_ALL_TRACE}" = 'YES' ] && set -x && : "$0" "$@"
+[ "${TRACE}" = 'YES' -o "${MULLE_PROJECT_TRACE}" = 'YES' ] && set -x && : "$0" "$@"
 
 
 ### >> START OF mulle-boot.sh >>
@@ -65,7 +65,7 @@ print_flags()
    --ignore <name>     : ignore a project from REPOS, multiples are possible
    --others            : also execute in other projects, like demo
    --parallel          : execute operations in parallel
-   --repos-file <f>    : REPOS file to use
+   --repos-file <f>    : REPOS file to use (shortcut: -r)
    --sde               : only execute in mulle-sde projects
    --skip-until <s>    : skip projects in REPOS until <s>
    --strict            : errors preempt
@@ -255,6 +255,7 @@ shell_it()
               OTHER_NAME="'${OTHER_NAME}'" \
               TEST_NAME="'${TEST_NAME}'" \
               GITHUB_NAME="'${GITHUB_NAME}'" \
+              MULLE_PROJECT_ALL="${MULLE_EXECUTABLE_VERSION}" \
               eval_exekutor "${OPTION_IF}"
          then
             log_info "Skip ${C_RESET_BOLD}$1"
@@ -345,6 +346,7 @@ shell_it()
                        OTHER_NAME="'${OTHER_NAME}'" \
                        TEST_NAME="'${TEST_NAME}'" \
                        GITHUB_NAME="'${GITHUB_NAME}'" \
+                       MULLE_PROJECT_ALL="${MULLE_EXECUTABLE_VERSION}" \
                        "$@"
          return $?
       fi
@@ -833,7 +835,7 @@ main()
             OPTION_SKIP_UNTIL="$1"
          ;;
 
-         --skip-past)
+         --skip-past|--skip-after)
             [ $# -eq 1 ] && usage "missing argument to $1"
             shift
 
@@ -901,7 +903,7 @@ main()
                     "${OPTION_SKIP_PAST}"
    repos="${RVAL}"
 
-   if [ -z "${REPOS}" ]
+   if [ -z "${repos}" ]
    then
       log_info "Nothing to do"
    fi

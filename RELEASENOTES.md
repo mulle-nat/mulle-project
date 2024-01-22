@@ -1,3 +1,7 @@
+### 3.5.1
+
+* Various small improvements
+
 ## 3.4.0
 
 * added mulle-project-github-rerun
