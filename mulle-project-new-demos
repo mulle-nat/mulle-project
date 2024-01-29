@@ -79,6 +79,16 @@ library_task_run()
    local rc 
 
    #
+   # we want craftinfos that are easily gotten by name
+   #
+   rexekutor mulle-sourcetree \${MULLE_TECHNICAL_FLAGS} -N rcopy --update .. 'craftinfo/*'
+   rc=\$?
+   if [ \$rc -eq 2 ]
+   then
+      rc=0
+   fi
+
+   #
    # we only want linkable stuff (avoids -startup and mulle-objc-list)
    #
    rexekutor mulle-sourcetree \${MULLE_TECHNICAL_FLAGS} -N rcopy --update .. '*' 'ENABLES link AND ENABLES intermediate-link'
@@ -148,6 +158,52 @@ foreach( MAIN_SOURCE \${DEMO_MAIN_SOURCES})
 endforeach()
 
 EOF
+}
+
+
+new_demos::insert_line_before_last_endif()
+{
+   log_entry "new_demos::insert_line_before_last_endif" "$@"
+
+   local filename="$1"
+   local insert="$2"
+
+   local text
+
+   text="`cat "${filename}"`"
+
+   local output
+   local line
+
+   include "array"
+
+   while IFS= read -r line
+   do
+      # Check if the current line is "#endif", since we indent our
+      # endifs this should work
+
+      if [ "$line" = "#endif" ]
+      then
+         r_add_line_lf "${output}" "${insert}"
+         output="${RVAL}"
+      fi
+
+      r_add_line_lf "${output}" "${line}"
+      output="${RVAL}"
+   done <<< "${text}"
+
+   redirect_exekutor "${filename}" printf "%s\n" "${output}"
+}
+
+
+new_demos::append_line_at_end()
+{
+   log_entry "new_demos::append_line_at_end" "$@"
+
+   local filename="$1"
+   local insert="$2"
+
+   redirect_append_exekutor "${filename}" printf "%s\n" "${insert}"
 }
 
 
@@ -281,6 +337,7 @@ new_demos::main()
       # for benefit of an executable parent instead of a library
       #
       rexekutor mulle-sde ignore "../${LIBRARY_SOURCE_DIR}/main.m"
+      rexekutor mulle-sde ignore "../${LIBRARY_SOURCE_DIR}/generic/"
 
       #
       # Add library sources to project and reflect
@@ -291,6 +348,27 @@ new_demos::main()
          set MULLE_MATCH_PATH "\${MULLE_MATCH_PATH}:../${LIBRARY_SOURCE_DIR}"
 
       rexekutor mulle-sde reflect
+
+      #
+      # install custom CMakeLists.txt (clumsy)
+      #
+
+      if [ -d ../craftinfo ]
+      then
+        log_info "Adding symlink to parent craftinfo"
+        exekutor ln -sf ../craftinfo
+      fi
+
+      log_info "Patching generic headers to include parent generic headers"
+
+      new_demos::insert_line_before_last_endif 'src/generic/include-private.h' \
+                                               '#include "../src/generic/include-private.h"'
+      new_demos::insert_line_before_last_endif 'src/generic/include.h' \
+                                               '#include "../src/generic/include.h"'
+      new_demos::append_line_at_end 'src/generic/import-private.h' \
+                                    '#import "../src/generic/import-private.h"'
+      new_demos::append_line_at_end 'src/generic/import.h' \
+                                    '#import "../src/generic/import.h"'
    )
 }
 
