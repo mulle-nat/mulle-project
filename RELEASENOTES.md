@@ -1,3 +1,11 @@
+## 3.6.0
+
+* fix mulle-project-all so that trailing and leading spaces in the REPOS lines are ignored
+* fix for missing inclusion of parents generic headers
+* also copy craftinfos from parent
+* mulle-replace does not bail anymore if it encounters a directory in the list of files to work on
+
+
 ### 3.5.1
 
 * Various small improvements

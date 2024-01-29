@@ -55,6 +55,17 @@ Usage: ${MULLE_EXECUTABLE_USAGE_NAME:-mulle-project-distribute} [options]
    Distribute the project via github and homebrew. Debian is indirectly
    supported by calling mulle-project-debian.
 
+   There are five stages of the distribution process that you can choose to
+   skip:
+
+   * pre-release  : run .mulle/etc/project/pre-release.sh (--no-pre-release)
+   * git          : tag and push (--no-git)
+   * formula      : create a homebrew formula (--no-formula)
+   * formula-push : push formula to the brew tap (--no-formula-push)
+   * post-release : run .mulle/etc/project/post-release.sh (--no-post-release)
+
+   (Typically mulle-project-debian is run in post-release.)
+
 Options:
    --branch <name>   : branch to push to (${BRANCH:-release})
    --debname <name>  : debian repository name (${DEBIAN_REPOSITORY:-main})
@@ -204,6 +215,16 @@ __environment_main()
 
       *)
          MULLE_C_TAP="${MULLE_C_TAP}/"
+      ;;
+   esac
+
+   MULLE_CORE_TAP="${MULLE_CORE_TAP:-${MULLE_TAP_USER}/${MULLE_TAP_NAME}/}"
+   case "${MULLE_CORE_TAP}" in
+      */)
+      ;;
+
+      *)
+         MULLE_CORE_TAP="${MULLE_CORE_TAP}/"
       ;;
    esac
 

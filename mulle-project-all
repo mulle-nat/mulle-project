@@ -536,7 +536,8 @@ r_repos_contents()
 
    if [ -f "${reposfile}" ]
    then
-      repos="`rexekutor grep -E -v '^#' "${reposfile}" | sed -e '/^[[:space:]]*$/d' `"
+      repos="`rexekutor grep -E -v '^#' "${reposfile}" \
+      | sed -e 's/^[[:space:]]*//;s/[[:space:]]*$//;/^$/d' `"
    else
       [ ! -z "${reposfile}" ] && fail "\"${reposfile}\" not found"
 
