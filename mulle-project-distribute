@@ -388,6 +388,7 @@ main()
    OPTION_LATEST_TAG="latest"
    VERIFY_ONLY='NO'
 
+   local OPTION_POST_RELEASE_OPTIONS=
    local OPTION_DO_PUSH_FORMULA="DEFAULT"
    local OPTION_DO_GIT_RELEASE="DEFAULT"
    local OPTION_DO_GENERATE_FORMULA="DEFAULT"
@@ -486,6 +487,10 @@ main()
             OPTION_DO_POST_RELEASE='NO'
          ;;
 
+         --no-post-release-update)
+            OPTION_POST_RELEASE_OPTIONS='--no-update'
+         ;;
+
          # arg long
 
          --buildtools-tap)
@@ -540,6 +545,12 @@ main()
             [ $# -eq 1 ] && fail "missing parameter for \"$1\""
             shift
             ORIGIN="$1"
+         ;;
+
+         --post-release-options)
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
+            shift
+            OPTION_POST_RELEASE_OPTIONS="$1"
          ;;
 
          --project)
@@ -878,6 +889,7 @@ main()
          then
             log_info "Post release..."
             post_release ${MULLE_TECHNICAL_FLAGS} \
+                         ${OPTION_POST_RELEASE_OPTIONS} \
                          "${PROJECT}" \
                          "${NAME}" \
                          "${VERSION}" \

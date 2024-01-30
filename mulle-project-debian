@@ -26,12 +26,12 @@ Usage:
    Produce debian packages for bash projects.
    There is no signing involved.
 
-   Options:
+Options:
       --no-mulle       : do not assume did-update.sh uses mulle-bash
       --root <path>    : default is /usr
       --debname <name> : repository name parameter for did-update.sh (main)
-      --no-update      : don't execute did-update.sh in the taps directory
-      --no-publish     : don't publish to tap
+      --no-update      : don't execute did-update.sh, i.e. don't upload
+      --no-publish     : don't publish package to local debian repo
 EOF
    exit 1
 }
@@ -169,6 +169,14 @@ main()
 
          --no-update)
             OPTION_UPDATE='NO'
+         ;;
+
+         --package)
+            OPTION_PUBLISH='NO'
+         ;;
+
+         --publish)
+            OPTION_PUBLISH='YES'
          ;;
 
          --no-publish)

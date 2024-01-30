@@ -1,0 +1,21 @@
+## Install
+
+
+The command to install the latest {{ project.name }} into
+`/usr/local` (with **sudo**) is:
+
+``` bash
+curl -L 'https://github.com/{{ project.username }}/{{ project.reponame }}/archive/latest.tar.gz' \
+ | tar xfz - && cd '{{ project.reponame }}-latest' && sudo ./bin/installer /usr/local
+```
+
+{% if packages %}
+### Packages
+
+| OS    | Command
+|-------|--------------------------------------------------------------
+{% for package in packages%}
+| {{ package.os }} | `{{ package.command }}`
+{% endfor %}
+{% endif %}
+

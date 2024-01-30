@@ -258,7 +258,7 @@ info_version()
       if [ "${version}" = "${last}" ]
       then
          # memo this doesn't happen as we warn before!
-         log_info "Version is ${C_MAGENTA}${C_BOLD}${version}${C_INFO}. Last git tag is same."
+         log_info "Version is ${version}. Last git tag is same."
       else
          log_info "Version is ${C_MAGENTA}${C_BOLD}${version}${C_INFO}. Last git tag is ${C_RESET_BOLD}${last}${C_INFO}."
       fi
@@ -390,21 +390,35 @@ warn_version()
 {
    log_entry "warn_version" "$@"
 
-   if [ "${OPTION_TAG_WARNING}" = 'YES' ]
+   local warn="$1"
+
+   if project::git::tag_exists "${VERSION}"
    then
-      if project::git::tag_exists "${VERSION}"
+      local commits
+
+      commits="`project::git::commits_from_tag "${VERSION}"`"
+      if [ ! -z "${commits}" ]
       then
-         log_warning "${VERSION} already exists as a git tag"
+         log_warning "${VERSION} already exists as a git tag, but has commits"
       else
-         last="`rexekutor git tag -l --sort=-creatordate | grep -E -x '[0-9]*\.[0-9]*\.[0-9]*' | head -1`"
+         if ! project::git::is_clean
+         then
+            log_warning "${VERSION} already exists as a git tag, but has uncommitted files"
+         else
+            last="`rexekutor git tag -l --sort=-creatordate | grep -E -x '[0-9]*\.[0-9]*\.[0-9]*' | head -1`"
 
-         info_version "${VERSION}" "${last}"
+            info_version "${VERSION}" "${last}"
+         fi
       fi
+   else
+      last="`rexekutor git tag -l --sort=-creatordate | grep -E -x '[0-9]*\.[0-9]*\.[0-9]*' | head -1`"
 
-      if [ "${OPTION_RELEASENOTES}" != 'NO' ]
-      then
-         info_releasenotes "${VERSION}"
-      fi
+      info_version "${VERSION}" "${last}"
+   fi
+
+   if [ "${OPTION_RELEASENOTES}" != 'NO' ]
+   then
+      info_releasenotes "${VERSION}"
    fi
 }
 
@@ -807,8 +821,6 @@ main()
          OPTION_WRITE_EXTENSION_VERSIONS="NO"
       fi
    fi
-
-   INSTALLED_MULLE_PROJECT_VERSION="`mulle-project version`" || exit 1
 
    include "project::version"
    include "project::git"

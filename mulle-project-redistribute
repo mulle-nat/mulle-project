@@ -73,6 +73,7 @@ main()
 {
    local OPTION_PRERELEASE='NO'
    local OPTION_IF_UNCOMMITTED_FILES
+   local DISTRIBUTE_OPTIONS=
 
    while [ $# -ne 0 ]
    do
@@ -93,6 +94,10 @@ main()
 
          --prerelease)
             OPTION_PRERELEASE='YES'
+         ;;
+
+         --no-post-release-update)
+            DISTRIBUTE_OPTIONS="$1"
          ;;
 
          -*)
@@ -154,9 +159,9 @@ main()
 
    if [ "${OPTION_PRERELEASE}" = 'YES' ]
    then
-      rexekutor mulle-project-prerelease ${MULLE_TECHNICAL_FLAGS}
+      rexekutor mulle-project-prerelease ${MULLE_TECHNICAL_FLAGS} ${DISTRIBUTE_OPTIONS}
    else
-      rexekutor mulle-project-distribute ${MULLE_TECHNICAL_FLAGS}
+      rexekutor mulle-project-distribute ${MULLE_TECHNICAL_FLAGS} ${DISTRIBUTE_OPTIONS}
    fi
 }
 
