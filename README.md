@@ -25,7 +25,7 @@ Later on `mulle-project-sourcetree-doctor` and
 
 | Release Version                                       | Release Notes
 |-------------------------------------------------------|--------------
-| ![Mulle kybernetiK tag](https://img.shields.io/github/tag/mulle-sde/mulle-project.svg?branch=release)  | [RELEASENOTES](RELEASENOTES.md) |
+| ![Mulle kybernetiK tag](https://img.shields.io/github/tag/mulle-nat/mulle-project.svg?branch=release)  | [RELEASENOTES](RELEASENOTES.md) |
 
 | Command                            | Description
 | -----------------------------------|-----------------------
@@ -106,15 +106,12 @@ mulle-project-distribute
 
 ## Install
 
-See [mulle-sde-developer](//github.com/mulle-sde/mulle-sde-developer) how to
-install mulle-sde, which will also install mulle-project with required
-dependencies.
 
-The command to install only the latest mulle-project into
+The command to install the latest mulle-project into
 `/usr/local` (with **sudo**) is:
 
 ``` bash
-curl -L 'https://github.com/mulle-sde/mulle-project/archive/latest.tar.gz' \
+curl -L 'https://github.com/mulle-nat/mulle-project/archive/latest.tar.gz' \
  | tar xfz - && cd 'mulle-project-latest' && sudo ./bin/installer /usr/local
 ```
 

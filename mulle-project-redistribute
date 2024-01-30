@@ -96,8 +96,9 @@ main()
             OPTION_PRERELEASE='YES'
          ;;
 
-         --no-post-release-update)
-            DISTRIBUTE_OPTIONS="$1"
+         -f|--force-push|--no-post-release-update)
+            r_concat "${DISTRIBUTE_OPTIONS}" "$1"
+            DISTRIBUTE_OPTIONS="${RVAL}"
          ;;
 
          -*)
