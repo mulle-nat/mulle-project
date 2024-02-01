@@ -163,7 +163,7 @@ get_version()
 
       if [ -z "${VERSIONFILE}" ]
       then
-         VERSIONFILE="`project::version::get_header_from_project "${PROJECT}" "${LANGUAGE}"`"
+         VERSIONFILE="`project::version::get_header_from_project "${PROJECT_NAME}" "${LANGUAGE}"`"
       fi
 
       if [ -z "${VERSIONNAME}" ]
@@ -175,15 +175,15 @@ get_version()
             include "case"
 
             # hacky hack for mulle-objc
-            case "${PROJECT}" in
+            case "${PROJECT_NAME}" in
                mulle-objc*)
                   log_verbose "VERSIONNAME: Use special hack for mulle-objc- prefixed projects "
-                  r_smart_upcase_identifier "${PROJECT}"
+                  r_smart_upcase_identifier "${PROJECT_NAME}"
                   VERSIONNAME="${RVAL}_VERSION"
                ;;
 
                *)
-                  r_smart_file_upcase_identifier "${PROJECT}"
+                  r_smart_file_upcase_identifier "${PROJECT_NAME}"
                   VERSIONNAME="${RVAL}_VERSION"
                ;;
             esac
@@ -215,7 +215,7 @@ get_version()
 
    if [ -z "${VERSION}" ]
    then
-      fail "Could not figure out the version for PROJECT=\"${PROJECT}\", \
+      fail "Could not figure out the version for PROJECT_NAME=\"${PROJECT_NAME}\", \
 LANGUAGE=\"${LANGUAGE}\", VERSIONNAME=\"${VERSIONNAME}\", \
 VERSIONFILE=\"${VERSIONFILE}\".
 Hint: specify VERSIONNAME, VERSIONFILE in .mulle/etc/project/version-info.sh"
@@ -751,18 +751,28 @@ main()
 
    options_setup_trace "${MULLE_TRACE}" && set -x
 
+
+   local PROJECT_NAME
+   local DIRECTORY_NAME
+
    r_basename "${PWD}"
    DIRECTORY_NAME="${RVAL}"
 
    log_setting "DIRECTORY_NAME=${DIRECTORY_NAME}"
 
-   if [ -z "${PROJECT}" ]
+   if [ $# -ne 0 ]
    then
-      PROJECT="${1:-${DIRECTORY_NAME}}"
-      [ $# -ne 0 ] && shift
+      PROJECT_NAME="$1"
+      shift
    fi
+   if [ -z "${PROJECT_NAME}" ]
+   then
+      # use mulle-sde to navigate properly
+      PROJECT_NAME="`mulle-sde env get PROJECT_NAME 2> /dev/null`"
+   fi
+   PROJECT_NAME="${PROJECT_NAME:-${DIRECTORY_NAME}}"
 
-   log_setting "PROJECT=${PROJECT}"
+   log_setting "PROJECT_NAME=${PROJECT_NAME}"
 
    if [ "${OPTION_READ_INFO}" = 'YES' ]
    then
