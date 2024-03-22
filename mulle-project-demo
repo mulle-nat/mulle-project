@@ -15,44 +15,51 @@ MULLE_EXECUTABLE_VERSION="0.0.0"
 
 
 
-new_demos::print_flags()
+demo::print_flags()
 {
    ##
    ## ADD YOUR FLAGS DESCRIPTIONS HERE
    ##
 
    options_technical_flags_usage \
-           "          : "
+           " : "
 }
 
 
-new_demos::usage()
+demo::usage()
 {
    [ $# -ne 0 ] && log_error "$*"
 
    cat <<EOF >&2
 Usage:
-   mulle-project-new-demos [flags] 
+   ${MULLE_EXECUTABLE_NAME} [flags] 
 
-   Create a new demos subdirectory in a library project. The library will be
-   built "inline" with the demos. Each file of the form main-*.<extension> in
-   \`src\` will produce an executable.
+   Create a new "demo" subdirectory in a library project. Each file of the form 
+   main-*.<extension> in \`src\` will produce an executable.
 
+   The library sources will be built by the demo project. Therefore the library 
+   won't get linked as a library but as each individual .o file. The advantage 
+   is more rapid development due to better dependency checking and no need to 
+   clean, when there are changes in the library.
    The result is not well upgradable though. As it would be, if this was 
    completely done by a proper extension.
 
    With the -f flag you can force this to work with executable projects as 
    well. You are on you own there though..
 
+   MEMO: need to add a -startup library for Objective-C manually for now
+   
 Flags:
 EOF
-   new_demos::print_flags | LC_ALL=C sort >&2
+   demo::print_flags | LC_ALL=C sort >&2
+
+   echo >&2
 
    exit 1
 }
 
 
-new_demos::r_get_env()
+demo::r_get_env()
 {
    local key="$1"
 
@@ -63,7 +70,7 @@ new_demos::r_get_env()
 }
 
 
-new_demos::emit_task_script()
+demo::emit_task_script()
 {
    cat <<EOF
 #! /usr/bin/env mulle-bash
@@ -111,12 +118,12 @@ EOF
 }
 
 
-new_demos::emit_cmakelists_txt()
+demo::emit_cmakelists_txt()
 {
    cat <<EOF
 cmake_minimum_required( VERSION 3.15)
 
-project( demos C)
+project( demo C)
 
 set( MULLE_PROJECT_TYPE "Executable")
 
@@ -132,15 +139,21 @@ include( Environment)
 
 include( Files)
 
+include( IDESupport OPTIONAL)
+
 include( Dependencies OPTIONAL)
 
 foreach( SOURCE \${SOURCES})
    # get rid off src/main- prefix and .m suffix
    #             offset 9  length -9 - 2
-   if( SOURCE MATCHES "^src/main-")
-      list( APPEND DEMO_MAIN_SOURCES "\${SOURCE}")
-   else()
-      list( APPEND DEMO_OTHER_SOURCES "\${SOURCE}")
+   # ignore library "main.c" and "main.m" files, just in case
+   #
+   if( NOT (SOURCE MATCHES ".*/main\\.[cm]$"))
+      if( SOURCE MATCHES "^src/main-")
+         list( APPEND DEMO_MAIN_SOURCES "\${SOURCE}")
+      else()
+         list( APPEND DEMO_OTHER_SOURCES "\${SOURCE}")
+      endif()
    endif()
 endforeach()
 
@@ -161,9 +174,9 @@ EOF
 }
 
 
-new_demos::insert_line_before_last_endif()
+demo::insert_line_before_last_endif()
 {
-   log_entry "new_demos::insert_line_before_last_endif" "$@"
+   log_entry "demo::insert_line_before_last_endif" "$@"
 
    local filename="$1"
    local insert="$2"
@@ -196,9 +209,9 @@ new_demos::insert_line_before_last_endif()
 }
 
 
-new_demos::append_line_at_end()
+demo::append_line_at_end()
 {
-   log_entry "new_demos::append_line_at_end" "$@"
+   log_entry "demo::append_line_at_end" "$@"
 
    local filename="$1"
    local insert="$2"
@@ -207,13 +220,13 @@ new_demos::append_line_at_end()
 }
 
 
-new_demos::main()
+demo::main()
 {
    #
    # simple option/flag handling
    #
    local OPTION_LICENSE="BSD-3-Clause"
-   local OPTION_DIRNAME="demos"
+   local OPTION_DIRNAME="demo"
 
    while [ $# -ne 0 ]
    do
@@ -229,7 +242,7 @@ new_demos::main()
          ;;
 
          -h*|--help|help)
-            new_demos::usage
+            demo::usage
          ;;
 
          -d|--directory-name)
@@ -252,7 +265,7 @@ new_demos::main()
          ;;
 
          -*)
-            new_demos::usage "Unknown flag \"$1\""
+            demo::usage "Unknown flag \"$1\""
          ;;
 
          *)
@@ -265,7 +278,7 @@ new_demos::main()
 
    options_setup_trace "${MULLE_TRACE}" && set -x
 
-   [ $# -ne 0 ] && new_demos::usage "Superflous arguments $*"
+   [ $# -ne 0 ] && demo::usage "Superflous arguments $*"
 
    if [ -d "${OPTION_DIRNAME}" ]
    then
@@ -275,19 +288,19 @@ new_demos::main()
    local PROJECT_SOURCE_DIR
    local PROJECT_TYPE
 
-   new_demos::r_get_env "PROJECT_SOURCE_DIR"
+   demo::r_get_env "PROJECT_SOURCE_DIR"
    LIBRARY_SOURCE_DIR="${RVAL}"
 
-   new_demos::r_get_env "PROJECT_TYPE"
+   demo::r_get_env "PROJECT_TYPE"
    PROJECT_TYPE="${RVAL}"
 
    if [ "${PROJECT_TYPE}" != 'library' -a "${MULLE_FLAG_MAGNUM_FORCE}" != 'YES' ]
    then
-      fail "Need a library project to install demos"
+      fail "Need a library project to install demo"
    fi
 
    # get first only
-   new_demos::r_get_env "PROJECT_EXTENSIONS"
+   demo::r_get_env "PROJECT_EXTENSIONS"
    PROJECT_EXTENSION="${RVAL%%:*}"
 
    local meta 
@@ -306,7 +319,7 @@ new_demos::main()
    (
       exekutor cd "${OPTION_DIRNAME}"
 
-      new_demos::r_get_env "PROJECT_SOURCE_DIR"
+      demo::r_get_env "PROJECT_SOURCE_DIR"
       PROJECT_SOURCE_DIR="${RVAL}"
 
       exekutor mv "${PROJECT_SOURCE_DIR}/main.${PROJECT_EXTENSION}" \
@@ -317,7 +330,7 @@ new_demos::main()
       #
       log_info "Installing ${C_MAGENTA}${C_BOLD}library${C_INFO} task to copy parent dependencies on reflect"
 
-      new_demos::emit_task_script \
+      demo::emit_task_script \
       | rexekutor mulle-monitor ${MULLE_TECHNICAL_FLAGS} task add library -
 
       rexekutor mulle-monitor ${MULLE_TECHNICAL_FLAGS} callback create library
@@ -330,7 +343,7 @@ new_demos::main()
       #
       log_info "Installing custom ${C_RESET_BOLD}CMakeLists.txt"
 
-      new_demos::emit_cmakelists_txt \
+      demo::emit_cmakelists_txt \
       | redirect_exekutor CMakeLists.txt cat
 
       #
@@ -361,13 +374,13 @@ new_demos::main()
 
       log_info "Patching generic headers to include parent generic headers"
 
-      new_demos::insert_line_before_last_endif 'src/generic/include-private.h' \
+      demo::insert_line_before_last_endif 'src/generic/include-private.h' \
                                                '#include "../src/generic/include-private.h"'
-      new_demos::insert_line_before_last_endif 'src/generic/include.h' \
+      demo::insert_line_before_last_endif 'src/generic/include.h' \
                                                '#include "../src/generic/include.h"'
-      new_demos::append_line_at_end 'src/generic/import-private.h' \
+      demo::append_line_at_end 'src/generic/import-private.h' \
                                     '#import "../src/generic/import-private.h"'
-      new_demos::append_line_at_end 'src/generic/import.h' \
+      demo::append_line_at_end 'src/generic/import.h' \
                                     '#import "../src/generic/import.h"'
    )
 }
@@ -375,9 +388,9 @@ new_demos::main()
 
 #
 # You can also use the function `call_with_flags`, which has been defined
-# during mulle-boot. It lets you call 'new_demos::main'
+# during mulle-boot. It lets you call 'demo::main'
 # with MULLE_PROJECT_NEW_DEMOS_FLAGS interposed.
 #
-# call_with_flags "new_demos::main" "${MULLE_PROJECT_NEW_DEMOS_FLAGS}" "$@"
+# call_with_flags "demo::main" "${MULLE_PROJECT_NEW_DEMOS_FLAGS}" "$@"
 
-new_demos::main "$@"
+demo::main "$@"

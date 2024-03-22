@@ -42,7 +42,8 @@ Usage:
    mulle-project-new-repo [flags] <user/repo>
 
    Create a new repository on github, mulle-kybernetik (or other providers
-   in the future).
+   in the future).It's OK if the repository already has been created on
+   github. It will be merged.
 
 Flags:
 EOF

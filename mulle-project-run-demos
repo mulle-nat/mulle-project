@@ -18,20 +18,17 @@ print_flags()
    --video-x11          : take several screenshots and make an movie
    --resize-percent <n> : resize to n percent of window size (50)
    --resize <wxh>       : resize to widthxheight pixels
-   --fps <fps>          : frames per second                 -- NYI
-   --duration <s>       : length of the animation / video   -- NYI
+   --strict             : break on failure
+   --fps <fps>          : video: frames per second                 -- NYI
+   --duration <s>       : video: length of the animation / video   -- NYI
    -d <dir>             : use <dir> to locate demo sources
    --no-resize          : don't resize
    --no-timeout         : keep demos running until they are closed by the user
    --timeout <s>        : run a demo for <s> seconds, then kill it (10)
    --prefix <name>      : prefix for demo source (main-)
 EOF
-   ##
-   ## ADD YOUR FLAGS DESCRIPTIONS HERE
-   ##
-
    options_technical_flags_usage \
-       "            : "
+       "                : "
 }
 
 
@@ -47,7 +44,7 @@ Usage:
    Run demos in a typical MulleUI "demo" directory. The "demo" directory will
    usually be besides "test". It is a self-containd mulle-sde project, which
    sources in "demo/src". Each demo is a sourcefile with a "main-" prefix and
-   a ".m" suffix.  The runner builds the demos with mulle-sde craft, then
+   a ".m" suffix.  The runner builds the demos with \`mulle-sde craft\`, then
    runs each demo in sequence for a duration of 10 seconds. Optionally a
    screenshot can be made of the running demo.
 
@@ -193,7 +190,6 @@ take_video_with_delay()
 }
 
 
-
 take_gif_with_delay()
 {
    local windowclass="$1"
@@ -239,7 +235,6 @@ take_gif_with_delay()
 }
 
 
-
 take_screenshot_with_delay()
 {
    local windowclass="$1"
@@ -280,15 +275,18 @@ main()
    #
    # simple option/flag handling
    #
-   local OPTION_TIMEOUT=10
-   local OPTION_DIRECTORY_NAME='src'
-   local OPTION_PREFIX='main-'
-   local OPTION_SCREENSHOT_X11
    local OPTION_DEMO_NAME
+   local OPTION_DIRECTORY_NAME='src'
    local OPTION_GIF_X11
-   local OPTION_VIDEO_X11
-   local OPTION_SCREENSHOT_TIMEOUT
+   local OPTION_CLEAN='NO'
+   local OPTION_PREFIX='main-'
    local OPTION_RESIZE="50%"
+   local OPTION_SCREENSHOT_TIMEOUT
+   local OPTION_SCREENSHOT_X11
+   local OPTION_SQUELCH='DEFAULT'
+   local OPTION_STRICT
+   local OPTION_TIMEOUT=10
+   local OPTION_VIDEO_X11
 
    while [ $# -ne 0 ]
    do
@@ -305,6 +303,18 @@ main()
 
          -h*|--help|help)
             usage
+         ;;
+
+         --clean)
+            OPTION_CLEAN='--all'
+         ;;
+
+         --tidy)
+            OPTION_CLEAN='--tidy'
+         ;;
+
+         --gravetidy)
+            OPTION_CLEAN='--gravetidy'
          ;;
 
          -d|--directory-name)
@@ -360,6 +370,18 @@ main()
             shift
 
             OPTION_RESIZE="$1"
+         ;;
+
+         --strict)
+            OPTION_STRICT='YES'
+         ;;
+
+         --squelch)
+            OPTION_SQUELCH='YES'
+         ;;
+
+         --no-squelch)
+            OPTION_SQUELCH=NO
          ;;
 
          -t|--timeout)
@@ -443,7 +465,22 @@ main()
       fi
    fi
 
-   if ! DEMOPATH="`mulle-sde product searchpath binary`"
+   if [ "${OPTION_CLEAN}" != 'NO' ]
+   then
+      rexekutor mulle-sde clean ${OPTION_CLEAN} || exit 1
+   fi
+
+   local kitchen_dir
+
+   kitchen_dir="`mulle-sde kitchen-dir`"
+   if ! [ -d "${kitchen_dir}" ]
+   then
+      log_info "Running ${C_MAGENTA}${C_BOLD}craft${C_INFO} first to produce demos"
+      rexekutor mulle-sde craft || exit 1
+   fi
+
+
+   if ! demos="`mulle-sde product list`"
    then
       exit 1
    fi
@@ -453,13 +490,12 @@ main()
    local name
    local match
 
-   for src in ${OPTION_DIRECTORY_NAME}/${OPTION_PREFIX}*.m
-   do
-      r_basename "${src}"
-      exe="${RVAL%.m}"
-      exe="${exe#${OPTION_PREFIX}}"
+   .foreachline exe_path in ${demos}
+   .do
+      r_basename "${exe_path}"
+      exe="${RVAL#${OPTION_PREFIX}}"
 
-      log_debug "Derived demo executable \"${exe}\" from \"${src}\""
+      log_debug "Derived demo executable name \"${exe}\" from \"${exe_path}\""
 
       if [ $# -ne 0 ]
       then
@@ -473,22 +509,16 @@ main()
             fi
          done
 
-         [ "${match}" = 'NO' ] && continue
+         [ "${match}" = 'NO' ] && .continue
       fi
 
       if [ ! -z "${OPTION_DEMO_NAME}" -a "${OPTION_DEMO_NAME}" != "${exe}" ]
       then
          log_fluff "Skipping \"${exe}\""
-         continue
+         .continue
       fi
 
       (
-         exe_path="`PATH="${DEMOPATH}" command -v "${exe}"`"
-         if [ -z "${exe_path}" ]
-         then
-            fail "No executable found for demo \"${exe}\" in $DEMOPATH"
-         fi
-
          if [ "${OPTION_GIF_X11}" = 'YES' ]
          then
             take_gif_with_delay "Demo" \
@@ -524,14 +554,41 @@ main()
          log_info "Running ${C_RESET_BOLD}${exe} ${C_INFO}for${text}"
          log_verbose "Path: \"${exe_path}\""
 
+         #
+         # use MULLE_NO_BACKGROUND='YES' to signal mulle-tty-demo and maybe
+         # others, that we intend to timeout the demo, so please don't fork
+         # into background
+         #
          local rc
 
-         if [ "${MULLE_FLAG_LOG_VERBOSE}" = 'YES' ]
+         if [ "${OPTION_SQUELCH}" = 'DEFAULT' -a "${MULLE_FLAG_LOG_VERBOSE}" = 'YES' ]
          then
-            exekutor "${TIMEOUT_EXE}" "${OPTION_TIMEOUT}s" "${exe_path}"
+            OPTION_SQUELCH='NO'
+         fi
+
+         local EXECUTABLE="${exe_path}"
+         local MULLE_VIRTUAL_ROOT="${MULLE_VIRTUAL_ROOT:-$PWD}"
+
+         commandline="`mulle-sde env get MULLE_SDE_RUN`"
+
+         log_setting "commandline: ${commandline}"
+
+         r_expanded_string "${commandline}"
+         commandline="${RVAL}"
+
+         log_setting "expanded: ${commandline}"
+
+         if [ -z "${commandline}" ]
+         then
+            commandline="'${exe_path}'"
+         fi
+
+         if [ "${OPTION_SQUELCH}" = 'YES' ]
+         then
+            MULLE_NO_BACKGROUND='YES' eval_exekutor "'${TIMEOUT_EXE}'" "${OPTION_TIMEOUT}s" "${commandline}" > /dev/null 2>&1
             rc=$?
          else
-            exekutor "${TIMEOUT_EXE}" "${OPTION_TIMEOUT}s" "${exe_path}" > /dev/null 2>&1
+            MULLE_NO_BACKGROUND='YES' eval_exekutor "'${TIMEOUT_EXE}'" "${OPTION_TIMEOUT}s" "${commandline}"
             rc=$?
          fi
 
@@ -551,11 +608,15 @@ main()
                log_verbose "Demo ran successfully, but under ${OPTION_TIMEOUT} seconds"
             else
                log_warning "Demo ${C_RESET_BOLD}${exe_path}${C_WARNING} failed or crashed ($rc)"
+               if [ "${OPTION_STRICT}" = 'YES' ]
+               then
+                  exit 1
+               fi
             fi
          fi
          exit 0
       ) || return 1
-   done
+   .done
 }
 
 

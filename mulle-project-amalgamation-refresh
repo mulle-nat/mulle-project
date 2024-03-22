@@ -16,13 +16,17 @@ MULLE_EXECUTABLE_VERSION="0.0.0"
 
 print_flags()
 {
-   echo "   -f    : force operation"
+   echo "   -f           : force operation"
+   echo "   --background : run almagamation in background process"
+   echo "   --name <s>   : a bogus name useful for grepping ps output"
+   echo "   --serial     : do not parallelize amalgamation"
+   echo "   --version    : print version "  
    ##
    ## ADD YOUR FLAGS DESCRIPTIONS HERE
    ##
 
    options_technical_flags_usage \
-           "      : "
+                "        : "
 }
 
 
@@ -33,7 +37,7 @@ usage()
 
    cat <<EOF >&2
 Usage:
-   ${MULLE_EXECUTABLE_NAME} [flags]
+   ${MULLE_EXECUTABLE_NAME} [flags] [directory]
 
    Calls mulle-project-clib-json -o clib.json in constituents. Then does a
    mulle-sde clean all and mulle-sde fetch. In the end you have a new
@@ -298,6 +302,25 @@ refresh()
 refresh_if_needed()
 {
    log_entry "refresh_if_needed" "$@"
+
+   if [ $# -ne 0 ]
+   then
+      local library_dir="$1"; shift
+
+      if [ ! -d "${library_dir}" ]
+      then
+         fail "${library_dir} is missing"
+      fi
+
+      local library_name
+
+      r_basename "${library_dir}"
+      library_name="${RVAL}"
+
+      log_info "Reamalgamate ${C_MAGENTA}${C_BOLD}${library_name}"
+      exekutor cd "${library_dir}" || exit 1
+   fi
+
 
    [ $# -ne 0 ] && usage "superflous arguments $*"
 

@@ -168,26 +168,21 @@ get_version()
 
       if [ -z "${VERSIONNAME}" ]
       then
-         if [ ! -z "${PROJECT_UPCASE_IDENTIFIER}" ]
-         then
-            VERSIONNAME="${PROJECT_UPCASE_IDENTIFIER}_VERSION"
-         else
-            include "case"
+         include "case"
 
-            # hacky hack for mulle-objc
-            case "${PROJECT_NAME}" in
-               mulle-objc*)
-                  log_verbose "VERSIONNAME: Use special hack for mulle-objc- prefixed projects "
-                  r_smart_upcase_identifier "${PROJECT_NAME}"
-                  VERSIONNAME="${RVAL}_VERSION"
-               ;;
+         # hacky hack for mulle-objc
+         case "${PROJECT_NAME}" in
+            mulle-objc*)
+               log_verbose "VERSIONNAME: Use special hack for mulle-objc- prefixed projects "
+               r_smart_upcase_identifier "${PROJECT_NAME}"
+               VERSIONNAME="${RVAL}_VERSION"
+            ;;
 
-               *)
-                  r_smart_file_upcase_identifier "${PROJECT_NAME}"
-                  VERSIONNAME="${RVAL}_VERSION"
-               ;;
-            esac
-         fi
+            *)
+               r_smart_file_upcase_identifier "${PROJECT_NAME}"
+               VERSIONNAME="${RVAL}_VERSION"
+            ;;
+         esac
       fi
 
       if [ ! -f "${VERSIONFILE}" -a -f "VERSION" ]
@@ -567,6 +562,9 @@ main()
    # clobber some environment variables...
    LANGUAGE=
 
+#   options_technical_flags "-ls"
+#   options_technical_flags "-ld"
+
    while [ $# -ne 0 ]
    do
       if options_technical_flags "$1"
@@ -774,6 +772,13 @@ main()
 
    log_setting "PROJECT_NAME=${PROJECT_NAME}"
 
+   local VERSIONNAME
+   local VERSIONFILE
+   local VERSIONCUSTOM
+   local VERSIONXCODEPROJ
+   local VERSION
+   local OLDVERSION
+
    if [ "${OPTION_READ_INFO}" = 'YES' ]
    then
       if [ -f "./.mulle/etc/project/version-info.sh" ]
@@ -849,7 +854,6 @@ main()
       return 0
    fi
 
-
    if [ ! -z "${OPTION_VERSION_SET}" ]
    then
       VERSION="${OPTION_VERSION_SET}"
@@ -859,16 +863,16 @@ main()
       edit_version
    fi
 
-   if [ "${OPTION_TAG_WARNING}" = 'YES' ]
-   then
-      warn_version
-   fi
-
    log_setting "VERSION=${VERSION}"
    log_setting "VERSIONNAME=${VERSIONNAME}"
    log_setting "VERSIONFILE=${VERSIONFILE}"
    log_setting "VERSIONCUSTOM=${VERSIONCUSTOM}"
    log_setting "VERSIONXCODEPROJ=${VERSIONXCODEPROJ}"
+
+   if [ "${OPTION_TAG_WARNING}" = 'YES' ]
+   then
+      warn_version
+   fi
 
    if [ "${OPTION_WRITE}" = 'YES' \
         -o "${OPTION_WRITE_XCODE_VERSION}" = 'YES' \
