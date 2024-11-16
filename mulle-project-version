@@ -80,6 +80,7 @@ Options:
    --increment-custom    : add 1 to custom (fourth) version part, needs --write
    --if-needed           : increment, if needed only (determined by status)
    --language <name>     : project language, (c, obj, cpp, bash etc)
+   --no-cmake            : do not edit CMakeLists.txt if it exists
    --no-info             : do not read -info.sh files
    --no-tag-warning      : do not warn if git tag exists
    --print-latest-tag    : print latest release tag
@@ -206,6 +207,18 @@ get_version()
       fi
    else
       VERSIONFILE=
+   fi
+
+   if [ -z "${VERSION}" ]
+   then
+      if [ "${OPTION_READ_CMAKELISTS_TXT}" = 'YES' -a -f 'CMakeLists.txt' ]
+      then
+         VERSION="`rexekutor grep -A10 "^project" CMakeLists.txt \
+                   | grep -E "project|VERSION"        \
+                   | sed -n 's/.*VERSION[[:space:]]*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p' \
+                   | head -n1`"
+         # we don't change VERSIONFILE here
+      fi
    fi
 
    if [ -z "${VERSION}" ]
@@ -458,6 +471,36 @@ edit_version()
 }
 
 
+emit_patched_cmakelists_txt()
+{
+   log_entry "emit_patched_cmakelists_txt" "$@"
+
+   local version="$1"
+
+   local in_project=0
+   local notfound=1
+
+   while IFS= read -r line
+   do
+       if [ $notfound -eq 1 ]
+       then
+          if [[ $line =~ ^[[:space:]]*project\( ]]; then
+              in_project=1
+          fi
+
+          if [[ $in_project -eq 1 && $line =~ VERSION[[:space:]]*[0-9]+\.[0-9]+\.[0-9]+ ]]
+          then
+              line="`printf "%s\n" "${line}" \
+                    | sed -E 's/([[:space:]]*VERSION[[:space:]]*)[0-9]+\.[0-9]+\.[0-9]+/\1'$version'/'`"
+              notfound=0
+          fi
+       fi
+       printf "%s\n" "$line"
+   done
+   return $notfound # 0 i goof
+}
+
+
 write_version()
 {
    log_entry "write_version" "$@"
@@ -486,11 +529,24 @@ write_version()
          fi
       .done
 
-      # set mirrors first before "real", which is nicer in case of fails
-      project::version::set "${VERSION}" \
-                            "${VERSIONFILE}" \
-                            "${VERSIONNAME}" \
-                            "${VERSIONCUSTOM}" || exit 1
+      if [ ! -z "${VERSIONFILE}" ]
+      then
+         # set mirrors first before "real", which is nicer in case of fails
+         project::version::set "${VERSION}" \
+                               "${VERSIONFILE}" \
+                               "${VERSIONNAME}" \
+                               "${VERSIONCUSTOM}" || exit 1
+      fi
+   fi
+
+   if [ "${OPTION_WRITE_CMAKELISTS_TXT}" = 'YES' -a -f CMakeLists.txt ]
+   then
+      if text="`emit_patched_cmakelists_txt "${VERSION}" < CMakeLists.txt`"
+      then
+         redirect_exekutor CMakeLists.txt  printf "%s\n" "${text}"
+      else
+         fail "Failed to find version info in CMakeLists.txt"
+      fi
    fi
 
    if [ "${OPTION_WRITE_XCODE_VERSION}" = 'YES' ]
@@ -540,7 +596,9 @@ main()
    local OPTION_FIRST_CUSTOM="0"
    local OPTION_READ_INFO='YES'
    local OPTION_READ_XCODE_VERSION='NO'
+   local OPTION_READ_CMAKELISTS_TXT='YES'
    local OPTION_WRITE='DEFAULT'
+   local OPTION_WRITE_CMAKELISTS_TXT='YES'
    local OPTION_WRITE_XCODE_VERSION='DEFAULT'
    local OPTION_WRITE_EXTENSION_VERSIONS='DEFAULT'
    local OPTION_XCODEPROJ=""
@@ -576,6 +634,19 @@ main()
       case "$1" in
          -h*|--help|help)
             usage
+         ;;
+
+         --no-cmake)
+            OPTION_READ_CMAKELISTS_TXT='NO'
+            OPTION_WRITE_CMAKELISTS_TXT='NO'
+         ;;
+
+         --no-cmake-read)
+            OPTION_READ_CMAKELISTS_TXT='NO'
+         ;;
+
+         --no-cmake-write)
+            OPTION_WRITE_CMAKELISTS_TXT='NO'
          ;;
 
          --no-info)

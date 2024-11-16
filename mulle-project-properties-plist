@@ -257,6 +257,31 @@ find_description()
 )
 
 
+get_language()
+{
+   log_entry "get_language" "$@"
+
+   local value
+
+   value="`mulle-sde env get PROJECT_LANGUAGE`"
+   value="${value:-unknown}"
+   log_debug "language: ${value}"
+
+   printf "%s\n" "${value}"
+}
+
+
+get_dialect()
+{
+   log_entry "r_get_dialect" "$@"
+
+   value="`mulle-sde env get PROJECT_DIALECT`"
+   value="${value:-unknown}"
+   log_debug "dialect: ${value}"
+
+   printf "%s\n" "${value}"
+}
+
 
 get_license_text()
 {
@@ -353,6 +378,8 @@ project =
 {
    description="${PROJECT_DESCRIPTION:-`get_description`}";
    domain="${PROJECT_DOMAIN:-github}";
+   language="${PROJECT_LANGUAGE:-`get_language`}";
+   dialect="${PROJECT_DIALECT:-`get_dialect`}";
    name="${PROJECT_NAME:-`get_projectname`}";
    user="${PROJECT_ORGANIZATION:-`get_organization`}";
    repo="${PROJECT_NAME:-`get_projectname`}";

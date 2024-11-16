@@ -349,8 +349,8 @@ __environment_main()
    # git remote to push to, usually github, can be empty
    GITHUB="${GITHUB:-github}"
 
-   # git branch to release to, source is always current
-   BRANCH="${BRANCH:-release}"
+   # git branch to master to, source is always current
+   BRANCH="${BRANCH:-master}"
 
 
    # --- HOMEBREW TAP ---

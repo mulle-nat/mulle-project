@@ -132,7 +132,7 @@ git_need_merge()
    then
       git remote update > /dev/null 2>&1
    fi
-   [ ! -z "`git log HEAD..github/release --oneline 2> /dev/null`" ]
+   [ ! -z "`git log HEAD..github/master --oneline 2> /dev/null`" ]
 }
 
 
@@ -227,7 +227,7 @@ main()
 
    if git_need_merge
    then
-      log_error "You need to merge release from github first"
+      log_error "You need to merge master from github first"
       return 1
    fi
 

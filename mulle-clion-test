@@ -1,0 +1,496 @@
+#! /usr/bin/env mulle-bash
+#! MULLE_BASHFUNCTIONS_VERSION=<|MULLE_BASHFUNCTIONS_VERSION|>
+# shellcheck shell=bash
+#
+#
+#  mulle-clion-test
+#  mulle-project
+#
+#  Copyright (c) 2024 Nat! - Mulle kybernetiK.
+#  All rights reserved.
+#
+#
+#  Redistribution and use in source and binary forms, with or without
+#  modification, are permitted provided that the following conditions are met:
+#
+#  Redistributions of source code must retain the above copyright notice, this
+#  list of conditions and the following disclaimer.
+#
+#  Redistributions in binary form must reproduce the above copyright notice,
+#  this list of conditions and the following disclaimer in the documentation
+#  and/or other materials provided with the distribution.
+#
+#  Neither the name of Mulle kybernetiK nor the names of its contributors
+#  may be used to endorse or promote products derived from this software
+#  without specific prior written permission.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+#  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+#  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+#  ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+#  LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+#  CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+#  SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+#  INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+#  CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+#  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+#  POSSIBILITY OF SUCH DAMAGE.
+#
+
+
+[ "${TRACE}" = 'YES' -o "${MULLE_PROJECT_CLION_TEST_DEBUG_TRACE}" = 'YES' ] \
+&& set -x  \
+&& : "$0" "$@"
+
+### >> START OF mulle-boot.sh >>
+### << END OF mulle-boot.sh <<
+
+#
+# Versioning of this script
+#
+MULLE_EXECUTABLE_VERSION="0.0.1"
+
+
+### >> START OF mulle-bashfunctions-embed.sh >>
+### << END OF mulle-bashfunctions-embed.sh <<
+
+clion_debug::print_flags()
+{
+   echo "   -f    : force operation"
+   echo "   -a    : add all tests in directory to project"
+
+   options_technical_flags_usage \
+                " : "
+}
+
+
+clion_debug::usage()
+{
+   [ $# -ne 0 ] && log_error "$*"
+
+
+   cat <<EOF >&2
+Usage:
+   mulle-clion-test [flags] <testfile>
+
+   Run this in a mulle-sde test directory which contains one or more tests.
+   Firsr an .idea folder, if not yet present, is created to set up a clion
+   project for debugging test executables.
+
+   It will then launch clion (https://www.jetbrains.com/clion)
+
+Flags:
+EOF
+   clion_debug::print_flags | LC_ALL=C sort >&2
+
+   exit 1
+}
+
+
+clion_debug::workspace()
+{
+   log_entry "clion_debug::workspace" "$@"
+
+   local name="$1"
+   local target_name="$2"
+   local config_name="$3"
+   local default_test_file="$4"
+   local tests="$5"
+
+   local project_id
+
+   project_id="`uuidgen | tr -d '-' | cut -c 1-27`"
+
+   local default_test_name
+   local test_file
+
+   r_extensionless_basename "${default_test_file}"
+   default_test_name="${RVAL}"
+
+
+   cat <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CMakeRunConfigurationManager">
+    <generated />
+  </component>
+  <component name="CMakeSettings">
+    <configurations>
+      <configuration PROFILE_NAME="Debug" ENABLED="true" CONFIG_NAME="Debug" />
+    </configurations>
+  </component>
+  <component name="ProjectApplicationVersion">
+    <option name="ide" value="CLion" />
+    <option name="majorVersion" value="2023" />
+    <option name="minorVersion" value="3.4" />
+  </component>
+  <component name="ProjectId" id="${project_id}" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="RunManager" selected="Custom Build Application.${default_test_name}">
+EOF
+
+   .foreachline test_file in ${tests}
+   .do
+      r_extensionless_basename "${test_file}"
+      test_name="${RVAL}"
+
+   cat <<EOF
+    <configuration name="${test_name}"
+                   type="CLionExternalRunConfiguration"
+                   factoryName="Application"
+                   REDIRECT_INPUT="false"
+                   ELEVATE="false"
+                   USE_EXTERNAL_CONSOLE="false"
+                   EMULATE_TERMINAL="false"
+                   WORKING_DIR="file://\$FileDir\$"
+                   PASS_PARENT_ENVS_2="true"
+                   PROJECT_NAME="${name}"
+                   TARGET_NAME="${target_name}"
+                   CONFIG_NAME="${config_name}"
+                   RUN_PATH="\$PROJECT_DIR\$/${test_name}.exe">
+      <method v="2">
+        <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider\$BuildBeforeRunTask" enabled="true" />
+      </method>
+   </configuration>
+EOF
+   .done
+
+   cat <<EOF
+    <list>
+      <item itemvalue="Custom Build Application.${default_test_name}" />
+    </list>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+    </task>
+    <servers />
+  </component>
+</project>
+EOF
+}
+
+clion_debug::modules()
+{
+   log_entry "clion_debug::modules" "$@"
+
+   local name="$1"
+
+   cat <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://\$PROJECT_DIR\$/.idea/${name}.iml" filepath="\$PROJECT_DIR\$/.idea/${name}.iml" />
+    </modules>
+  </component>
+</project>
+EOF
+}
+
+
+clion_debug::iml()
+{
+   log_entry "clion_debug::iml" "$@"
+
+   cat <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<module type="CPP_MODULE" version="4">
+  <component name="NewModuleRootManager">
+    <content url="file://\$MODULE_DIR\$" />
+    <orderEntry type="inheritedJdk" />
+    <orderEntry type="sourceFolder" forTests="false" />
+  </component>
+</module>
+EOF
+}
+
+#EOF
+#
+#   local testfile
+#   local target_id
+#   local configuration_id
+#   local name
+#
+#   .foreachline testfile in ${tests}
+#   .do
+#      target_id="`uuidgen`"
+#      configuration_id="`uuidgen`"
+#
+#      cat <<EOF
+#    <target id="${target_id}" name="build-tests-dummy" defaultType="TOOL">
+#      <configuration id="${configuration_id}" name="build-tests-dummy" />
+#    </target>
+#EOF
+
+
+clion_debug::customTargets()
+{
+   log_entry "clion_debug::customTargets" "$@"
+
+   local target_name="$1"
+   local config_name="$2"
+
+   local target_id
+   local configuration_id
+
+   target_id="`uuidgen`"
+   configuration_id="`uuidgen`"
+
+   cat <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CLionExternalBuildManager">
+    <target id="${target_id}" name="${target_name}" defaultType="TOOL">
+      <configuration id="${configuration_id}" name="${config_name}">
+        <build type="TOOL">
+          <tool actionId="Tool_External Tools_mulle-sde test crun --keep-exe" />
+        </build>
+      </configuration>
+    </target>
+  </component>
+</project>
+EOF
+}
+
+
+# just a copy from an  actual file
+clion_debug::vcs()
+{
+   log_entry "clion_debug::vcs" "$@"
+
+   cat <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="VcsDirectoryMappings">
+    <mapping directory="\$PROJECT_DIR\$/../.." vcs="Git" />
+  </component>
+</project>
+EOF
+}
+
+
+clion_debug::external()
+{
+   log_entry "clion_debug::external" "$@"
+
+   cat <<EOF
+<toolSet name="External Tools">
+  <tool name="mulle-sde test crun --keep-exe"
+        description="Craft the main library and run test anew"
+        showInMainMenu="false"
+        showInEditor="false"
+        showInProject="false"
+        showInSearchPopup="false"
+        disabled="false"
+        useConsole="true"
+        showConsoleOnStdOut="false"
+        showConsoleOnStdErr="false"
+        synchronizeAfterRun="true">
+    <exec>
+      <option name="COMMAND" value="mulle-sde" />
+      <option name="PARAMETERS" value="test --no-clean crun --keep-exe \$FileName\$" />
+      <option name="WORKING_DIRECTORY" value="\$FileDir\$" />
+    </exec>
+  </tool>
+  <tool name="mulle-sde clean all" description="Clean everything and rebuild"
+        showInMainMenu="false"
+        showInEditor="false"
+        showInProject="false"
+        showInSearchPopup="false"
+        disabled="false"
+        useConsole="true"
+        showConsoleOnStdOut="false"
+        showConsoleOnStdErr="false"
+        synchronizeAfterRun="true">
+    <exec>
+      <option name="COMMAND" value="mulle-sde" />
+      <option name="PARAMETERS" value="clean all" />
+      <option name="WORKING_DIRECTORY" value="\$FileDir\$" />
+    </exec>
+  </tool>
+</toolSet>
+EOF
+}
+
+
+
+clion_debug::main()
+{
+   #
+   # simple option/flag handling
+   #
+   local OPTION_RUN='YES'
+   local OPTION_CREATE='YES'
+   local OPTION_CLOBBER='YES'
+   local OPTION_ADD_ALL='NO'
+
+   while [ $# -ne 0 ]
+   do
+      if options_technical_flags "$1"
+      then
+         shift
+         continue
+      fi
+
+      case "$1" in
+         -f|--force)
+            MULLE_FLAG_MAGNUM_FORCE='YES'
+         ;;
+
+         -h*|--help|help)
+            clion_debug::usage
+         ;;
+
+         -a|--add-all)
+            OPTION_ADD_ALL='YES'
+         ;;
+
+         --no-clobber)
+            OPTION_CLOBBER='NO'
+         ;;
+
+         --no-run)
+            OPTION_RUN='NO'
+         ;;
+
+         --no-create)
+            OPTION_CREATE='NO'
+         ;;
+
+         --version)
+            printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
+            exit 0
+         ;;
+
+         -*)
+            clion_debug::usage "Unknown flag \"$1\""
+         ;;
+
+         *)
+            break
+         ;;
+      esac
+
+      shift
+   done
+
+   options_setup_trace "${MULLE_TRACE}" && set -x
+
+   # user should supply source
+   local filename
+
+   for filename in "$@"
+   do
+      case "${file}" in
+         *.exe)
+            fail "Call it with the source file"
+         ;;
+      esac
+   done
+
+   if [ $# -ne 1 ]
+   then
+      clion_debug::usage
+   fi
+
+   local default_test_file
+
+   default_test_file="$1"
+
+
+   local extensions
+
+   #
+   # figure out some stuff
+   extensions="`mulle-sde get PROJECT_EXTENSIONS`"
+   if [ -z "${extensions}" ]
+   then
+      fail "Could not figure out test extensions"
+   fi
+
+   local tests
+
+   if [ "${OPTION_ADD_ALL}" = 'YES' ]
+   then
+      local files
+      local extension
+
+      .foreachpath extension in ${extensions}
+      .do
+         files="`dir_list_files "." "*.${extension}" f`"
+         r_add_line "${tests}" "${files}"
+         tests="${RVAL}"
+      .done
+   else
+      tests="${default_test_file}"
+   fi
+
+   if [ -z "${tests}" ]
+   then
+      fail "Could not find any tests with test extensions \"${extensions}\""
+   fi
+
+   local name
+
+   r_basename "${PWD}"
+   name="${RVAL}"
+
+   local target_name
+   local config_name
+
+   target_name="build-test"
+   config_name="build-test"
+
+
+   if [ "${OPTION_CREATE}" = 'YES' ]
+   then
+      if [ -d .idea ]
+      then
+         if [ "${MULLE_FLAG_MAGNUM_FORCE}" = 'YES' -o "${OPTION_CLOBBER}" = 'YES' ]
+         then
+            rmdir_safer ".idea"
+         else
+            OPTION_CREATE='NO'
+         fi
+      fi
+   fi
+
+   if [ "${OPTION_CREATE}" = 'YES' ]
+   then
+      mkdir_if_missing ".idea/tools"
+
+      redirect_exekutor ".idea/tools/External\ Tools.xml" clion_debug::external
+      redirect_exekutor ".idea/vcs.xml" clion_debug::vcs
+      redirect_exekutor ".idea/${name}.iml" clion_debug::iml
+      redirect_exekutor ".idea/modules.xml" clion_debug::modules "${name}"
+      redirect_exekutor ".idea/customTargets.xml" clion_debug::customTargets "${target_name}" \
+                                                                             "${config_name}"
+      redirect_exekutor ".idea/workspace.xml" clion_debug::workspace "${name}" \
+                                                                     "${target_name}" \
+                                                                     "${config_name}" \
+                                                                     "${default_test_file}" \
+                                                                     "${tests}"
+   fi
+
+   CLION="${CLION:-`command -v clion`}"
+   CLION="${CLION:-`command -v clion.sh`}"
+
+   if [ "${OPTION_RUN}" = 'YES' ]
+   then
+      exekutor "${CLION}" "${default_test_file}"
+   fi
+}
+
+#
+# You can also use the function `call_with_flags`, which has been defined
+# during mulle-boot. It lets you call 'clion_debug::main'
+# with MULLE_PROJECT_CLION_TEST_DEBUG_FLAGS interposed.
+#
+# call_with_flags "clion_debug::main" "${MULLE_PROJECT_CLION_TEST_DEBUG_FLAGS}" "$@"
+
+clion_debug::main "$@"

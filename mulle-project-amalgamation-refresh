@@ -354,7 +354,10 @@ background()
 {
    [ $# -eq 0 ] && usage "missing library argument"
 
-   local library_dir="$1"; shift
+   local serial="$1"
+   local library_dir="$2"
+
+   shift 2
 
    [ $# -ne 0 ] && usage "superflous arguments $*"
 
@@ -368,9 +371,16 @@ background()
    r_basename "${library_dir}"
    library_name="${RVAL}"
 
+   set -- "${MULLE_EXECUTABLE_NAME}" -s ${MULLE_TECHNICAL_FLAGS} \
+                                     --name "${OPTION_NAME:-${library_name}}"
+   if [ "${serial}" = 'YES' ]
+   then
+      set -- "$@" --serial 
+   fi                                     
+
    log_info "Reamalgamate ${C_MAGENTA}${C_BOLD}${library_name}"
    exekutor cd "${library_dir}" &&
-   exekutor "${MULLE_EXECUTABLE_NAME}" -s --name "${OPTION_NAME:-${library_name}}"
+   exekutor "$@"
 }
 
 
@@ -447,7 +457,7 @@ main()
 
    if [ "${OPTION_BACKGROUND}" = 'YES' ]
    then
-      background "$@"
+      background "${OPTION_SERIAL}" "$@"
       return $?
    fi
 

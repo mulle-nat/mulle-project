@@ -1,0 +1,32 @@
+#!/usr/bin/env mulle-bash
+
+if [ ! -f CMakeLists.txt ]
+then
+   fail "CMakeLists.txt not found"
+fi
+
+if ! version=$(mulle-project-version -s)
+then
+   fail "Could not figure out project version"
+fi
+
+if grep -q "^project( [[:alnum:]-]\+ [[:alnum:]]\+)$" CMakeLists.txt; then
+   inplace_sed -E 's/^project\( ([[:alnum:]-]+) ([[:alnum:]]+)\)$/project( \1 VERSION '"${version}"' LANGUAGES \2)/' CMakeLists.txt
+   log_info "Updated CMakeLists.txt with version ${version}"
+fi
+
+log_verbose "Adding cmake package support if needed"
+
+inplace_sed '/^include( InstallLibrary)$/!b;n;/^include( FinalOutput OPTIONAL)$/{
+i\
+\
+if( LINK_PHASE)\
+   include( InstallCMakeInclude)\
+   include( InstallCMakePackage)\
+endif() \
+
+}' CMakeLists.txt
+
+
+log_verbose "Updating CMAKE_MODULE_PATH if needed"
+inplace_sed 's/list( INSERT CMAKE_MODULE_PATH 0 "${PROJECT_SOURCE_DIR}/list( INSERT CMAKE_MODULE_PATH 0 "${CMAKE_CURRENT_SOURCE_DIR}/' CMakeLists.txt

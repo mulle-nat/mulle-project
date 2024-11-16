@@ -163,17 +163,17 @@ project::git::can_push()
    log_entry "project::git::can_push" "$@"
 
    local remote="${1:-origin}"
-   local branch="${2:-release}"
+   local branch="${2:-master}"
 
    local result
 
    if ! rexekutor git fetch -q "${remote}" "${branch}"
    then
-      if [ "${branch}" = "master" ]
+      if [ "${branch}" = "develop" ]
       then
          return 1
       fi
-      if exekutor git fetch -q "${remote}" "master"
+      if exekutor git fetch -q "${remote}" "develop"
       then
          return 0
       fi
@@ -196,7 +196,7 @@ project::git::remote_branch_is_synced()
    log_entry "project::git::remote_branch_is_synced" "$@"
 
    local remote="${1:-origin}"
-   local branch="${2:-release}"
+   local branch="${2:-master}"
 
    local no_change
 
@@ -281,10 +281,10 @@ project::git::untag_all()
 
 project::git::_parse_params()
 {
-   branch="${1:-${GIT_DEFAULT_BRANCH:-master}}"
+   branch="${1:-${GIT_DEFAULT_BRANCH:-develop}}"
    [ $# -ne 0 ] && shift
 
-   dstbranch="${1:-release}"
+   dstbranch="${1:-master}"
    [ $# -ne 0 ] && shift
 
    origin="${1:-origin}"
@@ -519,7 +519,7 @@ project::git::verify_main()
    local branch
 
    branch="`rexekutor git rev-parse --abbrev-ref HEAD`"
-   branch="${branch:-${GIT_DEFAULT_BRANCH:-master}}" # for dry run
+   branch="${branch:-${GIT_DEFAULT_BRANCH:-develop}}" # for dry run
 
    project::git::_verify_main "${branch}" "$@"
 
@@ -532,10 +532,10 @@ project::git::assert_not_on_release_branch()
    local branch
 
    branch="`exekutor git rev-parse --abbrev-ref HEAD`"
-   branch="${branch:-${GIT_DEFAULT_BRANCH:-master}}" # for dry run
-   if [ "${branch}" = "release" ]
+   branch="${branch:-${GIT_DEFAULT_BRANCH:-develop}}" # for dry run
+   if [ "${branch}" = "master" ]
    then
-      fail "Don't call it from release branch"
+      fail "Don't call it from master branch"
    fi
 }
 
@@ -613,10 +613,10 @@ project::git::main()
    local rval
 
    branch="`exekutor git rev-parse --abbrev-ref HEAD`"
-   branch="${branch:-${GIT_DEFAULT_BRANCH:-master}}" # for dry run
-   if [ "${branch}" = "release" ]
+   branch="${branch:-${GIT_DEFAULT_BRANCH:-develop}}" # for dry run
+   if [ "${branch}" = "master" ]
    then
-      fail "Don't call it from release branch"
+      fail "Don't call it from master branch"
    fi
 
    project::git::_commit_main "${branch}" "$@"

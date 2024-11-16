@@ -5,16 +5,18 @@
 #
 
 IFS=$'\n'
-for line in `mulle-sde dependency list -r \
-                                       --columnar \
-                                       -- "$@" \
-                                          --dedupe-mode url-filename \
-                                          --output-no-column \
-                                          --output-no-header \
-                                          --output-eval \
-                                          --format '%n;%u\n' `
+for line in `mulle-sde -s dependency list -r \
+                                          --columnar \
+                                          -- "$@" \
+                                             --dedupe-mode url-filename \
+                                             --output-no-column \
+                                             --output-no-header \
+                                             --output-eval \
+                                             --format '%n;%b;%u\n' `
 do
-   nodetype="${line%;*}"
+   nodetype="${line%%;*}"
+   line="${line#*;}"
+   branch="${line%;*}"
    url="${line##*;}"
 
    case "${nodetype}" in
@@ -40,8 +42,22 @@ do
       ;;
    esac
 
-   echo git submodule add "${url}" "submodule/${repo}"
+   printf "git submodule add -f"
+   if [ ! -z "${branch}" ]
+   then
+      r_escaped_doublequotes "${branch}"
+      printf " -b \"%s\"" "${RVAL}"
+   fi
+
+   r_escaped_doublequotes "${repo}"
+   printf " --name \"%s\"" "${RVAL}"
+
+   r_escaped_doublequotes "${url}"
+   printf " \"%s\"" "${url}"
+
+   r_escaped_doublequotes "${repo}"
+   printf " \"stash/%s\"\n" "${RVAL}"
 done
 
 echo mulle-sde environment --global set MULLE_FETCH_SEARCH_PATH \
-"'"'${PWD}/submodule:${MULLE_FETCH_SEARCH_PATH}'"'"
+"'"'${PWD}/stash:${MULLE_FETCH_SEARCH_PATH}'"'"

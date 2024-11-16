@@ -239,6 +239,7 @@ repo  ${repo}
 
    (
       cd "${MULLE_KYBERNETIK_GITOLITE}" || exit 1
+      exekutor git pull --no-edit || exit 1
       redirect_append_exekutor "${MULLE_KYBERNETIK_GITOLITE}/conf/gitolite.conf" \
                                   printf "%s\n" "${text}" &&
       exekutor git commit -m "Added \"${repo}\" to the repositories" \
@@ -316,8 +317,8 @@ new_repo::main()
 
          --mulle)
             OPTION_PROVIDERS='github,mulle-kybernetik'
-            OPTION_BRANCH='release'
-            OPTION_MASTER='master'
+            OPTION_BRANCH='master'
+            OPTION_MASTER='develop'
             OPTION_PUSH='YES'
          ;;
 

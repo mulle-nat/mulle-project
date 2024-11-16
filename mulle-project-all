@@ -78,6 +78,7 @@ EOF
    --lenient           : lenient operation, errors don't preempt (default)
    --main-project      : also execute in main project
    --no-cd             : do not change to project directory
+   --no-fake-aliases   : do not expand executable "sde" to "mulle-sde"
    --only-others       : only execute in other projects, like demo
    --only-main-project : only execute in main project (default)
    --only-tests        : only execute in tests directories
@@ -294,7 +295,6 @@ shell_it()
          ;;
       esac
 
-
       shift
 
       if [ ! -z "${OPTION_DIRECTORY}" ]
@@ -308,6 +308,22 @@ shell_it()
          then
             rexekutor cd "${OPTION_DIRECTORY}" || exit 1
          fi
+      fi
+
+      #
+      # its inconvenient, that aliases doesn't carry through, so fake the
+      # most often used ones 
+      #
+      if [ "${OPTION_FAKE_ALIASES}" = 'YES' ]
+      then
+         case "$1" in 
+            'sde')
+               log_verbose "Expanding \"sde\" to \"mulle-sde\""
+
+               shift
+               set -- "mulle-sde" "$@"
+            ;;
+         esac
       fi
 
       if [ "${OPTION_EVAL}" = 'YES' -o "${OPTION_EXEC}" = 'YES' ]
@@ -693,6 +709,7 @@ main()
 {
    local OPTION_ADORN
    local OPTION_CD='YES'
+   local OPTION_FAKE_ALIASES='YES'
    local OPTION_LENIENT='YES'
    local OPTION_MODE="main-project"
    local OPTION_REPOSFILE
@@ -778,6 +795,10 @@ main()
 
          --no-cd)
             OPTION_CD='NO'
+         ;;
+
+         --no-fake-aliases)
+            OPTION_FAKE_ALIASES='NO'
          ;;
 
          -p|--parallel)

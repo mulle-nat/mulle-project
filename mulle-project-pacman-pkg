@@ -35,7 +35,7 @@ Usage:
    Run as mulle-project-man >> PKGBUILD in any mulle-sde project.
    The resulting file can then be processed by "makepkg".
 
-   If you have a "release" branch, it will be checked for the latest
+   If you have a "master" branch, it will be checked for the latest
    tag that matches [v0-9]*.*.* and this will be used. As a fallback the
    default branch is checked.
 
@@ -367,7 +367,7 @@ get_archive()
 
    eval `rexekutor mulle-domain parse "${remote}"`
 
-   tag="${tag:-`get_latest_tag release 2> /dev/null`}"
+   tag="${tag:-`get_latest_tag master 2> /dev/null`}"
    tag="${tag:-`get_latest_tag 2> /dev/null`}"
 
    local url

@@ -19,11 +19,11 @@ print_flags()
    echo "   -f                 : force operation"
    echo "   --always-amend     : always amend the commit [dangerous]"
    echo "   --boring           : all files are considered to be boring"
+   echo "   --ignore-untracked : ignore untracked files"
    echo "   --no-amend         : never amend, just create a new commit [most safe]"
    echo "   --no-diff          : don't diff non-boring changes"
-   echo "   --safe-amend       : amend if harmless, otherwise new commit (default)"
    echo "   --only-amend       : don't commit, if an amend is not possible"
-   echo "   --ignore-untracked : ignore untracked files"
+   echo "   --safe-amend       : amend if harmless, otherwise new commit (default)"
 
    options_technical_flags_usage \
                 "              : "
