@@ -39,6 +39,8 @@ usage()
 Usage:
    mulle-project-squash-prerelease [flags]
 
+   MEMO: do not use, seems unreliable on first sight
+
    Squash all leading commits that only contain a single line commit message,
    that isn't  prefixed by '*'. (Hint: use --mulle)
    If no words are given, then the following words must exist in the
@@ -110,6 +112,7 @@ main()
          --mulle)
             OPTION_MULLE="$1"
             OPTION_PUSH='YES'
+            GIT_DEFAULT_BRANCH="develop"
          ;;
 
          --)
@@ -138,7 +141,7 @@ main()
       fail "Project ${PWD#"${MULLE_USER_PWD}/"} is not pristine"
    fi
 
-   exekutor git checkout "${GIT_DEFAULT_BRANCH:-master}" || return 1
+   exekutor git checkout "${GIT_DEFAULT_BRANCH:-develop}" || return 1
 
    local commit
    local count
@@ -153,8 +156,12 @@ main()
    count=0
    .foreachline commit in `rexekutor git rev-list "${OPTION_REV}" `
    .do
-      message="`git log -1 --pretty='format:%B' "${commit}" `"
-      log_debug "Commit \"${commit}\" message is \"${message}\""
+      message="`rexekutor git log -1 --pretty='format:%B' "${commit}" `"
+      log_verbose "Commit \"${commit}\" message is \"${message}\""
+      if [ -z "${message}" -a "${MULLE_FLAG_MAGNUM_FORCE}" != 'YES' ]
+      then
+         fail "Empty commit for \"${commit}\" message is suspicous. Use -f to force"
+      fi
 
       n_lines="`wc -l <<< "${message}" `"
 

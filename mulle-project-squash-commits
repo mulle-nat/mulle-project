@@ -169,7 +169,7 @@ main()
       .foreachline line in ${squashed_tags}
       .do
          case "${line}" in
-            *prerelease)
+            *prerelease*)
             ;;
 
             *)
