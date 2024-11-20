@@ -56,7 +56,7 @@ print_flags()
    echo "   --tag <tag>        : force tag the commit" 
    echo "   --clobber          : ignore commits in prerelease, clobber them"
    echo "   --touch            : push an empty commit for github"
-   echo "   --sloppy <message> : committing unsaved changes in master"
+   echo "   --sloppy <message> : committing unsaved changes in develop"
    echo "   --always-amend     : always amend the commit [dangerous]"
    echo "   --no-amend         : never amend, just create a new commit (default)"
    echo "   --no-origin        : don't push to origin"
@@ -81,7 +81,7 @@ Usage:
    Use this only if this mental model works for you:
 
       * there are two remotes "origin" and "github"
-      * changes happen on master, they are pushed to prerelease
+      * changes happen on develop, they are pushed to prerelease
       * prerelease branches are clobbered
       * version numbers are tagged, you don't push a prerelease, if the
         version number is unchanged
@@ -91,13 +91,13 @@ Usage:
 
    In force mode (-f), preferred:
 
-   Deletes current prerelease branch, copies current master to prerelease.
+   Deletes current prerelease branch, copies current develop to prerelease.
    Force pushes to origin and github. Will therefore forcibly wipe remote
    prelease branches.
 
    In normal mode:
 
-   Checks out or creates prerelease branch from master. Rebases on master.
+   Checks out or creates prerelease branch from develop. Rebases on develop.
    Pushes to remote prerelease branches.
 
 Flags:
@@ -264,15 +264,15 @@ main()
    include "project::git"
 
    #
-   # Go to master, we only push from master (for now)
+   # Go to develop, we only push from develop (for now)
    #
    local rval
 
-   exekutor git checkout -q master
+   exekutor git checkout -q develop
    rval=$?
    if [ $rval -ne 0 ]
    then
-      fail "Could not checkout master"
+      fail "Could not checkout develop"
    fi
 
    #
@@ -349,21 +349,21 @@ main()
       if [ "${OPTION_CLOBBER}" != 'YES' ]
       then
          #
-         # Ensure that prerelease is not ahead of master.
+         # Ensure that prerelease is not ahead of develop.
          # We don't want to lose **local** commits accidentally pushed into the
          # wrong branch, as can happen...
          #
-         counts="`rexekutor git rev-list --left-right --count master...${BRANCH}`" || return 1
+         counts="`rexekutor git rev-list --left-right --count develop...${BRANCH}`" || return 1
 
          # clumsy
-         local master_count
+         local develop_count
          local prerelease_count=0
 
          for count in ${counts}
          do
-            if [ -z "${master_count}" ]
+            if [ -z "${develop_count}" ]
             then
-               master_count="${count}"
+               develop_count="${count}"
             else
                prerelease_count="${count}"
             fi
@@ -372,12 +372,12 @@ main()
 
          if [ ${prerelease_count} -gt 0 ]
          then
-            fail "Prerelease branch is ahead of master"
+            fail "Prerelease branch is ahead of develop"
          fi
 
-         if [ ${master_count:-0} -eq 0 ]
+         if [ ${develop_count:-0} -eq 0 ]
          then
-            log_info "Prerelease is same as master, nothing to rebase"
+            log_info "Prerelease is same as develop, nothing to rebase"
             justpush='YES'
          fi
       fi
@@ -429,7 +429,7 @@ main()
    fi
 
    #
-   # Update prerelease branch from master
+   # Update prerelease branch from develop
    #
    local rval
 
@@ -468,11 +468,11 @@ main()
             fail "\"${BRANCH}\" checkout failed ($rval)"
          fi
 
-         exekutor git rebase master
+         exekutor git rebase develop
          rval=$?
          if [ $rval -ne 0 ]
          then
-            fail "\"${BRANCH}\" rebase to \"master\" failed ($rval)"
+            fail "\"${BRANCH}\" rebase to \"develop\" failed ($rval)"
             return 1
          fi
       fi
@@ -548,11 +548,11 @@ main()
       fi
    fi
 
-   exekutor git checkout -q master
+   exekutor git checkout -q develop
    rval=$?
    if [ $rval -ne 0 ]
    then
-      fail "Could not checkout master"
+      fail "Could not checkout develop"
    fi
 }
 
