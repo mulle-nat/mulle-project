@@ -56,6 +56,57 @@ EOF
 }
 
 
+r_get_before()
+{
+   log_entry r_get_before "$@"
+
+   RVAL=
+
+   # TODO check file size
+   if [ -f "${filename}" ]
+   then
+      RVAL="`cat "${filename}"`"
+      return 0
+   fi
+
+   if [ -e "${filename}" ]
+   then
+      log_warning "File ${C_RESET_BOLD}${filename}${C_WARNING} is not readable"
+   else
+      log_warning "File ${C_RESET_BOLD}${filename}${C_WARNING} does not exist"
+   fi
+   return 1
+}
+
+
+explain_result()
+{
+   log_entry explain_result "$@"
+
+   local before="$1"
+   local after="$2"
+   local filename="$3"
+
+   if [ "${after}" = "${before}" ]
+   then
+      log_verbose "No changes in ${C_RESET_BOLD}${filename}"
+      return 0
+   fi
+
+   if ! DIFF="${DIFF:-"`command -v diff`"}"
+   then
+      log_warning "diff command not installed"
+   fi
+
+   log_info "Changes in ${C_RESET_BOLD}${filename}"
+   if [ ! -z "${DIFF}" ]
+   then
+      rexekutor "${DIFF}" -b <( echo "${before}") <( echo "${after}") >&2
+   fi
+
+   return 2
+}
+
 
 delete_line()
 {
@@ -89,23 +140,17 @@ delete_line()
    local after
    local DIFF
 
-   if [ "${MULLE_FLAG_LOG_VERBOSE}" = 'YES' -o "${MULLE_FLAG_EXEKUTOR_DRY_RUN}" = 'YES' ]
+   if ! r_get_before "${filename}"
    then
-      # TODO check file size
-      before="`rexekutor cat "${filename}"`"
-
-      if ! DIFF="${DIFF:-"`command -v diff`"}"
-      then
-         log_warning "diff command not installed"
-      fi
+      return 1
    fi
+   before="${RVAL}"
 
    if [ "${MULLE_FLAG_EXEKUTOR_DRY_RUN}" = 'YES' ]
    then
       after="`eval_rexekutor sed "${sed_command}" "'${filename}'" `"
-      log_info "Changes in ${C_RESET_BOLD}${filename}"
-      rexekutor "${DIFF}" -b <( echo "${before}") <( echo "${after}" ) >&2
-      return $?
+      explain_result "${before}" "${after}" "${filename}"
+      return 0
    fi
 
    local unprotect
@@ -124,8 +169,12 @@ delete_line()
    fi
 
    local error
+   local old="${MULLE_FLAG_LOG_EXEKUTOR}"
 
-   if ! "`{ error=$( eval_rexekutor inplace_sed "${sed_command}" "'${filename}'" 2>&1 >&3 3>&-); } 3>&1`"
+   eval exekutor_trace "exekutor_print" inplace_sed "${sed_command}" "'${filename}'"
+   MULLE_FLAG_LOG_EXEKUTOR=NO
+
+   if ! "`{ error=$( eval inplace_sed "${sed_command}" "'${filename}'" 2>&1 >&3 3>&-); } 3>&1`"
    then
       if [ -d "${filename}" ]
       then
@@ -135,6 +184,7 @@ delete_line()
       printf "%s\n" "${error}" >&2
       return 1
    fi
+   MULLE_FLAG_LOG_EXEKUTOR="${old}"
 
    if [ "${unprotect}" = 'YES' ]
    then
@@ -143,9 +193,11 @@ delete_line()
 
    if [ "${MULLE_FLAG_LOG_VERBOSE}" = 'YES' ]
    then
-      log_verbose "Changes in ${C_RESET_BOLD}${filename}"
-      rexekutor "${DIFF}" -b <( echo "${before}") "${filename}" >&2
+      after="`cat "${filename}"`"
+      explain_result "${before}" "${after}" "${filename}"
    fi
+
+   return 0
 }
 
 
@@ -189,22 +241,16 @@ replace()
    local after
    local DIFF
 
-   if [ "${MULLE_FLAG_LOG_VERBOSE}" = 'YES' -o "${MULLE_FLAG_EXEKUTOR_DRY_RUN}" = 'YES' ]
+   if ! r_get_before "${filename}"
    then
-      before="`rexekutor cat "${filename}" 2> /dev/null`"
-
-      if ! DIFF="${DIFF:-"`command -v diff`"}"
-      then
-         log_warning "diff command not installed"
-      fi
+      return 1
    fi
+   before="${RVAL}"
 
    if [ "${MULLE_FLAG_EXEKUTOR_DRY_RUN}" = 'YES' ]
    then
       after="`eval_rexekutor sed "${sed_command}" "'${filename}'" `"
-
-      log_info "Changes in ${C_RESET_BOLD}${filename}"
-      rexekutor "${DIFF}" -b <( echo "${before}") <( echo "${after}" ) >&2
+      explain_result "${before}" "${after}" "${filename}"
       return 0
    fi
 
@@ -224,8 +270,12 @@ replace()
    fi
 
    local error
+   local old="${MULLE_FLAG_LOG_EXEKUTOR}"
 
-   if ! { error=$( eval_rexekutor inplace_sed "${sed_command}" "'${filename}'" 2>&1 >&3 3>&-); } 3>&1
+   eval exekutor_trace "exekutor_print" inplace_sed "${sed_command}" "'${filename}'"
+   MULLE_FLAG_LOG_EXEKUTOR=NO
+
+   if ! { error=$( eval inplace_sed "${sed_command}" "'${filename}'" 2>&1 >&3 3>&-); } 3>&1
    then
       if [ -d "${filename}" ]
       then
@@ -235,6 +285,7 @@ replace()
       printf "%s\n" "${error}" >&2
       return 1
    fi
+   MULLE_FLAG_LOG_EXEKUTOR="${old}"
 
    if [ "${unprotect}" = 'YES' ]
    then
@@ -243,8 +294,8 @@ replace()
 
    if [ "${MULLE_FLAG_LOG_VERBOSE}" = 'YES' ]
    then
-      log_verbose "Changes in ${C_RESET_BOLD}${filename}"
-      rexekutor "${DIFF}" -b <( echo "${before}") "${filename}" >&2
+      after="`cat "${filename}"`"
+      explain_result "${before}" "${after}" "${filename}"
    fi
 
    return 0

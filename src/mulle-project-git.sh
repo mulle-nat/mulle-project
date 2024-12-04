@@ -461,7 +461,7 @@ project::git::_commit_main()
    # make it a release
    #
    log_info "Push clean state of \"${branch}\" to \"${origin}\""
-   exekutor git push "${origin}" "${branch}"  || ${return_or_continue_if_dry_run} 1
+   exekutor git push ${gitpushflags} "${origin}" "${branch}"  || ${return_or_continue_if_dry_run} 1
 
    log_info "Make \"${dstbranch}\" a release, by rebasing on \"${branch}\""
    exekutor git checkout -B "${dstbranch}"    || ${return_or_continue_if_dry_run} 1

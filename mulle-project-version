@@ -460,13 +460,13 @@ edit_version()
       fi
 
       VERSION="`project::version::add "${VERSION}" \
-                                    "${OPTION_ADD_MAJOR}" \
-                                    "${OPTION_ADD_MINOR}" \
-                                    "${OPTION_ADD_PATCH}" \
-                                    "${OPTION_ADD_CUSTOM}" \
-                                    "0" \
-                                    "${OPTION_FIRST_PATCH}" \
-                                    "${OPTION_FIRST_CUSTOM}"`" || exit 1
+                                      "${OPTION_ADD_MAJOR}" \
+                                      "${OPTION_ADD_MINOR}" \
+                                      "${OPTION_ADD_PATCH}" \
+                                      "${OPTION_ADD_CUSTOM}" \
+                                      "0" \
+                                      "${OPTION_FIRST_PATCH}" \
+                                      "${OPTION_FIRST_CUSTOM}"`" || exit 1
    fi
 }
 

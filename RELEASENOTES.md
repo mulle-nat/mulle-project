@@ -1,3 +1,39 @@
+## 4.1.0
+
+* add some new commands, improve mulle-replace to be more debuggable
+
+
+* change master to develop in prelease
+
+feat: modernize project structure and improve version handling
+
+* Switch default branch strategy to master/develop
+  - Change release branch to master for modern git flow
+  - Make develop the default working branch
+  - Update branch references across scripts
+  - Fix branch validation and push checks
+
+* Enhance version management
+  - Add CMake version support in mulle-project-version
+  - Parse and update VERSION field in project() calls
+  - Support reading/writing CMakeLists.txt versions
+  - Add --no-cmake flags for version control
+
+* Improve repository management
+  - Fix gitolite repository creation with git pull
+  - Update mulle-project-new-repo defaults
+  - Fix submodule paths and branch handling
+  - Support branch specification in git submodules
+
+* Other improvements
+  - Fix path variables to use `CMAKE_CURRENT_SOURCE_DIR`
+  - Add language/dialect support in properties
+  - Add fake alias expansion in mulle-project-all
+  - Fix package description handling
+
+* mulle-project-new-demos renamed to mulle-project-demo
+
+
 # 4.0.0
 
 feat: modernize project structure and improve version handling
