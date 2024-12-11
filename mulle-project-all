@@ -67,7 +67,7 @@ print_flags()
    --parallel          : execute operations in parallel
    --repos-file <f>    : REPOS file to use (shortcut: -r)
    --sde               : only execute in mulle-sde projects
-   --skip-until <s>    : skip projects in REPOS until <s>
+   --start-from <s>    : skip projects in REPOS until, but not including <s>
    --strict            : errors preempt
    --tests             : also execute in test directories
 EOF
@@ -584,7 +584,7 @@ r_repos_contents()
    then
       if ! grep -q -F -x "${skipuntil}" <<< "${repos}"
       then
-         fail "--skip-until \"${skipuntil}\", repository not found"
+         fail "--start-with \"${skipuntil}\", repository not found"
       fi
 
       first="${skipuntil}"
@@ -721,7 +721,7 @@ main()
    local OPTION_IF
    local OPTION_IGNORE
    local OPTION_SKIP_FROM
-   local OPTION_SKIP_UNTIL
+   local OPTION_START_WITH
    local OPTION_PRINT
    local OPTION_SUBLIME
 
@@ -850,11 +850,11 @@ main()
             OPTION_SKIP_FROM="$1"
          ;;
 
-         --skip-until)
+         --start-from|--start-with|--skip-until)
             [ $# -eq 1 ] && usage "missing argument to $1"
             shift
 
-            OPTION_SKIP_UNTIL="$1"
+            OPTION_START_WITH="$1"
          ;;
 
          --skip-past|--skip-after)
@@ -912,16 +912,16 @@ main()
 
    options_setup_trace "${MULLE_TRACE}" && set -x
 
-   if [ ! -z "${OPTION_SKIP_PAST}" -a ! -z "${OPTION_SKIP_UNTIL}" ]
+   if [ ! -z "${OPTION_SKIP_PAST}" -a ! -z "${OPTION_START_WITH}" ]
    then
-      fail "Specify --skip-until or --skip-past but not both"
+      fail "Specify --start-with or --skip-past but not both"
    fi
 
    local repos
 
    r_repos_contents "${OPTION_REPOSFILE:-REPOS}" \
                     "${OPTION_SKIP_FROM}" \
-                    "${OPTION_SKIP_UNTIL}" \
+                    "${OPTION_START_WITH}" \
                     "${OPTION_SKIP_PAST}"
    repos="${RVAL}"
 

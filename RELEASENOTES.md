@@ -1,3 +1,7 @@
+### 4.1.1
+
+* rename --skip-until option to --start-from (but keep old name as well)
+
 ## 4.1.0
 
 * add some new commands, improve mulle-replace to be more debuggable
