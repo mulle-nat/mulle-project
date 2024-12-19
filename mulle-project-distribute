@@ -146,12 +146,14 @@ __environment_main()
    #
    if [ -z "${VERSION}" ]
    then
-      options="--no-info --no-tag-warning"
-      [ ! -z "${LANGUAGE}" ]    && options="${options} --language \"${LANGUAGE}\""
-      [ ! -z "${VERSIONNAME}" ] && options="${options} --versionname \"${VERSIONNAME}\""
-      [ ! -z "${VERSIONFILE}" ] && options="${options} --versionfile \"${VERSIONFILE}\""
+      local version_options 
 
-      VERSION="`eval mulle-project-version ${options} "${PROJECT}"`" || exit 1
+      version_options="--no-info --no-tag-warning"
+      [ ! -z "${LANGUAGE}" ]    && version_options="${version_options} --language \"${LANGUAGE}\""
+      [ ! -z "${VERSIONNAME}" ] && version_options="${version_options} --versionname \"${VERSIONNAME}\""
+      [ ! -z "${VERSIONFILE}" ] && version_options="${version_options} --versionfile \"${VERSIONFILE}\""
+
+      VERSION="`eval mulle-project-version ${version_options} "${PROJECT}"`" || exit 1
    fi
 
 
@@ -366,8 +368,11 @@ __environment_main()
 
    if [ ! -z "${PUBLISHER_TAP}" ]
    then
+      local tmp 
+      
       r_basename "${PUBLISHER_TAP}"
       tmp="${RVAL}"
+
       HOMEBREW_TAP="${HOMEBREW_TAP:-${TAPS_LOCATION}/homebrew-${tmp}}"
    fi
 

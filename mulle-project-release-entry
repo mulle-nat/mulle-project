@@ -15,16 +15,16 @@ fi
 
 print_flags()
 {
-   echo "   -f        : force operation"
-   echo "   -m        : suppress output if there is only a patch change"
-   echo "   -p <date> : use date as previous release date instead of tag"
-   echo "   -b        : put ** around major change fields"
+   echo "   -f          : force operation"
+   echo "   -m          : suppress output if there is only a patch change"
+   echo "   -p <date>   : use date as previous release date instead of tag"
+   echo "   -b <marker> : put marker around major change fields"
    ##
    ## ADD YOUR FLAGS DESCRIPTIONS HERE
    ##
 
    options_technical_flags_usage \
-                " : "
+                "       : "
 }
 
 
@@ -211,13 +211,18 @@ run()
    if [ ! -z "${version_commit}" ]
    then
       tag="`git_numeric_tags_in_timerange "${timestamp1}" "${timestamp2}" \
-            | tail -1 `"
+            | tail -1`"
       tag="${tag:-???}"
    else
       tag="`rexekutor git tag -l --points-at "${latest_commit}" \
             | sort -r -n \
             | grep -E '^[0-9]*\.[0-9]*\.[0-9]*$' | head -1`"
    fi
+
+   log_setting "latest_commit:  ${latest_commit}"
+   log_setting "version_commit: ${version_commit}"
+   log_setting "version:        ${version}"
+   log_setting "tag:            ${tag}"
 
    if [ "${suppress}" = 'YES' -o "${boldmarker}" = 'YES' ]
    then

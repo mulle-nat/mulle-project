@@ -148,7 +148,6 @@ append_to_gitignore_if_needed()
    # grep -F is bugged on at least OS X 10.x, so can't use -e chaining
 
    local terminator
-   local line
 
    line="${file}"
    terminator="`rexekutor tail -c 1 ".gitignore" 2> /dev/null | tr '\012' '|'`"

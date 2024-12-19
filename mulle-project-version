@@ -471,33 +471,44 @@ edit_version()
 }
 
 
-emit_patched_cmakelists_txt()
+emit_patched_cmakelists_txt() 
 {
    log_entry "emit_patched_cmakelists_txt" "$@"
 
    local version="$1"
 
    local in_project=0
-   local notfound=1
+   local found=0
 
-   while IFS= read -r line
+   while IFS=$'\n' read -r line
    do
-       if [ $notfound -eq 1 ]
-       then
-          if [[ $line =~ ^[[:space:]]*project\( ]]; then
-              in_project=1
-          fi
+      if [ $found -eq 0 ]
+      then
+         case "$line" in
+            *project\(*)
+               in_project=1
+            ;;
 
-          if [[ $in_project -eq 1 && $line =~ VERSION[[:space:]]*[0-9]+\.[0-9]+\.[0-9]+ ]]
-          then
-              line="`printf "%s\n" "${line}" \
-                    | sed -E 's/([[:space:]]*VERSION[[:space:]]*)[0-9]+\.[0-9]+\.[0-9]+/\1'$version'/'`"
-              notfound=0
-          fi
-       fi
-       printf "%s\n" "$line"
+            ""|'#'*)
+               in_project=0
+            ;;
+         esac
+
+         if [ $in_project -eq 1 ]
+         then
+            case "$line" in
+               *VERSION*)
+                  line=$(sed -E "s/(VERSION[[:space:]]*)[0-9]+\.[0-9]+\.[0-9]+/\1$version/" <<< "${line}")
+                  found=1
+               ;;
+            esac
+         fi
+      fi
+      printf "%s\n" "$line"
    done
-   return $notfound # 0 i goof
+
+   [ $found -eq 1 ]
+   return $?
 }
 
 
@@ -545,7 +556,7 @@ write_version()
       then
          redirect_exekutor CMakeLists.txt  printf "%s\n" "${text}"
       else
-         fail "Failed to find version info in CMakeLists.txt"
+         log_warning "Failed to find version info in CMakeLists.txt"
       fi
    fi
 
