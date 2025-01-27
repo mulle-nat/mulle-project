@@ -19,7 +19,7 @@ print_flags()
    echo "   -o <file>     : output JSON to file"
    echo "   --update-only : only run if output file exists"
 
-   options_technical_flags_usage "       : "
+   options_technical_flags_usage "         : "
 }
 
 

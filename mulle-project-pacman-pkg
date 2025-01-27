@@ -121,11 +121,16 @@ print_version()
 {
    log_entry "print_version" "$@"
 
-   local version
-
-   # picks up our environment though
-   version="`get_latest_tag`" || _internal_fail "No project version found"
-   printf "pkgver=%s\n" "${version}"
+   if [ -z "${PROJECT_VERSION}" ]
+   then
+      PROJECT_VERSION="`mulle-sde -s env get PROJECT_VERSION 2> /dev/null`"
+      if [ -z "${PROJECT_VERSION}" ]
+      then
+         # picks up our environment though
+         PROJECT_VERSION="`get_latest_tag`" || _internal_fail "No project version found"
+      fi
+   fi
+   printf "pkgver=%s\n" "${PROJECT_VERSION}"
 }
 
 

@@ -17,12 +17,15 @@ MULLE_EXECUTABLE_VERSION="0.0.0"
 
 demo::print_flags()
 {
+   echo "   --standalone : just create a standalone demo project"
+   echo "   --meta <ext> : specify mulle-sde meta extension to use"
+   echo "   -d <dir>     : directory to use instead of demo"
    ##
    ## ADD YOUR FLAGS DESCRIPTIONS HERE
    ##
 
    options_technical_flags_usage \
-           " : "
+           "        : "
 }
 
 
@@ -225,8 +228,9 @@ demo::main()
    #
    # simple option/flag handling
    #
-   local OPTION_LICENSE="BSD-3-Clause"
    local OPTION_DIRNAME="demo"
+   local OPTION_STANDALONE
+   local OPTION_META="mulle-objc/objc-developer"
 
    while [ $# -ne 0 ]
    do
@@ -252,11 +256,15 @@ demo::main()
             OPTION_DIRNAME="$1"
          ;;
 
-         -l|--license)
+         --standalone)
+            OPTION_STANDALONE='YES'
+         ;;
+
+         --meta)
             [ $# -eq 1 ] && match_list_usage "missing argument to $1"
             shift
 
-            OPTION_LICENSE="$1"
+            OPTION_META="$1"
          ;;
 
          --version)
@@ -288,34 +296,40 @@ demo::main()
    local PROJECT_SOURCE_DIR
    local PROJECT_TYPE
 
-   demo::r_get_env "PROJECT_SOURCE_DIR"
-   LIBRARY_SOURCE_DIR="${RVAL}"
-
-   demo::r_get_env "PROJECT_TYPE"
-   PROJECT_TYPE="${RVAL}"
-
-   if [ "${PROJECT_TYPE}" != 'library' -a "${MULLE_FLAG_MAGNUM_FORCE}" != 'YES' ]
+   if [ "${OPTION_STANDALONE}" != 'YES' ]
    then
-      fail "Need a library project to install demo"
+      demo::r_get_env "PROJECT_SOURCE_DIR"
+      LIBRARY_SOURCE_DIR="${RVAL}"
+
+      demo::r_get_env "PROJECT_TYPE"
+      PROJECT_TYPE="${RVAL}"
+
+      if [ "${PROJECT_TYPE}" != 'library' -a "${MULLE_FLAG_MAGNUM_FORCE}" != 'YES' ]
+      then
+         fail "Need a library project to install demo"
+      fi
+
+      # get first only
+      demo::r_get_env "PROJECT_EXTENSIONS"
+      PROJECT_EXTENSION="${RVAL%%:*}"
+
+      OPTION_META=$(rexekutor mulle-sde extension meta)
    fi
 
-   # get first only
-   demo::r_get_env "PROJECT_EXTENSIONS"
-   PROJECT_EXTENSION="${RVAL%%:*}"
-
-   local meta 
-
-   if ! meta="`rexekutor mulle-sde extension meta`"
+   if [ -z "${OPTION_META}" ]
    then
-      fail "Couldn't figure out the meta extension of the library"
+      fail "Couldn't figure out the meta extension to use, provide it with --meta"
    fi
 
-   if ! exekutor mulle-sde init -m "${meta}" -d "${OPTION_DIRNAME}" executable
+   if ! exekutor mulle-sde init -m "${OPTION_META}" -d "${OPTION_DIRNAME}" executable
    then
       return 1
    fi
 
    log_info "Setting up ${C_RESET_BOLD}${OPTION_DIRNAME}"
+
+   if [ "${OPTION_STANDALONE}" != 'YES' ]
+   then
    (
       exekutor cd "${OPTION_DIRNAME}"
 
@@ -337,15 +351,6 @@ demo::main()
 
       rexekutor mulle-sde ${MULLE_TECHNICAL_FLAGS} environment \
          set MULLE_SDE_REFLECT_CALLBACKS 'library@:${MULLE_SDE_REFLECT_CALLBACKS}' 
-
-      #
-      # install custom CMakeLists.txt (clumsy)
-      #
-      log_info "Installing custom ${C_RESET_BOLD}CMakeLists.txt"
-
-      demo::emit_cmakelists_txt \
-      | redirect_exekutor CMakeLists.txt cat
-
       #
       # for benefit of an executable parent instead of a library
       #
@@ -382,6 +387,18 @@ demo::main()
                                     '#import "../src/generic/import-private.h"'
       demo::append_line_at_end 'src/generic/import.h' \
                                     '#import "../src/generic/import.h"'
+   )
+   fi
+
+   (
+      exekutor cd "${OPTION_DIRNAME}"
+      #
+      # install custom CMakeLists.txt (clumsy)
+      #
+      log_info "Installing custom ${C_RESET_BOLD}CMakeLists.txt"
+
+      demo::emit_cmakelists_txt \
+      | redirect_exekutor CMakeLists.txt cat
    )
 }
 

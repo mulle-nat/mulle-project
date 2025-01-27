@@ -218,8 +218,7 @@ main()
 
    if [ "${FLAG_STDIN}" = 'YES' ]
    then
-      IFS=$'\n'
-      while read -r line
+      while IFS=$'\n' read -r line
       do
          append_to_gitignore_if_needed "${line}"
       done

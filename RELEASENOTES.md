@@ -1,3 +1,7 @@
+### 4.1.3
+
+* try to fix mulle-project-pacman-pkg for mulle-core workflow
+
 ### 4.1.1
 
 * rename --skip-until option to --start-from (but keep old name as well)
