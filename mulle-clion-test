@@ -56,9 +56,10 @@ MULLE_EXECUTABLE_VERSION="0.0.1"
 
 clion_debug::print_flags()
 {
-   echo "   -f    : force operation"
-   echo "   -a    : add all tests in directory to project"
-
+   echo "   -f          : force operation"
+   echo "   -a          : add all tests in directory to project"
+   echo "   --no-run    : do not run clion"
+   echo "   --no-create : do create .idea folder (just run clion)"
    options_technical_flags_usage \
                 " : "
 }
@@ -74,7 +75,7 @@ Usage:
    mulle-clion-test [flags] <testfile>
 
    Run this in a mulle-sde test directory which contains one or more tests.
-   Firsr an .idea folder, if not yet present, is created to set up a clion
+   First an .idea folder, if not yet present, is created to set up a clion
    project for debugging test executables.
 
    It will then launch clion (https://www.jetbrains.com/clion)
@@ -199,13 +200,36 @@ clion_debug::iml()
 
    cat <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
-<module type="CPP_MODULE" version="4">
-  <component name="NewModuleRootManager">
-    <content url="file://\$MODULE_DIR\$" />
-    <orderEntry type="inheritedJdk" />
-    <orderEntry type="sourceFolder" forTests="false" />
-  </component>
+<module classpath="CMake" type="CPP_MODULE" version="4">
 </module>
+EOF
+}
+
+
+clion_debug::external_tools()
+{
+   log_entry "clion_debug::external_tools" "$@"
+
+   cat <<EOF
+<toolSet name="External Tools">
+  <tool name="Recraft test executable"
+        description="Craft the main library and craft test anew"
+        showInMainMenu="false"
+        showInEditor="false"
+        showInProject="false"
+        showInSearchPopup="false"
+        disabled="false"
+        useConsole="true"
+        showConsoleOnStdOut="false"
+        showConsoleOnStdErr="false"
+        synchronizeAfterRun="true">
+    <exec>
+      <option name="COMMAND" value="mulle-sde" />
+      <option name="PARAMETERS" value="test --no-clean crun --no-run-test \$FileName\$" />
+      <option name="WORKING_DIRECTORY" value="\$FileDir\$" />
+    </exec>
+  </tool>
+</toolSet>
 EOF
 }
 
@@ -248,7 +272,7 @@ clion_debug::customTargets()
     <target id="${target_id}" name="${target_name}" defaultType="TOOL">
       <configuration id="${configuration_id}" name="${config_name}">
         <build type="TOOL">
-          <tool actionId="Tool_External Tools_mulle-sde test crun --keep-exe" />
+          <tool actionId="Tool_External Tools_Recraft test executable" />
         </build>
       </configuration>
     </target>
@@ -297,7 +321,8 @@ clion_debug::external()
       <option name="WORKING_DIRECTORY" value="\$FileDir\$" />
     </exec>
   </tool>
-  <tool name="mulle-sde clean all" description="Clean everything and rebuild"
+  <tool name="mulle-sde clean all"
+        description="Clean everything and rebuild"
         showInMainMenu="false"
         showInEditor="false"
         showInProject="false"
@@ -354,7 +379,7 @@ clion_debug::main()
             OPTION_CLOBBER='NO'
          ;;
 
-         --no-run)
+         --no-run|--no-launch)
             OPTION_RUN='NO'
          ;;
 
@@ -460,6 +485,11 @@ clion_debug::main()
       fi
    fi
 
+   #
+   # When clion changes the format: Create a new project like this:
+   #
+   # Then look at the created .idea folder and figure out what needs changing
+   #
    if [ "${OPTION_CREATE}" = 'YES' ]
    then
       mkdir_if_missing ".idea/tools"

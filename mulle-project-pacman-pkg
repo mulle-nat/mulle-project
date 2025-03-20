@@ -736,4 +736,4 @@ main()
    fi
 }
 
-call_with_flags "main" "${MULLE_PROJECT_PACMAN_FLAGS}" "$@"
+call_with_flags "main" "${MULLE_PROJECT_PACMAN_PKG_FLAGS}" "$@"

@@ -4,7 +4,7 @@
 [ "${TRACE}" = 'YES' -o "${MULLE_PROJECT_VERSIONCHECK_TRACE}" = 'YES' ] && set -x && : "$0" "$@"
 
 
-MULLE_EXECUTABLE_VERSION="0.0.0"
+MULLE_EXECUTABLE_VERSION="0.1.0"
 
 
 if [ -z "${MULLE_PROJECT_LIBEXEC_DIR}" ]
@@ -19,6 +19,7 @@ print_flags()
    echo "   -f                : force operation"
    echo "   --reflect         : write into ${PROJECT_SOURCE_DIR:-src}/reflect"
    echo "   --update-only     : only write if file exists"
+   echo "   --no-pragma       : do not add #pragma message for better errors"
    echo "   --fetch-if-needed : fetch dependencies if missing"
 
    options_technical_flags_usage \
@@ -44,10 +45,10 @@ Usage:
    # ifndef FOO_VERSION_MAX
    #  define FOO_VERSION_MAX  ((2UL << 20) | (0 << 8) | 0)
    # endif
-   # if FOO_VERSION < FOO_VERSION_MIN"
+   # if FOO_VERSION < FOO_VERSION_MIN
    #  error "foo is too old"
    # endif
-   # if FOO_VERSION >= FOO_VERSION_MAX"
+   # if FOO_VERSION >= FOO_VERSION_MAX
    #  error "foo is too new"
    # endif
    #endif
@@ -65,6 +66,8 @@ EOF
 emit_version_check()
 {
    log_entry "emit_version_check"
+
+   local pragma="$1"
 
    local version
 
@@ -129,6 +132,11 @@ emit_version_check()
 # ifndef ${identifier}_VERSION_MAX
 #  define ${identifier}_VERSION_MAX  ((${max_major}UL << 20) | (${max_minor} << 8) | 0)
 # endif
+EOF
+
+   if [ "${pragma}" = 'NO' ]
+   then
+      cat <<EOF
 # if ${identifier}_VERSION < ${identifier}_VERSION_MIN
 #  error "${name} is too old"
 # endif
@@ -136,8 +144,22 @@ emit_version_check()
 #  error "${name} is too new"
 # endif
 #endif
-
 EOF
+   else
+      cat <<EOF
+# if ${identifier}_VERSION < ${identifier}_VERSION_MIN || ${identifier}_VERSION >= ${identifier}_VERSION_MAX
+#  pragma message("${identifier}_VERSION     is " MULLE_C_STRINGIFY_MACRO( ${identifier}_VERSION))
+#  pragma message("${identifier}_VERSION_MIN is " MULLE_C_STRINGIFY_MACRO( ${identifier}_VERSION_MIN))
+#  pragma message("${identifier}_VERSION_MAX is " MULLE_C_STRINGIFY_MACRO( ${identifier}_VERSION_MAX))
+#  if ${identifier}_VERSION < ${identifier}_VERSION_MIN
+#   error "${name} is too old"
+#  else
+#   error "${name} is too new"
+#  endif
+# endif
+#endif
+EOF
+   fi
 }
 
 
@@ -147,6 +169,7 @@ emit_include_file()
 
    local main_identifier="$1"
    local stashdir="$2"
+   local pragma="$3"
 
 #   echo "#ifndef ${main_identifier}_CHECK_H__"
 #   echo "#define ${main_identifier}_CHECK_H__"
@@ -186,7 +209,7 @@ emit_include_file()
       if [ -d "${dependency}" ]
       then
       (
-         cd "${dependency}" 2> /dev/null && emit_version_check
+         cd "${dependency}" 2> /dev/null && emit_version_check "${pragma}"
       )
       else
          log_verbose "\"${dependency}\" does not exist"
@@ -201,6 +224,7 @@ main()
    local OPTION_REFLECT
    local OPTION_UPDATE
    local OPTION_FETCH
+   local OPTION_PRAGMA
 
    #
    # simple flag handling
@@ -220,6 +244,14 @@ main()
 
          -h*|--help|help)
             usage
+         ;;
+
+         --pragma)
+            OPTION_PRAGMA='YES'
+         ;;
+
+         --no-pragma)
+            OPTION_PRAGMA='NO'
          ;;
 
          --fetch-if-needed)
@@ -296,7 +328,7 @@ ${C_INFO}Run mulle-sde fetch if this is unexpected."
    if [ "${OPTION_REFLECT}" != 'YES' ]
    then
       log_verbose "Unreflected emit for testing"
-      emit_include_file "${PROJECT_UPCASE_IDENTIFIER}" "${stashdir}"
+      emit_include_file "${PROJECT_UPCASE_IDENTIFIER}" "${stashdir}" "${OPTION_PRAGMA}"
       return
    fi
 
@@ -334,7 +366,7 @@ ${C_INFO}Run mulle-sde fetch if this is unexpected."
    local text
    local shield_identifier
 
-   text="`emit_include_file "${PROJECT_UPCASE_IDENTIFIER}" "${stashdir}" `"
+   text="`emit_include_file "${PROJECT_UPCASE_IDENTIFIER}" "${stashdir}" "${OPTION_PRAGMA}" `"
    if [ ! -z "${text}" ]
    then
       r_lowercase "${PROJECT_UPCASE_IDENTIFIER}_VERSIONCHECK_H__"

@@ -379,14 +379,16 @@ demo::main()
 
       log_info "Patching generic headers to include parent generic headers"
 
+      # include from demo/src/generic means ../../.. to reach parent
+
       demo::insert_line_before_last_endif 'src/generic/include-private.h' \
-                                               '#include "../src/generic/include-private.h"'
+                                               '#include "../../../src/generic/include-private.h"'
       demo::insert_line_before_last_endif 'src/generic/include.h' \
-                                               '#include "../src/generic/include.h"'
+                                               '#include "../../../src/generic/include.h"'
       demo::append_line_at_end 'src/generic/import-private.h' \
-                                    '#import "../src/generic/import-private.h"'
+                                    '#import "../../../src/generic/import-private.h"'
       demo::append_line_at_end 'src/generic/import.h' \
-                                    '#import "../src/generic/import.h"'
+                                    '#import "../../../src/generic/import.h"'
    )
    fi
 
