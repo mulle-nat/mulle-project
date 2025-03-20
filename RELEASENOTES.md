@@ -1,3 +1,12 @@
+## 4.2.0
+
+
+* mulle-project-all now also uses more intuitive --from --after and --until options
+* the replacement of "sde" with "mulle-sde" in the command string is now less buggy
+* mulle-project-versioncheck now emits better error messages if the versioning doesnt match
+* fix for include paths in mulle-project-demo
+
+
 ### 4.1.3
 
 * try to fix mulle-project-pacman-pkg for mulle-core workflow
