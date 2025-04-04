@@ -611,7 +611,29 @@ r_repos_contents()
       skipuntil="/^${RVAL}\$/"  # sic
    fi
 
-   r_add_line "${first}" "`rexekutor sed -e "${skipfrom:-0},${skipuntil:-"\$"}d" <<< "${repos}"`"
+   local start 
+
+   start=0
+   if [ -z "${skipfrom}" ]
+   then
+      # test for BSD sed, which don't like 0 like GNU
+      local tmp 
+
+      tmp="`sed '0,1d' <<< "x" `"
+      if [ ! -z "${tmp}" ]
+      then
+         start=1
+      fi
+   fi
+
+   local lines 
+
+   lines="`rexekutor sed -e "${skipfrom:-${start}},${skipuntil:-"\$"}d" <<< "${repos}"`"
+
+   log_debug "${first}"
+   log_debug "${lines}"
+
+   r_add_line "${first}" "${lines}"
 }
 
 

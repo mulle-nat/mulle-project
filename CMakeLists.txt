@@ -1,6 +1,6 @@
 cmake_minimum_required (VERSION 3.0)
 
-project( mulle-project VERSION 4.2.0 LANGUAGES NONE)
+project( mulle-project VERSION 4.2.1 LANGUAGES NONE)
 
 option( MULLE_PROJECT_EMBED_BASHFUNCTIONS "Make some scripts independent from mulle-bash" ON)
 

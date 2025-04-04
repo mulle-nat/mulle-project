@@ -279,6 +279,7 @@ main()
    local OPTION_DIRECTORY_NAME='src'
    local OPTION_GIF_X11
    local OPTION_CLEAN='NO'
+   local OPTION_CORE='NO'
    local OPTION_PREFIX='main-'
    local OPTION_RESIZE="50%"
    local OPTION_SCREENSHOT_TIMEOUT
@@ -303,6 +304,14 @@ main()
 
          -h*|--help|help)
             usage
+         ;;
+
+         --core)
+            OPTION_CORE='YES'
+         ;;
+
+         --no-core)
+            OPTION_CORE='NO'
          ;;
 
          --clean)
@@ -396,6 +405,11 @@ main()
             exit 0
          ;;
 
+         --)
+            shift
+            break
+         ;;
+
          -*)
             usage "Unknown flag \"$1\""
          ;;
@@ -476,7 +490,7 @@ main()
    if ! [ -d "${kitchen_dir}" ]
    then
       log_info "Running ${C_MAGENTA}${C_BOLD}craft${C_INFO} first to produce demos"
-      rexekutor mulle-sde craft || exit 1
+      rexekutor mulle-sde craft "$@" || exit 1
    fi
 
 
@@ -519,6 +533,18 @@ main()
       fi
 
       (
+         # if we coredump, the likelihood that we timeout while doing the
+         # coredump is pretty high for -t 1 and then this script misses it
+         # so by default we don't.
+         # MEMO: reasoning seems sound, but still we get 124 :(
+         #
+         if [ "${OPTION_CORE}" = 'NO' ]
+         then
+            rexekutor ulimit -c 0
+         else
+            rexekutor ulimit -c umlimited
+         fi
+
          if [ "${OPTION_GIF_X11}" = 'YES' ]
          then
             take_gif_with_delay "Demo" \
@@ -551,6 +577,7 @@ main()
          else
             text=" ${OPTION_TIMEOUT}s"
          fi
+
          log_info "Running ${C_RESET_BOLD}${exe} ${C_INFO}for${text}"
          log_verbose "Path: \"${exe_path}\""
 
@@ -598,6 +625,7 @@ main()
               "${OPTION_VIDEO_X11}" = 'YES' \
             ]
          then
+            log_fluff "Waiting on screenshot"
             wait # wait on screenshot
          fi
 
@@ -613,6 +641,8 @@ main()
                   exit 1
                fi
             fi
+         else
+            log_fluff "Demo was timeouted after ${OPTION_TIMEOUT} seconds"
          fi
          exit 0
       ) || return 1
