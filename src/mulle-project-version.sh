@@ -395,10 +395,6 @@ project::version::set()
 
    project::version::get_major_minor_patch_custom "${version}"
 
-   # not lenient for setting at all!
-   # // ((0UL << 20) | (4 << 8) | 9)
-   # // or 0.4.9
-
    local value
    local scheme
 
@@ -478,6 +474,15 @@ ${C_INFO}Use either 1.2.3[.4] or ((1 << 20) | (2 << 8) | 3)"
       ;;
    esac
 
-   inplace_sed -e "${sed_script}" "${versionfile}"
+   # Check for separate version component variables
+   local major_name="${versionname}_MAJOR"
+   local minor_name="${versionname}_MINOR"
+   local patch_name="${versionname}_PATCH"
+   
+   inplace_sed -e "${sed_script}" \
+               -e "s/\(${major_name}[^0-9]*\)[0-9][0-9]*/\1${major}/" \
+   -e "s/\(${minor_name}[^0-9]*\)[0-9][0-9]*/\1${minor}/" \
+   -e "s/\(${patch_name}[^0-9]*\)[0-9][0-9]*/\1${patch}/" \
+   "${versionfile}"
 }
 

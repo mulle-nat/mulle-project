@@ -568,7 +568,7 @@ write_version()
 
    if [ "${OPTION_WRITE_EXTENSION_VERSIONS}" = 'YES' ]
    then
-      exekutor mulle-project-extension-versions --project-version "${VERSION}" bump
+      exekutor mulle-project-version-extensions --project-version "${VERSION}" bump
    fi
 }
 

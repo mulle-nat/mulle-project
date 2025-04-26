@@ -108,8 +108,8 @@ usage()
 Usage:
    mulle-project-all [flags] ...
 
-   Execute a command in all projects that are defined by the file "REPOS"
-   in the current directory.  mulle-project-all can execute commands in
+   Evaluate a command in all projects that are defined by the file "REPOS"
+   in the current directory.  mulle-project-all can evaluate commands in
    parallel on all repositories with the --parallel option. By default
    mulle-project-all will replace "sde" commands with "mulle-sde".
 
@@ -619,7 +619,7 @@ r_repos_contents()
       # test for BSD sed, which don't like 0 like GNU
       local tmp 
 
-      tmp="`sed '0,1d' <<< "x" `"
+      tmp="`sed '0,1d' <<< "x" 2> /dev/null `"
       if [ ! -z "${tmp}" ]
       then
          start=1
@@ -790,7 +790,7 @@ main()
             OPTION_EXEC='YES'
          ;;
 
-         -i|--ignore)
+         -i|--ignore|--skip)
             [ $# -eq 1 ] && fail "missing parameter for \"$1\""
             shift
 
