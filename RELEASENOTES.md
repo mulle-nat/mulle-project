@@ -1,3 +1,14 @@
+### 4.2.1
+
+* added support fot githubusercontent in the properties.plist generator
+
+* need to update `cmake_minimum_required` because cmake has a weird concept of min required
+* mulle-project-version should now be able to update `.._MAJOR` `.._MINOR` `.._PATCH` as well
+* mulle-project-extension-versions renamed to mulle-project-version-extensions for the sake of completion
+* mulle-project-all now takes --skip as an alias for --ignore
+
+* fix sed command for BSDs
+
 ## 4.2.0
 
 
