@@ -187,6 +187,7 @@ get_description_2()
 {
    rexekutor sed -e '/^[[:space:]]*$/d' "$1" \
    | head -2 \
+   | grep -E -v '^=|^#|^-' \
    | tr -d $'\r' \
    | tail -1
 }
@@ -447,10 +448,19 @@ print_dependencies()
 
 
       eval "`mulle-domain -s parse-url "${url}"`"
+      case "${domain}" in
+         githubusercontent)
+            domain="github"
+         ;;
+      esac
+
       repo_url="`mulle-domain -s compose-url --domain "${domain}" \
                                              --scm "none" \
+                                             --host "${host}" \
                                              --user "${user}" \
                                              --repo "${repo}" `"
+
+      # hacky hack
 
       description="`find_description "${repo}" `"
       if [ ! -z "${description}" ]
