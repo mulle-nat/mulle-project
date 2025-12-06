@@ -221,7 +221,7 @@ status team_add watch workflow_run"
       OPTION_TOKEN="$1"
       shift
    fi
-   [ $# -eq 0 ] || project_github_install_discord_webhook::usage "Superflous arguments $*"
+   [ $# -eq 0 ] || project_github_install_discord_webhook::usage "Superfluous arguments $*"
 
 
    OPTION_URL="${OPTION_URL:-https://discord.com/api/webhooks/${OPTION_SERVER}/${OPTION_TOKEN}/github}"

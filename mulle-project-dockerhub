@@ -127,7 +127,7 @@ project_dockerhub::main()
       shift
    fi
 
-   [ $# -ne 0 ] && project_dockerhub::usage "Superflous parameters $*"
+   [ $# -ne 0 ] && project_dockerhub::usage "Superfluous parameters $*"
 
 
    ##

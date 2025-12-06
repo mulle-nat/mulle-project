@@ -108,13 +108,13 @@ usage()
 Usage:
    mulle-project-all [flags] ...
 
-   Evaluate a command in all projects that are defined by the file "REPOS"
-   in the current directory.  mulle-project-all can evaluate commands in
-   parallel on all repositories with the --parallel option. By default
-   mulle-project-all will replace "sde" commands with "mulle-sde".
+   Execute (with --exec) or evaluate a command in all projects that are defined
+   by the file "REPOS" in the current directory.  mulle-project-all can
+   perform commands in parallel on all repositories with the --parallel option.
+   By default mulle-project-all will replace "sde" commands with "mulle-sde".
 
-   mulle-project-all in --exec mode, will define a couple of environment
-   variables for evaluation use:
+   mulle-project-all will define a couple of environment variables for your
+   evaluation use:
 
       NAME            : basename of the directory
       DIRECTORY       : path of the directory
@@ -258,6 +258,8 @@ shell_it()
               TEST_NAME="'${TEST_NAME}'" \
               GITHUB_NAME="'${GITHUB_NAME}'" \
               MULLE_PROJECT_ALL="${MULLE_EXECUTABLE_VERSION}" \
+              OLD_MULLE_USER_PWD="${MULLE_USER_PWD}" \
+              MULLE_USER_PWD='' \
               eval_exekutor "${OPTION_IF}"
          then
             log_info "Skip ${C_RESET_BOLD}$1"
@@ -374,6 +376,8 @@ shell_it()
                     TEST_NAME="'${TEST_NAME}'" \
                     GITHUB_NAME="'${GITHUB_NAME}'" \
                     MULLE_PROJECT_ALL="${MULLE_EXECUTABLE_VERSION}" \
+                    OLD_MULLE_USER_PWD="${MULLE_USER_PWD}" \
+                    MULLE_USER_PWD='' \
                     "$@"
    )
 }

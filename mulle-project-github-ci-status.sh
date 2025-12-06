@@ -212,7 +212,7 @@ project_github_ci_status::main()
 
    options_setup_trace "${MULLE_TRACE}" && set -x
 
-   [ $# -ne 0 ] && project_github_ci_status::usage "Superflous arguments \"$*\""
+   [ $# -ne 0 ] && project_github_ci_status::usage "Superfluous arguments \"$*\""
 
    local json
 

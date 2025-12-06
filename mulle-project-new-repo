@@ -102,6 +102,113 @@ new_repo::change_default_branch()
 }
 
 
+new_repo::codeberg()
+{
+   log_entry "new_repo::codeberg" "$@"
+
+   local user="$1"
+   local repo="$2"
+   local license="$3"
+   local description="$4"
+   local public_or_private="${5:-private}"
+   local branch="$6"
+   local push="$7"
+
+   local remote="codeberg"
+
+   if ! new_repo::check_remote "${remote}" && [ "${MULLE_FLAG_MAGNUM_FORCE}" != 'YES' ]
+   then
+      return 1
+   fi
+
+   [ -z "${CODEBERG_ACCESS_TOKEN}" ] && fail "Need CODEBERG_ACCESS_TOKEN to do codeberg API"
+
+
+   local status_code
+
+   status_code=$(rexekutor curl -o /dev/null \
+                                -s \
+                                -w "%{http_code}" \
+                                -H "Authorization: token ${CODEBERG_ACCESS_TOKEN}" \
+                                "https://codeberg.org/api/v1/repos/${user}/${repo}")
+
+   log_debug "status_code: ${status_code}"
+
+   if [ "$status_code" -ge 200 -a ${status_code} -lt 300 ]
+   then
+      log_info "Repo already exists on ${remote}"
+   else
+      local is_private
+
+      case "${public_or_private}" in
+         'private')
+            is_private='true'
+         ;;
+
+         *)
+            is_private='false'
+         ;;
+      esac
+
+      local json_payload
+
+      json_payload=$(jq -n \
+                       --arg name "$repo" \
+                       --arg description "$description" \
+                       --argjson private "$is_private" \
+                       --argjson auto_init false \
+                       '{
+                         name: $name,
+                         description: $description,
+                         private: $private,
+                         auto_init: $auto_init
+                       }')
+
+      local response
+      local body
+
+      response=$(exekutor curl -s \
+                               -w "%{http_code}" \
+                               -X POST "https://codeberg.org/api/v1/orgs/${user}/repos" \
+                               -H "Content-Type: application/json" \
+                               -H "Authorization: token ${CODEBERG_ACCESS_TOKEN}" \
+                               -d "${json_payload}")
+
+      status_code="${response: -3}"
+      body="${response:0:${#response}-3}"
+
+      # we gets 201 back on success
+      if [ "$status_code" -lt 200 -o ${status_code} -ge 300 ]
+      then
+         if [ "${MULLE_FLAG_EXEKUTOR_DRY_RUN}" != 'YES' ]
+         then
+            log_error "Failed to create repo on ${remote}: ${status_code}"
+            printf "%s\n" "${body}" >&2
+            return 1
+         fi
+      fi
+   fi
+
+   if ! exekutor git remote add "${remote}" "ssh://git@codeberg.org/${user}/${repo}.git"
+   then
+      if [ "${MULLE_FLAG_MAGNUM_FORCE}" != 'YES' ]
+      then
+         return 1
+      fi
+   fi
+
+   if [ "${push}" = 'YES' ]
+   then
+      new_repo::change_default_branch "${user}" \
+                                      "${repo}" \
+                                      "${remote}" \
+                                      "${branch}" \
+                                      "master"
+   fi
+   # don't push
+}
+
+
 new_repo::github()
 {
    log_entry "new_repo::github" "$@"
@@ -269,6 +376,8 @@ new_repo::main()
    local OPTION_BRANCH='master'
    local OPTION_PUSH='NO'
 
+   local name
+
    while [ $# -ne 0 ]
    do
       if options_technical_flags "$1"
@@ -332,6 +441,19 @@ new_repo::main()
 
             r_comma_concat "${OPTION_PROVIDERS}" "$1"
             OPTION_PROVIDERS="${RVAL}"
+         ;;
+
+         --*-token)
+            [ $# -eq 1 ] && match_list_usage "missing argument to $1"
+
+            name="${1#--}"
+            name="${name%-token}"
+            r_uppercase "${name}"
+            name="${RVAL}"
+
+            shift
+
+            eval "${name}_ACCESS_TOKEN='$1'"
          ;;
 
          --public)

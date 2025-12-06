@@ -137,7 +137,7 @@ project_github_rename_default_branch::main()
    local old="${1:-release}" 
    local new="${2:-master}"
 
-   [ $# -gt 2 ] && shift 2 &&  project_github_rename_default_branch::usage "Superflous arguments: $*"
+   [ $# -gt 2 ] && shift 2 &&  project_github_rename_default_branch::usage "Superfluous arguments: $*"
          
    # Create a new "new" branch from "release"
    gh api --method POST /repos/:owner/:repo/git/refs \

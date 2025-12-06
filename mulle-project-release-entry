@@ -86,6 +86,7 @@ emit_line()
    local repo
    local user
    local dir
+   local branch
 
    dir="${PWD}"
 
@@ -107,7 +108,10 @@ emit_line()
       ;;
    esac
 
-   echo "| ${marker}[${repo}](//github.com/${user}/${repo}/RELEASENOTES.md)${marker} | ${marker}${version}${marker} | ${tag:--} |"
+   # hardcoded for now
+   branch="master"
+
+   echo "| ${marker}[${repo}](//github.com/${user}/${repo}/blob/${branch}/RELEASENOTES.md)${marker} | ${marker}${version}${marker} | ${tag:--} |"
 }
 
 

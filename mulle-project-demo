@@ -100,8 +100,9 @@ library_task_run()
 
    #
    # we only want linkable stuff (avoids -startup and mulle-objc-list)
+   # also we can get rid of stuff like mulle-color with no-demo
    #
-   rexekutor mulle-sourcetree \${MULLE_TECHNICAL_FLAGS} -N rcopy --update .. '*' 'ENABLES link AND ENABLES intermediate-link'
+   rexekutor mulle-sourcetree \${MULLE_TECHNICAL_FLAGS} -N rcopy --update .. '*' 'ENABLES link AND ENABLES demo AND ENABLES intermediate-link'
    rc=\$?
    if [ \$rc -eq 2 ]
    then
@@ -124,7 +125,7 @@ EOF
 demo::emit_cmakelists_txt()
 {
    cat <<EOF
-cmake_minimum_required( VERSION 3.15)
+cmake_minimum_required( VERSION 3.13...99.99)
 
 project( demo C)
 
@@ -286,7 +287,7 @@ demo::main()
 
    options_setup_trace "${MULLE_TRACE}" && set -x
 
-   [ $# -ne 0 ] && demo::usage "Superflous arguments $*"
+   [ $# -ne 0 ] && demo::usage "Superfluous arguments $*"
 
    if [ -d "${OPTION_DIRNAME}" ]
    then
@@ -351,6 +352,11 @@ demo::main()
 
       rexekutor mulle-sde ${MULLE_TECHNICAL_FLAGS} environment \
          set MULLE_SDE_REFLECT_CALLBACKS 'library@:${MULLE_SDE_REFLECT_CALLBACKS}' 
+
+      # demo does not need graveyards
+      rexekutor mulle-sde ${MULLE_TECHNICAL_FLAGS} environment \
+         set MULLE_SOURCETREE_GRAVEYARD_ENABLED 'NO'
+
       #
       # for benefit of an executable parent instead of a library
       #
@@ -381,14 +387,29 @@ demo::main()
 
       # include from demo/src/generic means ../../.. to reach parent
 
-      demo::insert_line_before_last_endif 'src/generic/include-private.h' \
-                                               '#include "../../../src/generic/include-private.h"'
-      demo::insert_line_before_last_endif 'src/generic/include.h' \
-                                               '#include "../../../src/generic/include.h"'
-      demo::append_line_at_end 'src/generic/import-private.h' \
-                                    '#import "../../../src/generic/import-private.h"'
-      demo::append_line_at_end 'src/generic/import.h' \
-                                    '#import "../../../src/generic/import.h"'
+      if [ -f "../../../src/generic/include-private.h" ]
+      then
+         demo::insert_line_before_last_endif 'src/generic/include-private.h' \
+                                                  '#include "../../../src/generic/include-private.h"'
+      fi
+
+      if [ -f "../../../src/generic/include.h" ]
+      then
+         demo::insert_line_before_last_endif 'src/generic/include.h' \
+                                                  '#include "../../../src/generic/include.h"'
+      fi
+
+      if [ -f "../../../src/generic/import-private.h" ]
+      then
+         demo::append_line_at_end 'src/generic/import-private.h' \
+                                       '#import "../../../src/generic/import-private.h"'
+      fi
+
+      if [ -f "../../../src/generic/import.h" ]
+      then
+         demo::append_line_at_end 'src/generic/import.h' \
+                                       '#import "../../../src/generic/import.h"'
+      fi
    )
    fi
 

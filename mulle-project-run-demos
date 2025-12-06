@@ -23,7 +23,9 @@ print_flags()
    --duration <s>       : video: length of the animation / video   -- NYI
    -d <dir>             : use <dir> to locate demo sources
    --no-resize          : don't resize
+   --no-summary         : don't emit a summary post run
    --no-timeout         : keep demos running until they are closed by the user
+   --valgrind           : run in valgrind (timeout will be set to 120)
    --timeout <s>        : run a demo for <s> seconds, then kill it (10)
    --prefix <name>      : prefix for demo source (main-)
 EOF
@@ -286,8 +288,10 @@ main()
    local OPTION_SCREENSHOT_X11
    local OPTION_SQUELCH='DEFAULT'
    local OPTION_STRICT
-   local OPTION_TIMEOUT=10
+   local OPTION_TIMEOUT='DEFAULT'
    local OPTION_VIDEO_X11
+   local OPTION_SUMMARY='YES'
+   local OPTION_VALGRIND
 
    while [ $# -ne 0 ]
    do
@@ -363,6 +367,10 @@ main()
             OPTION_RESIZE=
          ;;
 
+         --no-summary)
+            OPTION_SUMMARY=
+         ;;
+
          --no-timeout)
             OPTION_TIMEOUT=0
          ;;
@@ -398,6 +406,10 @@ main()
             shift
 
             OPTION_TIMEOUT="$1"
+         ;;
+
+         --valgrind)
+           OPTION_VALGRIND='YES'
          ;;
 
          --version)
@@ -440,6 +452,23 @@ main()
       fi
    fi
 
+   local verb
+
+   verb='Running'
+
+   if [ "${OPTION_VALGRIND}" = 'YES' ]
+   then
+      if ! VALGRIND_EXE="`command -v valgrind`"
+      then
+         fail "Need valgrind command in PATH for valgrind"
+      fi
+      if [ "${OPTION_TIMEOUT}" = 'DEFAULT' ]
+      then
+         OPTION_TIMEOUT=120
+      fi
+      verb='Valgrinding'
+   fi
+
    if ! SCROT_EXE="`command -v scrot`"
    then
       # MEMO: could use imagemagic import in many cases as well.
@@ -460,9 +489,20 @@ main()
       fi
    fi
 
-   if ! TIMEOUT_EXE="`command -v timeout`"
+   if [ "${OPTION_TIMEOUT}" = 'DEFAULT' ]
    then
-      fail "Need timeout command in PATH"
+      OPTION_TIMEOUT=10
+   fi
+
+   if [ "${OPTION_TIMEOUT}" -gt 0 ]
+   then
+      if ! TIMEOUT_EXE="`command -v mulle-timeout`"
+      then
+         if ! TIMEOUT_EXE="`command -v timeout`"
+         then
+            fail "Need mulle-timeout or timeout command in PATH"
+         fi
+      fi
    fi
 
    if [ -d "demo/${OPTION_DIRECTORY_NAME}" ]
@@ -493,7 +533,6 @@ main()
       rexekutor mulle-sde craft "$@" || exit 1
    fi
 
-
    if ! demos="`mulle-sde product list`"
    then
       exit 1
@@ -503,6 +542,10 @@ main()
    local exe
    local name
    local match
+   local crashed_demos
+   local run_demos
+   local demo_name
+   local rc
 
    .foreachline exe_path in ${demos}
    .do
@@ -531,6 +574,12 @@ main()
          log_fluff "Skipping \"${exe}\""
          .continue
       fi
+
+      r_extensionless_basename "${exe}"
+      demo_name="${RVAL}"
+
+      r_add_line "${run_demos}" "${demo_name}"
+      run_demos="${RVAL}"
 
       (
          # if we coredump, the likelihood that we timeout while doing the
@@ -578,7 +627,7 @@ main()
             text=" ${OPTION_TIMEOUT}s"
          fi
 
-         log_info "Running ${C_RESET_BOLD}${exe} ${C_INFO}for${text}"
+         log_info "${verb} ${C_RESET_BOLD}${exe} ${C_INFO}for${text}"
          log_verbose "Path: \"${exe_path}\""
 
          #
@@ -610,12 +659,22 @@ main()
             commandline="'${exe_path}'"
          fi
 
+         if [ "${OPTION_VALGRIND}" = 'YES' ]
+         then
+            commandline="'${VALGRIND_EXE}' -q --leak-check=full ${commandline}"
+         fi
+
+         if [ "${OPTION_TIMEOUT}" -ne 0 ]
+         then
+            commandline="'${TIMEOUT_EXE}' ${OPTION_TIMEOUT}s ${commandline}"
+         fi
+
          if [ "${OPTION_SQUELCH}" = 'YES' ]
          then
-            MULLE_NO_BACKGROUND='YES' eval_exekutor "'${TIMEOUT_EXE}'" "${OPTION_TIMEOUT}s" "${commandline}" > /dev/null 2>&1
+            MULLE_NO_BACKGROUND='YES' eval_exekutor "${commandline}" > /dev/null 2>&1
             rc=$?
          else
-            MULLE_NO_BACKGROUND='YES' eval_exekutor "'${TIMEOUT_EXE}'" "${OPTION_TIMEOUT}s" "${commandline}"
+            MULLE_NO_BACKGROUND='YES' eval_exekutor "${commandline}"
             rc=$?
          fi
 
@@ -629,24 +688,53 @@ main()
             wait # wait on screenshot
          fi
 
-         if [ $rc -ne 124 ]
+         exit $rc
+      )
+      rc=$?
+
+      if [ $rc -ne 124 ]
+      then
+         if [ $rc -eq 0 ]
          then
-            if [ $rc -eq 0 ]
-            then
-               log_verbose "Demo ran successfully, but under ${OPTION_TIMEOUT} seconds"
-            else
-               log_warning "Demo ${C_RESET_BOLD}${exe_path}${C_WARNING} failed or crashed ($rc)"
-               if [ "${OPTION_STRICT}" = 'YES' ]
-               then
-                  exit 1
-               fi
-            fi
+            log_verbose "Demo ran successfully, but under ${OPTION_TIMEOUT} seconds"
          else
-            log_fluff "Demo was timeouted after ${OPTION_TIMEOUT} seconds"
+            log_warning "Demo ${C_RESET_BOLD}${exe_path}${C_WARNING} failed or crashed ($rc)"
+
+            r_add_line "${crashed_demos}" "${demo_name}"
+            crashed_demos="${RVAL}"
+
+            if [ "${OPTION_STRICT}" = 'YES' ]
+            then
+               exit 1
+            fi
          fi
-         exit 0
-      ) || return 1
+      else
+         log_fluff "Demo was timeouted after ${OPTION_TIMEOUT} seconds"
+      fi
    .done
+
+   local summary
+
+   if [ "${OPTION_SUMMARY}" = 'YES' ]
+   then
+      r_count_lines "${run_demos}"
+      printf -v summary "Ran %d demos" "${RVAL}"
+
+      r_count_lines "${crashed_demos}"
+      if [ "${RVAL}" -eq 0 ]
+      then
+         printf -v summary "%s, none crashed.\n" "${summary}"
+         log_info "${summary}"
+      else
+         printf -v summary "%s of which %d crashed:\n" "${summary}" "${RVAL}"
+         log_warning "${summary}"
+
+         .foreachline demo_name in ${crashed_demos}
+         .do
+            printf "   %s\n" "${demo_name}"
+         .done
+      fi
+   fi
 }
 
 

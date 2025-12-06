@@ -17,6 +17,7 @@ fi
 print_flags()
 {
    echo "   --mulle  : add some mulle hacks"
+   echo "   -o <f>   : output to file \"f\" instead, use "-" for stdout"
 
    options_technical_flags_usage \
                 "    : "
@@ -80,18 +81,19 @@ get_url()
    .do
       url="`git remote get-url "${remote}"`"
       # check if known domain
-      if ! eval "`mulle-domain -s parse-url "${url}"`"
+      if ! eval "`rexekutor mulle-domain -s parse-url "${url}"`"
       then
          .continue
       fi
 
       if find_line "${known_domains}" "${domain}"
       then
-         repository="`mulle-domain -s compose-url --domain "${domain}" \
-                                  --scm "none" \
-                                  --user "${user}" \
-                                  --repo "${repo}" \
-                                  --tag "${tag}" `"
+         repository="`rexekutor mulle-domain -s compose-url \
+                                             --domain "${domain}" \
+                                             --scm "none" \
+                                             --user "${user}" \
+                                             --repo "${repo}" \
+                                             --tag "${tag}" `"
          .break
       fi
    .done
@@ -129,7 +131,7 @@ get_projectname()
 {
    if [ -z "${PROJECT_NAME}" ]
    then
-      PROJECT_NAME="`mulle-sde -s env get PROJECT_NAME 2> /dev/null`"
+      PROJECT_NAME="`rexekutor mulle-sde -s env get PROJECT_NAME 2> /dev/null`"
       if [ -z "${PROJECT_NAME}" ]
       then
          r_basename "${PWD}"
@@ -264,7 +266,7 @@ get_language()
 
    local value
 
-   value="`mulle-sde env get PROJECT_LANGUAGE`"
+   value="`rexekutor mulle-sde env get PROJECT_LANGUAGE`"
    value="${value:-unknown}"
    log_debug "language: ${value}"
 
@@ -276,8 +278,13 @@ get_dialect()
 {
    log_entry "r_get_dialect" "$@"
 
-   value="`mulle-sde env get PROJECT_DIALECT`"
-   value="${value:-unknown}"
+   local value
+
+   value="`rexekutor mulle-sde env get PROJECT_DIALECT`"
+   if [ -z "${value}" ]
+   then
+      value="`get_language`"
+   fi
    log_debug "dialect: ${value}"
 
    printf "%s\n" "${value}"
@@ -379,8 +386,8 @@ project =
 {
    description="${PROJECT_DESCRIPTION:-`get_description`}";
    domain="${PROJECT_DOMAIN:-github}";
-   language="${PROJECT_LANGUAGE:-`get_language`}";
-   dialect="${PROJECT_DIALECT:-`get_dialect`}";
+   language="`get_language`";
+   dialect="`get_dialect`";
    name="${PROJECT_NAME:-`get_projectname`}";
    user="${PROJECT_ORGANIZATION:-`get_organization`}";
    repo="${PROJECT_NAME:-`get_projectname`}";
@@ -414,8 +421,7 @@ print_dependencies()
    local lines
 
    # ignore embedded
-   lines=`rexekutor mulle-sde ${MULLE_TECHNICAL_FLAGS} \
-                              ${MULLE_SDE_FLAGS} \
+   lines=`rexekutor mulle-sde ${MULLE_SDE_FLAGS} \
                         dependency list --columnar \
                                         -- \
                                            --dedupe-mode url-filename \
@@ -446,19 +452,20 @@ print_dependencies()
       name="${line%%;*}"
       url="${line#*;}"
 
+      eval "`rexekutor mulle-domain -s parse-url "${url}"`"
 
-      eval "`mulle-domain -s parse-url "${url}"`"
       case "${domain}" in
          githubusercontent)
             domain="github"
          ;;
       esac
 
-      repo_url="`mulle-domain -s compose-url --domain "${domain}" \
-                                             --scm "none" \
-                                             --host "${host}" \
-                                             --user "${user}" \
-                                             --repo "${repo}" `"
+      repo_url="`rexekutor mulle-domain -s compose-url \
+                                        --domain "${domain}" \
+                                        --scm "none" \
+                                        --host "${host}" \
+                                        --user "${user}" \
+                                        --repo "${repo}" `"
 
       # hacky hack
 
