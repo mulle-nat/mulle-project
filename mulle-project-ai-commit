@@ -1,0 +1,554 @@
+#! /usr/bin/env mulle-bash
+#! MULLE_BASHFUNCTIONS_VERSION=6.6.3
+# shellcheck shell=bash
+#
+#
+#  mulle-project-ai-commit.sh
+#
+#  Copyright (c) 2025 nat
+#  All rights reserved.
+#
+#
+#  Redistribution and use in source and binary forms, with or without
+#  modification, are permitted provided that the following conditions are met:
+#
+#  Redistributions of source code must retain the above copyright notice, this
+#  list of conditions and the following disclaimer.
+#
+#  Redistributions in binary form must reproduce the above copyright notice,
+#  this list of conditions and the following disclaimer in the documentation
+#  and/or other materials provided with the distribution.
+#
+#  Neither the name of <ORGANIZATION> nor the names of its contributors
+#  may be used to endorse or promote products derived from this software
+#  without specific prior written permission.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+#  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+#  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+#  ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+#  LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+#  CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+#  SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+#  INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+#  CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+#  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+#  POSSIBILITY OF SUCH DAMAGE.
+#
+
+[ "${TRACE}" = 'YES' -o "${MULLE_PROJECT_AI_COMMIT_TRACE}" = 'YES' ] && set -x  && : "$0" "$@"
+
+### >> START OF mulle-boot.sh >>
+### << END OF mulle-boot.sh <<
+
+#
+# Versioning of this script
+#
+MULLE_EXECUTABLE_VERSION="0.0.0"
+
+
+### >> START OF mulle-bashfunctions-embed.sh >>
+### << END OF mulle-bashfunctions-embed.sh <<
+
+print_flags()
+{
+   echo "   -b, --batch  : commit automatically without user approval (non-interactive)"
+   echo "   -u, --update : run 'git add -u' before generating commit message"
+   echo "   --no-commit  : show generated commit message but don't commit"
+   echo "   --kiro-cli   : use AWS kiro-cli instead (a bit more clumsy)"
+   options_technical_flags_usage \
+                "        : "
+}
+
+
+AI="github-copilot"
+AI_FLAGS="--allow-all-tools --no-color -p"
+
+usage()
+{
+   [ $# -ne 0 ] && log_error "$*"
+
+   cat <<EOF >&2
+Usage:
+   mulle-project-ai-commit [flags] [additional text]
+
+   Use AI to generate a commit message for currently staged changes.
+   Calls ${AI%%\ *} with a specialized prompt that analyzes staged
+   files and creates a commit message suitable for release notes.
+
+   The AI will:
+   - Review git diff --cached
+   - Generate a formatted commit message
+   - Optionally commit the changes
+
+   To see the command without executing, use: -lx -n
+
+Flags:
+EOF
+   print_flags | LC_ALL=C sort >&2
+
+   exit 1
+}
+
+
+PROMPT_TEXT='I need you to create a git commit message for my staged changes.
+Follow these rules:
+
+FORMAT:
+<type>: <brief summary of WHAT changed functionally>
+
+* <user-facing change 1>
+* <user-facing change 2>
+
+Optional technical notes as plain paragraphs (won'\''t appear in release notes).
+
+COMMIT TYPE PRIORITY (use the HIGHEST priority type that applies):
+1. feature: NEW functionality, APIs, features, or capabilities
+2. fix: Bug fixes, corrections, error handling
+3. performance: Performance improvements
+4. refactor: Code restructuring without behavior change
+5. docs: Documentation only
+6. test: Test additions/changes
+7. maintenance: Version bumps, tooling, config
+
+IMPORTANT: If changes are ONLY version bumps, config files, or dotfiles with no user impact,
+create only a very short commit message entirely without bullet points.
+
+UNDERSTANDING THE PROJECT:
+1. Get familiar with the project, read the README.md and peruse some sources to understand what this project is about
+2. Identify the project type (C library? Shell tool? Python package?)
+3. Focus on changes relevant to that project type
+4. For a C library: .c/.h files matter
+5. For a shell tool: shell scripts matter
+
+FILES OF INTEREST:
+1. The most interesting changes will be in the src/ folder if present
+2. Changes in ANY dotfile/dotfolder (.mulle/, .github/, etc) MUST BE IGNORED
+3. Also ignore changes in ANY share/ folder, these are boilerplate code from the outside of the project
+4  Dotfiles (.mulle, .github, .vscode, etc) - IGNORE COMPLETELY
+5. Build system configuration is boring
+6. CI/CD configuration is boring
+7. Version number changes in any file are boring
+8. Documentation/README changes unless they are the ONLY changes
+
+RULES FOR SUMMARY LINE:
+- Focus on WHAT changed from a user/API perspective
+- Version numbers are BORING - mention the feature, not the version
+- Bad: "upgrade mulle-sde tooling to version 3.5.0"
+- Good: "add alignment helpers for C11 structures"
+- Be specific about functionality, not file names or version numbers
+
+RULES FOR BULLET POINTS (* lines):
+- These appear in RELEASE NOTES - make them count!
+- Focus on USER-VISIBLE or API-VISIBLE changes
+- Technical audience = developers using this code
+- Emphasize: new APIs, behavior changes, new capabilities, fixes
+- De-emphasize: config changes, version bumps, internal refactoring
+- Each bullet should answer: "Why does the API user care?"
+- If you notice a breaking API change in a function or method definition or declaration in this project mention it with **BREAKING**. Use of different API is not a breaking change
+- An additional function or method is not breaking
+
+RULES FOR TECHNICAL PARAGRAPHS (no * prefix):
+- Put boring details here: file names, config changes, version numbers
+- Implementation details that won'\''t help users
+- These are FILTERED from release notes but kept in git history
+
+EXAMPLES FOR C LIBRARY:
+
+Good (code-focused, ignoring dotfiles):
+feature: add C11 alignment utilities
+
+* new mulle-c11-align.h header with alignment macros
+* portable alignment helpers for struct packing
+* support for _Alignof and _Alignas on all platforms
+
+Added mulle-c11-align.h to CMakeLists.txt public headers list.
+
+Good (specific about the fix):
+fix: prevent NULL dereference in parser cleanup
+
+* parser now safely handles early termination errors
+* improved error messages for invalid input
+
+TASK:
+1. Read README.md to understand the project
+2. Review the staged changes with git diff --cached
+3. If an interesting file (e.g. src/) has changes give a short summary of one or two sentences
+4. COMPLETELY IGNORE all dotfile/dotfolder changes (.mulle, .github, etc)
+5. Identify the PRIMARY purpose from NON-dotfile changes
+6. Choose the correct type based on that primary purpose
+7. Write bullets focusing on API/user-visible impact
+8. Put mundane details (versions, file names, config) in plain paragraphs
+9. IMPORTANT: Output the commit message surrounded by separator lines like this:
+
+---------
+<your commit message here>
+---------
+
+Output ONLY the separators and commit message. No explanations before or after.
+
+Now review my staged changes and create the commit message.'
+
+
+
+r_generate_ai_prompt()
+{
+   log_entry "r_generate_ai_prompt" "$@"
+
+   local user_args="$1"
+   local previous_msg="$2"
+   local feedback="$3"
+   local prompt
+
+   if [ -n "${previous_msg}" ]
+   then
+      printf -v prompt "%q" "${PROMPT_TEXT}"$'\n'"${user_args}"$'\n\nPrevious attempt:\n'"${previous_msg}"$'\n\nUser feedback: '"${feedback}"$'\n\nIMPORTANT: Surround your commit message with --------- separator lines as shown in the instructions above.'
+   else
+      printf -v prompt "%q" "${PROMPT_TEXT}"$'\n'"${user_args}"$'\n\nIMPORTANT: Surround your commit message with --------- separator lines as shown in the instructions above.'
+   fi
+
+   RVAL="${prompt}"
+}
+
+
+r_call_ai_for_commit_message()
+{
+   log_entry "r_call_ai_for_commit_message" "$@"
+
+   local prompt="$1"
+   local stderr_file="$2"
+
+   local raw_output
+   local commit_msg
+
+   raw_output=$(rexekutor ${AI} -- ${AI_FLAGS} "${prompt}" 2> "${stderr_file}")
+   commit_msg=$(printf "%s\n" "${raw_output}" | sed -n '/^---------/,/^---------/p' | sed '1d;$d')
+
+   RVAL="${commit_msg}"
+}
+
+
+interactive_show_status()
+{
+   log_entry "interactive_show_status" "$@"
+
+   rexekutor git --no-pager status
+   printf "\n"
+}
+
+
+interactive_show_diff()
+{
+   log_entry "interactive_show_diff" "$@"
+
+   local diff_files
+
+   read -p "Enter files to diff (empty for all staged): " diff_files
+
+   if [ -z "${diff_files}" ]
+   then
+      rexekutor git --no-pager diff --cached
+   else
+      rexekutor git --no-pager diff HEAD ${diff_files}
+   fi
+   printf "\n"
+}
+
+
+interactive_show_log()
+{
+   log_entry "interactive_show_log" "$@"
+
+   rexekutor git log $(git describe --tags --abbrev=0)
+}
+
+
+interactive_bash_shell()
+{
+   log_entry "interactive_bash_shell" "$@"
+
+   log_info "Starting interactive bash shell. Type 'exit' to return to commit prompt."
+   bash
+   printf "\n"
+}
+
+
+r_interactive_edit_message()
+{
+   log_entry "r_interactive_edit_message" "$@"
+
+   local current_msg="$1"
+
+   local tmpfile
+
+   r_make_tmp_file
+   tmpfile="${RVAL}"
+
+   redirect_exekutor "${tmpfile}" printf "%s\n" "${current_msg}"
+   exekutor "${EDITOR:-vi}" "${tmpfile}"
+
+   RVAL=$(<"${tmpfile}")
+   remove_file_if_present "${tmpfile}"
+}
+
+
+r_interactive_retry_with_ai()
+{
+   log_entry "r_interactive_retry_with_ai" "$@"
+
+   local user_args="$1"
+   local current_msg="$2"
+   local stderr_file="$3"
+
+   local comment
+   local prompt
+
+   read -p "Enter comment for AI (what to fix/change): " comment
+
+   if [ -z "${comment}" ]
+   then
+      log_warning "No comment provided, skipping AI retry"
+      return 1
+   fi
+
+   r_generate_ai_prompt "${user_args}" "${current_msg}" "${comment}"
+   prompt="${RVAL}"
+
+   r_call_ai_for_commit_message "${prompt}" "${stderr_file}"
+
+   if [ -z "${RVAL}" ]
+   then
+      log_error "AI returned empty commit message on retry"
+      cat "${stderr_file}" >&2
+      return 1
+   fi
+
+   return 0
+}
+
+
+main()
+{
+   local OPTION_NO_COMMIT='NO'
+   local OPTION_INTERACTIVE='YES'
+   local OPTION_ADD_UPDATED='NO'
+   local OPTION_AMEND='NO'
+
+   while [ $# -ne 0 ]
+   do
+      if options_technical_flags "$1"
+      then
+         shift
+         continue
+      fi
+
+      case "$1" in
+         -h*|--help|help)
+            usage
+         ;;
+
+         --version)
+            printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
+            exit 0
+         ;;
+
+         --kiro-cli)
+            AI="aws-kiro"
+            AI_FLAGS="chat --no-interactive --wrap never --trust-all-tools"
+         ;;
+
+         --ai)
+            [ $# -eq 1 ] && usage "missing parameter for \"$1\""
+            shift
+
+            AI="$1"
+         ;;
+
+         --ai-flags)
+            [ $# -eq 1 ] && usage "missing parameter for \"$1\""
+            shift
+
+            AI_FLAGS="$1"
+         ;;
+
+         -u|--update)
+            OPTION_ADD_UPDATED='YES'
+         ;;
+
+         -b|--batch)
+            OPTION_INTERACTIVE='NO'
+         ;;
+
+         -a|--amend)
+            OPTION_AMEND='YES'
+         ;;
+
+         --no-commit)
+            OPTION_NO_COMMIT='YES'
+         ;;
+
+         -*)
+            usage "Unknown flag \"$1\""
+         ;;
+
+         *)
+            break
+         ;;
+      esac
+
+      shift
+   done
+
+   options_setup_trace "${MULLE_TRACE}" && set -x
+
+   if [ "${OPTION_ADD_UPDATED}" = 'YES' ]
+   then
+      exekutor git add -u
+   fi
+
+   if [ -z "$(git diff --cached --name-only)" ]
+   then
+      if [ "${OPTION_ADD_UPDATED}" = 'YES' ]
+      then
+         local untracked
+
+         untracked=$(git ls-files --others --exclude-standard)
+
+         if [ -n "${untracked}" ]
+         then
+            local count
+
+            count=$(echo "${untracked}" | wc -l)
+            log_warning "No changes staged, but found ${count} untracked file(s):"
+            echo "${untracked}" | sed 's/^/  /' >&2
+            log_info "Use 'git add' to track these files if needed"
+            return 1
+         fi
+
+         log_info "No changes to commit after git add -u"
+         return 0
+      fi
+      fail "No staged changes. Use 'git add' first or use -u to add updated files."
+   fi
+
+   if [ -n "$(git diff --name-only)" ]
+   then
+      fail "You have unstaged changes. Stage them with 'git add' or use -u to add updated files, or commit them separately first."
+   fi
+
+   local commit_msg
+   local stderr_output
+   local prompt
+
+   r_make_tmp_file
+   stderr_output="${RVAL}"
+
+   r_generate_ai_prompt "$*" "" ""
+   prompt="${RVAL}"
+
+   r_call_ai_for_commit_message "${prompt}" "${stderr_output}"
+   commit_msg="${RVAL}"
+
+   if [ -z "${commit_msg}" ]
+   then
+      log_error "AI returned empty commit message"
+      cat "${stderr_output}" >&2
+      remove_file_if_present "${stderr_output}"
+      exit 1
+   fi
+
+   if [ "${OPTION_NO_COMMIT}" = 'YES' ]
+   then
+      printf "%s\n" "${commit_msg}"
+      remove_file_if_present "${stderr_output}"
+      return 0
+   fi
+
+   if [ "${OPTION_INTERACTIVE}" = 'YES' ]
+   then
+      while :
+      do
+         printf "%s\n" "${commit_msg}"
+         printf "\n"
+
+         local answer
+
+         read -p "Commit with this message? [y]es/[a]mend/[n]o/[e]dit/[r]etry/[s]tatus/[l]og/[d]iff/[b]ash: " answer
+
+         case "${answer}" in
+            y|Y|yes|YES)
+               break
+            ;;
+
+            a|A|amend)
+               OPTION_AMEND='YES'
+               break
+            ;;
+
+
+            n|N|no|NO)
+               log_info "Commit cancelled"
+               remove_file_if_present "${stderr_output}"
+               return 1
+            ;;
+
+            l|L|log)
+               interactive_show_log
+               continue
+            ;;
+
+            s|S|status)
+               interactive_show_status
+               continue
+            ;;
+
+            d|D|diff)
+               interactive_show_diff
+               continue
+            ;;
+
+            b|B|bash)
+               interactive_bash_shell
+               continue
+            ;;
+
+            e|E|edit)
+               r_interactive_edit_message "${commit_msg}"
+               commit_msg="${RVAL}"
+
+               if [ -z "${commit_msg}" ]
+               then
+                  log_warning "Empty commit message after edit"
+                  continue
+               fi
+               break
+            ;;
+
+            r|R|retry)
+               if r_interactive_retry_with_ai "$*" "${commit_msg}" "${stderr_output}"
+               then
+                  commit_msg="${RVAL}"
+               fi
+               continue
+            ;;
+
+            *)
+               log_warning "Invalid choice. Please enter y, n, e, r, s, d, or b"
+               continue
+            ;;
+         esac
+      done
+   fi
+
+   remove_file_if_present "${stderr_output}"
+
+   if [ "${OPTION_AMEND}" = 'YES' ]
+   then
+      exekutor git commit --amend -m "${commit_msg}"
+      return $?
+   fi
+
+   exekutor git commit -m "${commit_msg}"
+}
+
+main "$@"

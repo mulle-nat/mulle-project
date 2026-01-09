@@ -59,7 +59,7 @@ print_flags()
    cat <<EOF
    --all               : execute in all projects,subprojects,tests
    --directory <dir>   : enter subdirectory, before executing project command
-   --exec ...          : evaluate command line in the project
+   --exec ...          : do not expand command line arguments
    --if-exists <file>  : ignore project if <file> does not exist
    --if <expr>         : ignore project if shell expression evaluates to false
    --ignore <name>     : ignore a project from REPOS, multiples are possible
@@ -75,6 +75,7 @@ EOF
    then
       cat <<EOF
    --eval ...          : a less convenient legacy variant of exec
+   --if-not-exists <file> : ignore project if <file> exists
    --lenient           : lenient operation, errors don't preempt (default)
    --main-project      : also execute in main project
    --no-cd             : do not change to project directory
@@ -116,14 +117,15 @@ Usage:
    mulle-project-all will define a couple of environment variables for your
    evaluation use:
 
-      NAME            : basename of the directory
-      DIRECTORY       : path of the directory
-      PROJECT_NAME    : name of the main project
-      GITHUB_NAME     : basename of parent directory / basename directory
+      MULLE_PROJECT_ALL : set to "${MULLE_EXECUTABLE_VERSION}", mulle-craft uses --no-hook
+      NAME              : basename of the directory
+      DIRECTORY         : path of the directory
+      PROJECT_NAME      : name of the main project
+      GITHUB_NAME       : basename of parent directory / basename directory
 
-      SUBPROJECT_NAME : set if its a subproject
-      OTHER_NAME      : set if its an other project test
-      TEST_NAME       : set if its a test
+      SUBPROJECT_NAME   : set if its a subproject
+      OTHER_NAME        : set if its an other project test
+      TEST_NAME         : set if its a test
 
    These values are also available in the --if expression.
 
@@ -352,6 +354,13 @@ shell_it()
             arg="${RVAL}"
          fi
          set -- "$@" "${arg}"
+
+         # this allows mulle-craft to ignore --no-hook
+         case "${arg}" in
+            mulle-sde|*/mulle-sde)
+               set -- "$@" -DMULLE_PROJECT_ALL=${MULLE_EXECUTABLE_VERSION}
+            ;;
+         esac
       done
 
       if [ "${OPTION_EXEC}" = 'YES' ]
@@ -817,6 +826,15 @@ main()
             r_concat "${OPTION_IF}" "[ -e \"$1\" ]"
             OPTION_IF="${RVAL}"
          ;;
+
+         --if-not-exists)
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
+            shift
+
+            r_concat "${OPTION_IF}" "[ ! -e \"$1\" ]"
+            OPTION_IF="${RVAL}"
+         ;;
+
 
          -l|--lenient)
             OPTION_LENIENT='YES'

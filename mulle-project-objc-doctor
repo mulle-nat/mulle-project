@@ -1,0 +1,363 @@
+#! /usr/bin/env mulle-bash
+#! MULLE_BASHFUNCTIONS_VERSION=6.6.3
+# shellcheck shell=bash
+#
+#
+#  mulle-project-objc-doctor.sh
+#
+#  Copyright (c) 2026 nat
+#  All rights reserved.
+#
+#
+#  Redistribution and use in source and binary forms, with or without
+#  modification, are permitted provided that the following conditions are met:
+#
+#  Redistributions of source code must retain the above copyright notice, this
+#  list of conditions and the following disclaimer.
+#
+#  Redistributions in binary form must reproduce the above copyright notice,
+#  this list of conditions and the following disclaimer in the documentation
+#  and/or other materials provided with the distribution.
+#
+#  Neither the name of <ORGANIZATION> nor the names of its contributors
+#  may be used to endorse or promote products derived from this software
+#  without specific prior written permission.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+#  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+#  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+#  ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+#  LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+#  CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+#  SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+#  INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+#  CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+#  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+#  POSSIBILITY OF SUCH DAMAGE.
+#
+
+[ "${TRACE}" = 'YES' -o "${MULLE_PROJECT_OBJC_DOCTOR_TRACE}" = 'YES' ] && set -x  && : "$0" "$@"
+
+### >> START OF mulle-boot.sh >>
+### << END OF mulle-boot.sh <<
+
+#
+# Versioning of this script
+#
+MULLE_EXECUTABLE_VERSION="0.0.0"
+
+
+### >> START OF mulle-bashfunctions-embed.sh >>
+### << END OF mulle-bashfunctions-embed.sh <<
+
+if [ -z "${MULLE_PROJECT_LIBEXEC_DIR}" ]
+then
+   r_get_libexec_dir "${MULLE_EXECUTABLE}" "mulle-project" "mulle-project-git.sh"
+   MULLE_PROJECT_LIBEXEC_DIR="${RVAL}"
+fi
+
+. "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-project-git.sh"
+
+print_flags()
+{
+   echo "   -f    : force operation"
+
+   ##
+   ## ADD YOUR FLAGS DESCRIPTIONS HERE
+   ##
+
+   options_technical_flags_usage                 "         : "
+}
+
+
+usage()
+{
+   [ $# -ne 0 ] && log_error "$*"
+
+
+   cat <<EOF >&2
+Usage:
+   mulle-project-objc-doctor [flags]
+
+   Check Objective-C project setup and configuration.
+   Verifies git branches, sourcetree, and project structure.
+
+Flags:
+EOF
+   print_flags | LC_ALL=C sort >&2
+
+   exit 1
+}
+
+
+check_git_repository()
+{
+   if [ ! -d ".git" ]
+   then
+      fail "Not in a git repository"
+   fi
+   log_verbose "Git repository found"
+}
+
+
+check_required_branches()
+{
+   if ! project::git::branch_exists "master"
+   then
+      fail "Missing 'master' branch"
+   fi
+   
+   if ! project::git::branch_exists "develop"
+   then
+      fail "Missing 'develop' branch"
+   fi
+   
+   log_verbose "Required branches (master, develop) found"
+}
+
+
+check_current_branch()
+{
+   local current_branch
+   
+   current_branch="`git branch --show-current 2>/dev/null`"
+   
+   if [ "${current_branch}" != "develop" ]
+   then
+      fail "Current branch is '${current_branch}', should be 'develop'"
+   fi
+   
+   log_verbose "Currently on 'develop' branch"
+}
+
+
+check_sourcetree()
+{
+   if ! command -v mulle-project-sourcetree-doctor >/dev/null 2>&1
+   then
+      log_warning "mulle-project-sourcetree-doctor not found, skipping sourcetree check"
+      return
+   fi
+   
+   if [ ! -d ".mulle/etc/sourcetree" ]
+   then
+      log_verbose "No sourcetree directory found, skipping sourcetree check"
+      return
+   fi
+   
+   local config_files
+   config_files="`find .mulle/etc/sourcetree -maxdepth 1 -type f 2>/dev/null`"
+   
+   if [ -z "${config_files}" ]
+   then
+      log_verbose "No sourcetree config files found"
+      return
+   fi
+   
+   log_info "Running sourcetree doctor..."
+   local config
+   local failed=0
+   
+   while IFS= read -r config
+   do
+      local config_name
+      r_basename "${config}"
+      config_name="${RVAL}"
+      
+      log_verbose "Checking sourcetree config: ${config_name}"
+      if ! SOURCETREE_CONFIG_NAME="${config_name}" exekutor mulle-project-sourcetree-doctor "/"
+      then
+         failed=1
+      fi
+   done <<< "${config_files}"
+   
+   if [ ${failed} -eq 1 ]
+   then
+      fail "Sourcetree doctor failed on one or more configs"
+   fi
+}
+
+
+check_git_remotes()
+{
+   local remotes
+   remotes="`git remote 2>/dev/null`"
+   
+   if ! grep -q "^origin$" <<< "${remotes}"
+   then
+      log_warning "Missing 'origin' remote"
+   else
+      log_verbose "Found 'origin' remote"
+   fi
+   
+   if ! grep -q "^github$" <<< "${remotes}"
+   then
+      log_warning "Missing 'github' remote"
+   else
+      log_verbose "Found 'github' remote"
+   fi
+}
+
+
+check_clib_json_freshness()
+{
+   if [ ! -f "clib.json" ] || [ ! -f "cola/properties.plist" ]
+   then
+      log_verbose "No clib.json or cola/properties.plist found, skipping clib freshness check"
+      return
+   fi
+   
+   if [ "cola/properties.plist" -nt "clib.json" ]
+   then
+      log_warning "cola/properties.plist is newer than clib.json"
+      log_info "Consider running 'mulle-project-clib-json' to update clib.json"
+   else
+      log_verbose "clib.json is up to date with cola/properties.plist"
+   fi
+}
+
+
+check_git_status()
+{
+   local untracked modified added deleted
+   
+   untracked="`git ls-files --others --exclude-standard 2>/dev/null | wc -l`"
+   modified="`git diff --name-only 2>/dev/null | wc -l`"
+   added="`git diff --cached --name-only --diff-filter=A 2>/dev/null | wc -l`"
+   deleted="`git diff --cached --name-only --diff-filter=D 2>/dev/null | wc -l`"
+   
+   if [ ${untracked} -gt 0 ] || [ ${modified} -gt 0 ] || [ ${added} -gt 0 ] || [ ${deleted} -gt 0 ]
+   then
+      printf "Git status: "
+      [ ${untracked} -gt 0 ] && printf "\033[0;33m%d untracked\033[0m " ${untracked}
+      [ ${modified} -gt 0 ] && printf "\033[0;31m%d modified\033[0m " ${modified}
+      [ ${added} -gt 0 ] && printf "\033[0;32m%d added\033[0m " ${added}
+      [ ${deleted} -gt 0 ] && printf "\033[0;31m%d deleted\033[0m " ${deleted}
+      printf "\n"
+   fi
+}
+
+
+check_project_version()
+{
+   if ! command -v mulle-project-version >/dev/null 2>&1
+   then
+      log_warning "mulle-project-version not found, skipping version check"
+      return
+   fi
+   
+   local version
+   version="`mulle-project-version 2>/dev/null`"
+   
+   if [ -z "${version}" ]
+   then
+      log_warning "Could not determine project version"
+   else
+      log_verbose "Project version: ${version}"
+   fi
+}
+
+
+check_versioncheck_freshness()
+{
+   if ! command -v mulle-project-versioncheck >/dev/null 2>&1
+   then
+      return
+   fi
+   
+   mulle-project-versioncheck --check-freshness >/dev/null 2>&1
+}
+
+
+check_readme_freshness()
+{
+   if [ ! -d "cola" ] || [ ! -f "README.md" ]
+   then
+      log_verbose "No cola/ directory or README.md found, skipping freshness check"
+      return
+   fi
+   
+   local newer_files
+   newer_files="`find cola -newer README.md 2>/dev/null`"
+   
+   if [ ! -z "${newer_files}" ]
+   then
+      log_warning "Files in cola/ are newer than README.md:"
+      printf "%s\n" "${newer_files}" | sed 's/^/   /'
+      log_info "Consider running 'mulle-readme-cmd' to update README.md"
+   else
+      log_verbose "README.md is up to date with cola/ files"
+   fi
+}
+
+
+main()
+{
+   #
+   # simple option/flag handling
+   #
+   local OPTION_VALUE
+
+   while [ $# -ne 0 ]
+   do
+      if options_technical_flags "$1"
+      then
+         shift
+         continue
+      fi
+
+      case "$1" in
+         -f|--force)
+            MULLE_FLAG_MAGNUM_FORCE='YES'
+         ;;
+
+         -h*|--help|help)
+            usage
+         ;;
+
+         --value)
+            [ $# -eq 1 ] && usage "missing argument to $1"
+            shift
+
+            OPTION_VALUE="$1"
+         ;;
+
+         --version)
+            printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
+            exit 0
+         ;;
+
+
+         ##
+         ## ADD YOUR FLAGS HERE
+         ##
+
+         -*)
+            usage "Unknown flag \"$1\""
+         ;;
+
+         *)
+            break
+         ;;
+      esac
+
+      shift
+   done
+
+   options_setup_trace "${MULLE_TRACE}" && set -x
+
+   log_info "Checking Objective-C project setup..."
+   
+   check_git_repository
+   check_required_branches  
+   check_current_branch
+   check_git_remotes
+   check_sourcetree
+   check_clib_json_freshness
+   check_git_status
+   check_project_version
+   check_versioncheck_freshness
+   check_readme_freshness
+}
+
+main "$@"

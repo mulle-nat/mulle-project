@@ -17,6 +17,7 @@ fi
 print_flags()
 {
    echo "   -f    : force operation"
+   echo "   --fix : fix detected problems automatically"
    ##
    ## ADD YOUR FLAGS DESCRIPTIONS HERE
    ##
@@ -45,11 +46,112 @@ EOF
 }
 
 
+__doctor_fix_mulle_org_archive()
+{
+   log_entry "__doctor_fix_mulle_org_archive" "$@"
+   
+   local address="$1"
+   local upcaseid="$2"
+   
+   log_info "Fixing archive ${address} for mulle organization..."
+   
+   # Source mulle-sde if needed
+   if [ -z "${MULLE_SDE_LIBEXEC_DIR}" ]
+   then
+      MULLE_SDE_LIBEXEC_DIR="`mulle-sde libexec-dir 2>/dev/null`"
+   fi
+   
+   if [ -f "${MULLE_SDE_LIBEXEC_DIR}/mulle-sde-dependency.sh" ]
+   then
+      source "${MULLE_SDE_LIBEXEC_DIR}/mulle-sde-common.sh"
+      source "${MULLE_SDE_LIBEXEC_DIR}/mulle-sde-dependency.sh"
+      
+      # Fix tag to use correct upcaseid
+      sde::dependency::set_main "${address}" tag "\${${upcaseid}_TAG:-latest}"
+   fi
+}
+
+
+__doctor_fix_mulle_org()
+{
+   log_entry "__doctor_fix_mulle_org" "$@"
+   
+   local address="$1"
+   local user="$2" 
+   local repo="$3"
+   
+   log_info "Fixing ${address} for mulle organization ${user}..."
+   
+   # Source mulle-sde dependency functions if available
+   if [ -z "${MULLE_SDE_LIBEXEC_DIR}" ]
+   then
+      MULLE_SDE_LIBEXEC_DIR="`mulle-sde libexec-dir 2>/dev/null`"
+   fi
+   
+   if [ ! -f "${MULLE_SDE_LIBEXEC_DIR}/mulle-sde-dependency.sh" ]
+   then
+      log_error "mulle-sde not available, cannot fix automatically"
+      return 1
+   fi
+   
+   # Source required dependencies
+   source "${MULLE_SDE_LIBEXEC_DIR}/mulle-sde-common.sh"
+   source "${MULLE_SDE_LIBEXEC_DIR}/mulle-sde-dependency.sh"
+   
+   # Fix nodetype, tag, and URL
+   sde::dependency::set_main "${address}" nodetype tar &&
+   sde::dependency::set_main "${address}" tag latest &&
+   sde::dependency::set_main "${address}" url "https://github.com/${user}/${repo}/archive/\${MULLE_TAG}.tar.gz"
+}
+
+
 __doctor_repo_nodeline()
 {
    log_entry "__doctor_repo_nodeline" "$@"
 
    local upcaseid="$1"
+
+   # Check if this is a mulle GitHub org that should be tar, not git
+   case "${_evaledurl}" in
+      */github.com/*)
+         (
+            eval `rexekutor mulle-domain parse-url --domain github "${_evaledurl}" `
+
+            case "${user}" in
+               mulle-c|mulle-cc|mulle-gfx|mulle-objc|mulle-core|\
+mulle-concurrent|MulleEOF|MulleWeb|MulleFoundation|MulleUI)
+                  local needs_fix='NO'
+                  
+                  if [ "${_evalednodetype}" != "tar" ]
+                  then
+                     log_warning "${_address}: mulle GitHub org \"${user}\" should use nodetype 'tar', not '${_evalednodetype}'"
+                     needs_fix='YES'
+                  fi
+                  
+                  if [ "${_evaledtag}" != "latest" ]
+                  then
+                     log_warning "${_address}: mulle GitHub org \"${user}\" should use tag 'latest', not '${_evaledtag}'"
+                     needs_fix='YES'
+                  fi
+                  
+                  case "${_evaledurl}" in
+                     https://github.com/${user}/${repo}/archive/*)
+                     ;;
+                     *)
+                        log_warning "${_address}: mulle GitHub org \"${user}\" should use URL pattern 'https://github.com/${user}/${repo}/archive/\${MULLE_TAG}.tar.gz'"
+                        needs_fix='YES'
+                     ;;
+                  esac
+                  
+                  if [ "${needs_fix}" = 'YES' -a "${OPTION_FIX}" = 'YES' ]
+                  then
+                     __doctor_fix_mulle_org "${_address}" "${user}" "${repo}"
+                  fi
+               ;;
+            esac
+         )
+      ;;
+   esac
 }
 
 
@@ -82,16 +184,46 @@ __doctor_archive_nodeline()
       ;;
    esac
 
-   expect="\${${upcaseid}_TAG:-latest}"
-   if [ "${_tag}" != "${expect}" ]
-   then
-      log_warning "${_address}: tag is \"${_tag}\" not \"${expect}\""
-   fi
+   # Only check for "latest" tag on mulle organizations
+   case "${_evaledurl}" in
+      */github.com/*)
+         (
+            eval `rexekutor mulle-domain parse-url --domain github "${_evaledurl}" `
+            case "${user}" in
+               mulle-c|mulle-cc|mulle-gfx|mulle-objc|mulle-core|\
+mulle-concurrent|MulleEOF|MulleWeb|MulleFoundation|MulleUI)
+                  # Use the actual upcaseid that was passed in
+                  expect="\${${upcaseid}_TAG:-latest}"
+                  if [ "${_tag}" != "${expect}" ]
+                  then
+                     log_warning "${_address}: tag is \"${_tag}\" not \"${expect}\""
+                     if [ "${OPTION_FIX}" = 'YES' ]
+                     then
+                        __doctor_fix_mulle_org_archive "${_address}" "${upcaseid}"
+                     fi
+                  fi
+               ;;
+            esac
+         )
+      ;;
+   esac
 
    expect="\${${upcaseid}_BRANCH}"
    if [ "${_branch}" != "${expect}" ]
    then
-      log_warning "${_address}: branch is \"${_branch}\" not \"${expect}\""
+      # Check for empty default pattern
+      case "${_branch}" in
+         *:-\})
+            log_warning "${_address}: branch is \"${_branch}\" not \"${expect}\""
+            if [ "${OPTION_FIX}" = 'YES' ]
+            then
+               __doctor_fix_empty_default "${_address}" "branch" "${_branch}"
+            fi
+         ;;
+         *)
+            log_warning "${_address}: branch is \"${_branch}\" not \"${expect}\""
+         ;;
+      esac
    fi
 
    case "${_url}" in
@@ -147,14 +279,14 @@ mulle-concurrent|MulleEOF|MulleWeb|MulleFoundation|MulleUI)
                ;;
 
                *)
-                  log_warning "${_address}: URL \"${_url} specifies non-mulle github user \"${user}\""
+                  log_info "${_address}: URL \"${_url} specifies non-mulle github user \"${user}\""
                ;;
             esac
          )
       ;;
 
       *)
-         log_warning "${_address}: URL \"${_url} is not on github"
+         log_info "${_address}: URL \"${_url} is not on github"
       ;;
    esac
 }
@@ -188,6 +320,298 @@ is_balanced_character_pair()
 }
 
 
+r_extract_env_vars()
+{
+   log_entry "r_extract_env_vars" "$@"
+   
+   local text="$1"
+   
+   # Extract ${VAR_NAME} and ${VAR_NAME:-default} patterns
+   RVAL="`printf '%s\n' "${text}" | sed -n 's/.*\${\([^}]*\)}.*/\1/gp' | sed 's/:-.*$//'`"
+}
+
+
+doctor_check_environment_variables()
+{
+   log_entry "doctor_check_environment_variables" "$@"
+   
+   local address="$1"
+   
+   # Check all fields for environment variables
+   local field
+   local vars
+   local var
+   
+   for field in "${_nodetype}" "${_tag}" "${_branch}" "${_url}"
+   do
+      if [ ! -z "${field}" ]
+      then
+         r_extract_env_vars "${field}"
+         vars="${RVAL}"
+         
+         .foreachline var in ${vars}
+         .do
+            if [ ! -z "${var}" ]
+            then
+               # Check if variable is set in environment
+               if ! printenv "${var}" >/dev/null 2>&1
+               then
+                  log_warning "${address}: environment variable \${${var}} is not defined"
+                  
+                  if [ "${OPTION_FIX}" = 'YES' ]
+                  then
+                     __doctor_fix_missing_env_var "${address}" "${var}"
+                  fi
+               fi
+            fi
+         .done
+      fi
+   done
+}
+
+
+__doctor_fix_unbalanced_braces()
+{
+   log_entry "__doctor_fix_unbalanced_braces" "$@"
+   
+   local address="$1"
+   local field="$2"
+   local value="$3"
+   
+   log_info "Fixing unbalanced braces in ${field} for ${address}..."
+   
+   # Count braces
+   r_count_character "${value}" "{"
+   local open_count="${RVAL}"
+   r_count_character "${value}" "}"
+   local close_count="${RVAL}"
+   
+   if [ ${open_count} -gt ${close_count} ]
+   then
+      # Add missing closing braces
+      local missing=$((open_count - close_count))
+      local fixed_value="${value}"
+      while [ ${missing} -gt 0 ]
+      do
+         fixed_value="${fixed_value}}"
+         missing=$((missing - 1))
+      done
+      
+      # Source mulle-sde if needed
+      if [ -z "${MULLE_SDE_LIBEXEC_DIR}" ]
+      then
+         MULLE_SDE_LIBEXEC_DIR="`mulle-sde libexec-dir 2>/dev/null`"
+      fi
+      
+      if [ -f "${MULLE_SDE_LIBEXEC_DIR}/mulle-sde-dependency.sh" ]
+      then
+         source "${MULLE_SDE_LIBEXEC_DIR}/mulle-sde-common.sh"
+         source "${MULLE_SDE_LIBEXEC_DIR}/mulle-sde-dependency.sh"
+         
+         sde::dependency::set_main "${address}" "${field}" "${fixed_value}"
+      fi
+   fi
+}
+
+
+__doctor_fix_empty_default()
+{
+   log_entry "__doctor_fix_empty_default" "$@"
+   
+   local address="$1"
+   local field="$2"
+   local value="$3"
+   
+   log_info "Fixing empty default in ${field} for ${address}..."
+   
+   # Remove :-} and replace with }
+   local fixed_value="${value/:-\}/\}}"
+   
+   # Source mulle-sde if needed
+   if [ -z "${MULLE_SDE_LIBEXEC_DIR}" ]
+   then
+      MULLE_SDE_LIBEXEC_DIR="`mulle-sde libexec-dir 2>/dev/null`"
+   fi
+   
+   if [ -f "${MULLE_SDE_LIBEXEC_DIR}/mulle-sde-dependency.sh" ]
+   then
+      source "${MULLE_SDE_LIBEXEC_DIR}/mulle-sde-common.sh"
+      source "${MULLE_SDE_LIBEXEC_DIR}/mulle-sde-dependency.sh"
+      
+      sde::dependency::set_main "${address}" "${field}" "${fixed_value}"
+   fi
+}
+
+
+doctor_check_variable_wrapping()
+{
+   log_entry "doctor_check_variable_wrapping" "$@"
+   
+   local address="$1"
+   local upcaseid="$2"
+   
+   # Skip variable wrapping checks for special nodetypes
+   case "${_nodetype}" in
+      *none*|*comment*|*local*)
+         return 0
+      ;;
+   esac
+   
+   # Skip variable wrapping checks for no-share-shirk entries (they use ${VAR} format)
+   if [[ "${_marks}" == *"no-share-shirk"* ]]
+   then
+      return 0
+   fi
+   
+   # Check if nodetype is properly wrapped
+   case "${_nodetype}" in
+      \$\{${upcaseid}_NODETYPE:-*\})
+         # properly wrapped
+      ;;
+      *)
+         # Don't suggest wrapping if it's already a variable reference
+         case "${_nodetype}" in
+            \$\{*\})
+               # Already a variable, don't suggest wrapping
+            ;;
+            *)
+               log_warning "${address}: nodetype \"${_nodetype}\" should be wrapped as \${${upcaseid}_NODETYPE:-${_nodetype}}"
+               if [ "${OPTION_FIX}" = 'YES' ]
+               then
+                  __doctor_fix_variable_wrapping "${address}" "nodetype" "${_nodetype}" "${upcaseid}"
+               fi
+            ;;
+         esac
+      ;;
+   esac
+   
+   # Check if tag is properly wrapped  
+   case "${_tag}" in
+      \$\{${upcaseid}_TAG:-*\})
+         # properly wrapped
+      ;;
+      *)
+         if [ ! -z "${_tag}" ]
+         then
+            # Don't suggest wrapping if it's already a variable reference
+            case "${_tag}" in
+               \$\{*\})
+                  # Already a variable, don't suggest wrapping
+               ;;
+               *)
+                  log_warning "${address}: tag \"${_tag}\" should be wrapped as \${${upcaseid}_TAG:-${_tag}}"
+                  if [ "${OPTION_FIX}" = 'YES' ]
+                  then
+                     __doctor_fix_variable_wrapping "${address}" "tag" "${_tag}" "${upcaseid}"
+                  fi
+               ;;
+            esac
+         fi
+      ;;
+   esac
+   
+   # Check if branch is properly wrapped
+   case "${_branch}" in
+      \$\{${upcaseid}_BRANCH*\})
+         # properly wrapped (can be with or without default)
+      ;;
+      *)
+         if [ ! -z "${_branch}" ]
+         then
+            # Don't suggest wrapping if it's already a variable reference
+            case "${_branch}" in
+               \$\{*\})
+                  # Already a variable, don't suggest wrapping
+               ;;
+               *)
+                  log_warning "${address}: branch \"${_branch}\" should be wrapped as \${${upcaseid}_BRANCH:-${_branch}}"
+                  if [ "${OPTION_FIX}" = 'YES' ]
+                  then
+                     __doctor_fix_variable_wrapping "${address}" "branch" "${_branch}" "${upcaseid}"
+                  fi
+               ;;
+            esac
+         else
+            # Check for empty default that should be removed
+            case "${_branch}" in
+               *:-\})
+                  log_warning "${address}: branch \"${_branch}\" should be wrapped as \${${upcaseid}_BRANCH}"
+                  if [ "${OPTION_FIX}" = 'YES' ]
+                  then
+                     __doctor_fix_empty_default "${address}" "branch" "${_branch}"
+                  fi
+               ;;
+               *)
+                  log_warning "${address}: branch \"${_branch}\" should be wrapped as \${${upcaseid}_BRANCH}"
+                  if [ "${OPTION_FIX}" = 'YES' ]
+                  then
+                     __doctor_fix_variable_wrapping "${address}" "branch" "" "${upcaseid}"
+                  fi
+               ;;
+            esac
+         fi
+      ;;
+   esac
+   
+   # Check if URL is properly wrapped
+   case "${_url}" in
+      \$\{${upcaseid}_URL:-*\})
+         # properly wrapped
+      ;;
+      *)
+         # Don't suggest wrapping if it's already a variable reference
+         case "${_url}" in
+            \$\{*\})
+               # Already a variable, don't suggest wrapping
+            ;;
+            *)
+               log_warning "${address}: url \"${_url}\" should be wrapped as \${${upcaseid}_URL:-${_url}}"
+               if [ "${OPTION_FIX}" = 'YES' ]
+               then
+                  __doctor_fix_variable_wrapping "${address}" "url" "${_url}" "${upcaseid}"
+               fi
+            ;;
+         esac
+      ;;
+   esac
+}
+
+
+__doctor_fix_variable_wrapping()
+{
+   log_entry "__doctor_fix_variable_wrapping" "$@"
+   
+   local address="$1"
+   local field="$2"
+   local value="$3"
+   local upcaseid="$4"
+   
+   log_info "Wrapping ${field} for ${address}..."
+   
+   # Source mulle-sde if needed
+   if [ -z "${MULLE_SDE_LIBEXEC_DIR}" ]
+   then
+      MULLE_SDE_LIBEXEC_DIR="`mulle-sde libexec-dir 2>/dev/null`"
+   fi
+   
+   if [ -f "${MULLE_SDE_LIBEXEC_DIR}/mulle-sde-dependency.sh" ]
+   then
+      source "${MULLE_SDE_LIBEXEC_DIR}/mulle-sde-common.sh"
+      source "${MULLE_SDE_LIBEXEC_DIR}/mulle-sde-dependency.sh"
+      
+      r_uppercase "${field}"
+      local wrapped_value
+      if [ -z "${value}" ]
+      then
+         wrapped_value="\${${upcaseid}_${RVAL}}"
+      else
+         wrapped_value="\${${upcaseid}_${RVAL}:-${value}}"
+      fi
+      sde::dependency::set_main "${address}" "${field}" "${wrapped_value}"
+   fi
+}
+
+
 doctor_nodeline()
 {
    log_entry "doctor_nodeline" "$@"
@@ -209,19 +633,35 @@ doctor_nodeline()
 
    if ! is_balanced_character_pair "${_branch}" "{}"
    then
-      log_warning "${_address}: branch ${branch} has unbalanced {} characters"
+      log_warning "${_address}: branch ${_branch} has unbalanced {} characters"
+      if [ "${OPTION_FIX}" = 'YES' ]
+      then
+         __doctor_fix_unbalanced_braces "${_address}" "branch" "${_branch}"
+      fi
    fi
    if ! is_balanced_character_pair "${_tag}" "{}"
    then
       log_warning "${_address}: tag ${_tag} has unbalanced {} characters"
+      if [ "${OPTION_FIX}" = 'YES' ]
+      then
+         __doctor_fix_unbalanced_braces "${_address}" "tag" "${_tag}"
+      fi
    fi
    if ! is_balanced_character_pair "${_nodetype}" "{}"
    then
       log_warning "${_address}: nodetype ${_nodetype} has unbalanced {} characters"
+      if [ "${OPTION_FIX}" = 'YES' ]
+      then
+         __doctor_fix_unbalanced_braces "${_address}" "nodetype" "${_nodetype}"
+      fi
    fi
    if ! is_balanced_character_pair "${_url}" "{}"
    then
-      log_warning "${_address}: nodetype ${_url} has unbalanced {} characters"
+      log_warning "${_address}: url ${_url} has unbalanced {} characters"
+      if [ "${OPTION_FIX}" = 'YES' ]
+      then
+         __doctor_fix_unbalanced_braces "${_address}" "url" "${_url}"
+      fi
    fi
 
    local upcaseid
@@ -240,6 +680,9 @@ doctor_nodeline()
 
    r_smart_file_upcase_identifier "${RVAL}"
    upcaseid="${RVAL}"
+
+   # Check if variables are properly wrapped
+   doctor_check_variable_wrapping "${_address}" "${upcaseid}"
 
    if find_line "${UPCASEIDS}" "${upcaseid}"
    then
@@ -268,6 +711,7 @@ doctor_nodeline()
    esac
 }
 
+UPCASEIDS=
 
 main()
 {
@@ -285,6 +729,10 @@ main()
       case "$1" in
          -f|--force)
             MULLE_FLAG_MAGNUM_FORCE='YES'
+         ;;
+
+         --fix)
+            OPTION_FIX='YES'
          ;;
 
          -h*|--help|help)

@@ -206,7 +206,7 @@ project::version::get_header_from_project()
       c)
          project="`printf "%s\n" "${project}" | project::version::split_camelcase_string`"
 
-         filename="${filename}-version"
+         filename="${project}-version"
          if [ -f "${filename}.h" ]
          then
             printf "%s\n" "${filename}.h"
@@ -227,13 +227,22 @@ project::version::get_header_from_project()
             return
          fi
 
-         project::version::make_file_string <<< "src/${project}.h"
+         filename="`project::version::make_file_string <<< "${project}.h" `"
+         if [ -f "${filename}" ]
+         then
+            printf "%s\n" "${filename}"
+            return
+         fi
+
+         echo "src/${project}.h"
       ;;
 
       *|"")
          echo "src/${project}.h"
       ;;
    esac
+
+   set +x
 }
 
 

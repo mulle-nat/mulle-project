@@ -75,12 +75,14 @@ get_repo()
 
    .for remote in `git remote 2> /dev/null`
    .do
-      url="`git remote get-url "${remote}"`"
+      url="`rexekutor git remote get-url "${remote}"`"
       # check if known domain
-      eval "`mulle-domain parse-url "${url}"`"
-      if [ "${domain}" = github ]
+      if eval "$(rexekutor mulle-domain parse-url "${url}")"
       then
-         .break
+         if [ "${domain}" = github ]
+         then
+            .break
+         fi
       fi
       repo=
    .done

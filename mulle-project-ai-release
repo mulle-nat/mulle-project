@@ -1,0 +1,408 @@
+#! /usr/bin/env mulle-bash
+#! MULLE_BASHFUNCTIONS_VERSION=6.6.3
+# shellcheck shell=bash
+#
+#
+#  mulle-project-ai-release.sh
+#
+#  Copyright (c) 2025 nat
+#  All rights reserved.
+#
+#
+#  Redistribution and use in source and binary forms, with or without
+#  modification, are permitted provided that the following conditions are met:
+#
+#  Redistributions of source code must retain the above copyright notice, this
+#  list of conditions and the following disclaimer.
+#
+#  Redistributions in binary form must reproduce the above copyright notice,
+#  this list of conditions and the following disclaimer in the documentation
+#  and/or other materials provided with the distribution.
+#
+#  Neither the name of <ORGANIZATION> nor the names of its contributors
+#  may be used to endorse or promote products derived from this software
+#  without specific prior written permission.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+#  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+#  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+#  ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+#  LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+#  CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+#  SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+#  INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+#  CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+#  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+#  POSSIBILITY OF SUCH DAMAGE.
+#
+
+[ "${TRACE}" = 'YES' -o "${MULLE_PROJECT_AI_RELEASE_TRACE}" = 'YES' ] && set -x  && : "$0" "$@"
+
+### >> START OF mulle-boot.sh >>
+### << END OF mulle-boot.sh <<
+
+#
+# Versioning of this script
+#
+MULLE_EXECUTABLE_VERSION="0.0.0"
+
+
+### >> START OF mulle-bashfunctions-embed.sh >>
+### << END OF mulle-bashfunctions-embed.sh <<
+
+print_flags()
+{
+   options_technical_flags_usage \
+                "         : "
+}
+
+
+AI="github-copilot"
+
+
+usage()
+{
+   [ $# -ne 0 ] && log_error "$*"
+
+   cat <<EOF >&2
+Usage:
+   mulle-project-ai-release [flags] <stage> [additional text]
+
+   Use AI to prepare a mulle repository for release. This is done in multiple
+   stages, which you specify.
+
+Stages:
+   * Preparation-1
+      - Check if project builds
+      - Check if tests pass
+      - Run mulle-project-objc-doctor
+      - Freshen CI yml for github actions
+      - Run mulle-sde upgrade
+
+   * Preparation-2
+      - Update versions
+      - Run mulle-project-versioncheck and update if needed
+
+   * Preparation-3
+      - Reamalgamate amalgamated projects (we have proper clib.json versions now)
+      - Actually do this only once for all projects with mulle
+
+   * Preparation-4
+      - Run mulle-sde upgrade again to get newest version numbers
+      - Run mulle-project-versioncheck again
+      - Check if project builds
+      - Fix up version check after other projects have changed their
+        versions
+      - Create releasenotes
+
+   To see the command without executing, use: -lx -n
+
+Flags:
+EOF
+   print_flags | LC_ALL=C sort >&2
+
+   exit 1
+}
+
+
+PREPARATION_1_PROMPT_TEXT='I need you to prepare this repository for release.
+
+First read README.md to understand the project.
+
+## IMPORTANT ERROR HANDLING
+
+If anything goes wrong or commands fail, immediately output "FAIL FAIL FAIL" and stop. Do not attempt to continue or work around errors.
+
+This preparation step insures that the repository is "ready" it compiles and
+tests without errors. At the end the repository should be almost releaseable
+or we BAIL!
+
+## Run "doctor"
+
+`mulle-project-objc-doctor` when run on a "standard" mulle project, will
+emit helpful information.
+
+## Fix the mulle-sourcetree if present
+
+Run `mulle-project-sourcetree-doctor` iteratively until you fixed all problems.
+If there is no sourcetree skip this step.
+
+
+## Check if remotes origin and github are present
+
+`git remote -v | grep -E -q "github|mulle-kybernetik.com"`
+
+if not, then add them with
+
+`mulle-project-new-repo --mulle`
+
+
+## Upgrade mulle-sde
+
+If there is a .mulle/share/sde folder, this is a mulle-sde project.
+Upgrade it with:
+
+`mulle-sde upgrade`
+
+
+## Update github.actions
+
+If there is a .github/workflows folder the project like has the github-actions
+extension (you can check with `mulle-sde extension list`). Freshen the files
+with:
+
+`mulle-sde extension freshen github-actions`
+
+
+## Ensure everything builds and tests
+
+If this is a C or Objective-C project. Try to verify it. In 99% of all cases
+this will be mulle-sde project. So you do `mulle-sde retest`. This will
+also build the main library and run the tests.
+
+
+## Try to fix versionchecks only
+
+If tests fail due to version inconsistency. Try to refresh the project like
+this:
+
+`mulle-project-versioncheck --fetch-if-needed --update-only --reflect`
+
+If this does not work BAIL, else retry the test.
+
+## Also compile demos
+
+If there is a `demo` folder, also go there and check that everything builds.
+
+(cd demo && mulle-sde recraft)
+
+When everything is done. Give a short summary and call it a day.'
+
+
+PREPARATION_2_PROMPT_TEXT='I need you to prepare this repository for release.
+
+First read README.md to understand the project
+
+## IMPORTANT ERROR HANDLING
+
+If anything goes wrong or commands fail, immediately output "FAIL FAIL FAIL" and stop. Do not attempt to continue or work around errors.
+
+At this step the repository is in a almost releaseable state. Now we can
+set the project version and update some files.
+
+## Set the project version
+
+Every project MUST have a version. If there is none, BAIL!
+
+Use `NO_COLOR=YES mulle-project-version 2>&1` to figure out the current version
+(stderr is important). Here are some example outputs and what to do:
+
+
+```
+Version is 0.1.0. Last git tag is 0.0.3.
+Last RELEASENOTES.md version is 0.0.3
+0.1.0
+```
+
+Here the version has already been bumped. We trust this and do nothing further.
+
+
+Next example:
+
+```
+0.4.0 already exists as a git tag, but has commits
+Last RELEASENOTES.md version is 0.4.0
+0.4.0
+```
+
+The current version need to be bumped as we have commits. If there are no
+commits all would be fine. Peruse the git log until you find the tag.
+Examine the commit messages Then change the version according to:
+
+* `mulle-project-version --increment-major --write` for breaking changes
+* `mulle-project-version --increment-minor --write` for added functionality
+* `mulle-project-version --increment-patch --write` for just build system maintenance and documentation and wording and bug fixes
+
+## Update cola/properties.plist
+
+Our versioning should be reflected in the cola/properties.plist. If it exists.
+
+
+## IMPORTANT!
+
+* do not git commit anything we are just preparing the repository
+* do not git reset or do any other destructive git operation
+
+When everything is done. Give a short summary and call it a day.'
+
+
+
+
+PREPARATION_3_PROMPT_TEXT='I need you to prepare this repository for release.
+
+First read README.md to understand the project
+
+## IMPORTANT ERROR HANDLING
+
+If anything goes wrong or commands fail, immediately output "FAIL FAIL FAIL" and stop. Do not attempt to continue or work around errors.
+
+This is the final step. All projects will have the correct version number
+set, so we can copy the values into our version checks.
+
+## Check the project version
+
+Every project MUST have a version. This is a paranoia check.
+
+Use `NO_COLOR=YES mulle-project-version 2>&1` to figure out the current version
+(stderr is important). Here are some example outputs and what to do:
+
+
+```
+Version is 0.1.0. Last git tag is 0.0.3.
+Last RELEASENOTES.md version is 0.0.3
+0.1.0
+```
+
+The version must be correct now (ahead of the git tag, if we have any commits)
+If not BAIL!
+
+
+## Upgrade mulle-sde
+
+If there is a .mulle/share/sde folder, this is a mulle-sde project.
+Upgrade it with:
+
+`mulle-sde upgrade`
+
+we should now have the final extension versions numbers up to date, no
+actual changes to the extension though
+
+## Check versionchecks
+
+We can now create proper version check code for the release
+
+`mulle-project-versioncheck --fetch-if-needed --update-only --reflect`
+
+If this does not work BAIL, else retry the test.
+
+
+## Recreate clib.json
+
+If a clib.json is present, recreate it:
+
+`mulle-project-clib-json -o "clib.json"`
+
+## Recreate README.md
+
+If a cola/ folder is present, recreate the README.md with:
+
+`mulle-readme-cms`
+
+
+## Create the RELEASENOTES
+
+Do this if the latest releasenotes version differs from the current
+
+`mulle-project-releasenotes RELEASENOTES`
+
+
+
+## IMPORTANT!
+
+* do not git commit anything we are just preparing the repository
+* do not git reset or do any other destructive git operation
+
+When everything is done. Give a short summary and call it a day.'
+
+
+
+r_generate_ai_prompt()
+{
+   log_entry "r_generate_ai_prompt" "$@"
+
+   local prompt_text="$1"
+   local user_args="$2"
+   local previous_msg="$3"
+   local feedback="$4"
+
+   local prompt
+   
+   if [ -n "${previous_msg}" ]
+   then
+      printf -v prompt "%q" "${prompt_text}"$'\n'"${user_args}"$'\n\nPrevious attempt:\n'"${previous_msg}"$'\n\nUser feedback: '"${feedback}"$'\n\nIMPORTANT: Surround your commit message with --------- separator lines as shown in the instructions above.'
+   else
+      printf -v prompt "%q" "${prompt_text}"$'\n'"${user_args}"$'\n\nIMPORTANT: Surround your commit message with --------- separator lines as shown in the instructions above.'
+   fi
+   
+   RVAL="${prompt}"
+}
+
+
+main()
+{
+   while [ $# -ne 0 ]
+   do
+      if options_technical_flags "$1"
+      then
+         shift
+         continue
+      fi
+
+      case "$1" in
+         -h*|--help|help)
+            usage
+         ;;
+
+         --version)
+            printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
+            exit 0
+         ;;
+
+         -*)
+            usage "Unknown flag \"$1\""
+         ;;
+
+         *)
+            break
+         ;;
+      esac
+
+      shift
+   done
+
+   options_setup_trace "${MULLE_TRACE}" && set -x
+
+   [ $# -eq 0 ] && usage
+
+   local prompt_name="$1"
+   shift
+
+   local prompt_text
+
+   case "${prompt_name}" in
+      'Preparation-1'|'preparation-1'|1)
+         prompt_text="${PREPARATION_1_PROMPT_TEXT}"
+      ;;
+
+      'Preparation-2'|'preparation-2'|2)
+         prompt_text="${PREPARATION_2_PROMPT_TEXT}"
+      ;;
+
+      'Preparation-3'|'preparation-3'|3)
+         prompt_text="${PREPARATION_4_PROMPT_TEXT}"
+      ;;
+
+      *)
+         usage "Unknown stage \"${prompt_name}\""
+      ;;
+   esac
+
+   local prompt
+   
+   r_generate_ai_prompt "${prompt_text}" "$*"
+   prompt="${RVAL}"
+   
+   rexekutor "${AI}" -- --allow-all-tools --no-color -p "${prompt}"
+}
+
+main "$@"
