@@ -73,6 +73,7 @@ Flags:
    -f                       : overwrite existing releasenotes for version
    --all                    : dump all releasenotes from the beginning in one
    --commit                 : git commit --amend --no-edit releasenotes
+   --fallback-commit        : if amend fails, create new commit instead
    --default-message <text> : text to use,if there are no suitable git comments
    --filter <executable>    : use something else than grep -E to filter comments
    --first-patch-zero       : consider patch 0 to be the first minor commit
@@ -613,6 +614,7 @@ main()
    local OPTION_FIRST_PATCH="0"
    local MULLE_FLAG_MAGNUM_FORCE='NO'
    local OPTION_COMMIT='NO'
+   local OPTION_FALLBACK_COMMIT='NO'
    local OPTION_INPUT=""
    local OPTION_ADD_U='NO'
    local OPTION_KEEP_TMP='NO'
@@ -691,6 +693,10 @@ main()
 
          -c|--commit)
             OPTION_COMMIT='YES'
+         ;;
+
+         --fallback-commit)
+            OPTION_FALLBACK_COMMIT='YES'
          ;;
 
          -dm|--default_message)
@@ -948,13 +954,24 @@ main()
       then
          if [ "${OPTION_ADD_U}" = 'YES' ] # second OPTION_ADD_U stage
          then
-            exekutor git commit ${OPTION_COMMITFLAGS}
+            if [ "${OPTION_FALLBACK_COMMIT}" = 'YES' ] && ! project::git::can_amend
+            then
+               exekutor git commit -m "new RELEASENOTES.md for version ${VERSION}"
+            else
+               exekutor git commit ${OPTION_COMMITFLAGS}
+            fi
          else
             if ! project::git::can_amend
             then
-               fail "Automatic amend/commit not possible for tagged or already pushed commits"
+               if [ "${OPTION_FALLBACK_COMMIT}" = 'YES' ]
+               then
+                  exekutor git commit -m "new RELEASENOTES.md for version ${VERSION}" "${OPTION_OUTPUT}"
+               else
+                  fail "Automatic amend/commit not possible for tagged or already pushed commits"
+               fi
+            else
+               exekutor git commit ${OPTION_COMMITFLAGS} "${OPTION_OUTPUT}"
             fi
-            exekutor git commit ${OPTION_COMMITFLAGS} "${OPTION_OUTPUT}"
          fi
       fi
    fi

@@ -1,3 +1,24 @@
+## 4.3.0
+
+* --cmd-file option to mulle-project-all
+* -m option for mulle-project-commit
+
+
+feature: add AI-assisted commit message generation
+
+* new mulle-project-ai tool for AI-powered project management tasks
+* AI-assisted commit message generation following project conventions
+* ignore list support in sourcetree-doctor to exclude problematic nodes
+* version diff capability to determine semantic version changes
+* new word-replace utility for text manipulation
+
+
+* new AI scripts
+
+* much improved demo runner
+* `new_repo` now supports codeberg
+
+
 ### 4.2.1
 
 * added support fot githubusercontent in the properties.plist generator

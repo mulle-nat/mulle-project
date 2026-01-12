@@ -17,6 +17,7 @@ fi
 print_flags()
 {
    echo "   -f                 : force operation"
+   echo "   -m|--message <msg> : commit message to use when creating new commit"
    echo "   --                 : arguments after -- are passed to the git commit"
    echo "   --always-amend     : always amend the commit [dangerous]"
    echo "   --boring           : all files are considered to be boring"
@@ -78,6 +79,7 @@ main()
    local OPTION_DIFF='YES'
    local OPTION_BUMP
    local OPTION_BORING
+   local OPTION_MESSAGE
 
    #
    # simple flag handling
@@ -97,6 +99,13 @@ main()
 
          -h*|--help|help)
             usage
+         ;;
+
+         -m|--message)
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
+            shift
+
+            OPTION_MESSAGE="$1"
          ;;
 
          --amend)
@@ -162,6 +171,12 @@ main()
    done
 
    options_setup_trace "${MULLE_TRACE}" && set -x
+
+   # Check for unused arguments (not after --)
+   if [ $# -ne 0 ]
+   then
+      fail "Unexpected arguments: $*. Use -- to pass arguments to git commit, or -m for commit message."
+   fi
 
    . "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-project-git.sh" || exit 1
 
@@ -283,7 +298,7 @@ ${C_RESET}${interesting_changes# }"
    then
       local commit_options
 
-      project::git::r_commit_options "${OPTION_AMEND}" ""
+      project::git::r_commit_options "${OPTION_AMEND}" "" "${OPTION_MESSAGE}"
       commit_options="${RVAL}"
 
       log_verbose "Add changes and commit..."

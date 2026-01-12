@@ -58,6 +58,7 @@ print_flags()
    ##
    cat <<EOF
    --all               : execute in all projects,subprojects,tests
+   --cmd-file <file>   : read command from file (use - for stdin)
    --directory <dir>   : enter subdirectory, before executing project command
    --exec ...          : do not expand command line arguments
    --if-exists <file>  : ignore project if <file> does not exist
@@ -751,6 +752,7 @@ main()
 {
    local OPTION_ADORN
    local OPTION_CD='YES'
+   local OPTION_CMD_FILE
    local OPTION_LENIENT='YES'
    local OPTION_MODE="main-project"
    local OPTION_REPOSFILE
@@ -786,6 +788,13 @@ main()
 
          -a|--all)
             OPTION_MODE="main-project,subprojects,tests,others"
+         ;;
+
+         --cmd-file)
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
+            shift
+
+            OPTION_CMD_FILE="$1"
          ;;
 
          -d|--directory)
@@ -975,6 +984,33 @@ main()
    done
 
    options_setup_trace "${MULLE_TRACE}" && set -x
+
+   if [ ! -z "${OPTION_CMD_FILE}" ]
+   then
+      if [ $# -ne 0 ]
+      then
+         fail "Command line arguments not allowed when using --cmd-file"
+      fi
+
+      local cmd_content
+      if [ "${OPTION_CMD_FILE}" = "-" ]
+      then
+         cmd_content="$(cat)"
+      else
+         if [ ! -f "${OPTION_CMD_FILE}" ]
+         then
+            fail "Command file \"${OPTION_CMD_FILE}\" not found"
+         fi
+         cmd_content="$(cat "${OPTION_CMD_FILE}")"
+      fi
+
+      if [ -z "${cmd_content}" ]
+      then
+         fail "Command file is empty"
+      fi
+
+      set -- "${BASH:-sh}" -c "${cmd_content}"
+   fi
 
    if [ ! -z "${OPTION_SKIP_PAST}" -a ! -z "${OPTION_START_WITH}" ]
    then
