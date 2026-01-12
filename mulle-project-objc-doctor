@@ -154,7 +154,6 @@ check_sourcetree()
       return
    fi
    
-   log_info "Running sourcetree doctor..."
    local config
    local failed=0
    
@@ -188,6 +187,13 @@ check_git_remotes()
       log_warning "Missing 'origin' remote"
    else
       log_verbose "Found 'origin' remote"
+      local origin_url
+      origin_url="`git remote get-url origin 2>/dev/null`"
+      case "${origin_url}" in
+         *github.com*)
+            log_warning "Origin remote should not be GitHub: ${origin_url}"
+         ;;
+      esac
    fi
    
    if ! grep -q "^github$" <<< "${remotes}"
@@ -195,7 +201,51 @@ check_git_remotes()
       log_warning "Missing 'github' remote"
    else
       log_verbose "Found 'github' remote"
+      local github_url
+      github_url="`git remote get-url github 2>/dev/null`"
+      case "${github_url}" in
+         *github.com*)
+            # Check if github remote repository exists and has master branch
+            if ! git ls-remote --heads github master >/dev/null 2>&1
+            then
+               log_warning "GitHub remote repository not accessible or missing master branch"
+            else
+               log_verbose "GitHub remote repository accessible with master branch"
+            fi
+         ;;
+         *)
+            log_warning "GitHub remote should point to GitHub: ${github_url}"
+         ;;
+      esac
    fi
+   
+   # Check if remote URLs match project name
+   local project_name
+   project_name="`mulle-sde -s env get PROJECT_NAME 2>/dev/null`"
+   if [ -z "${project_name}" ]
+   then
+      r_basename "${PWD}"
+      project_name="${RVAL}"
+   fi
+   
+   local remote
+   while IFS= read -r remote
+   do
+      [ -z "${remote}" ] && continue
+      local url
+      url="`git remote get-url \"${remote}\" 2>/dev/null`"
+      if [ ! -z "${url}" ]
+      then
+         case "${url}" in
+            */${project_name}.git|*/${project_name}|*:${project_name}.git|*:${project_name})
+               log_verbose "Remote '${remote}' URL matches project name"
+            ;;
+            *)
+               log_warning "Remote '${remote}' URL doesn't match project name '${project_name}': ${url}"
+            ;;
+         esac
+      fi
+   done <<< "${remotes}"
 }
 
 
@@ -346,17 +396,25 @@ main()
 
    options_setup_trace "${MULLE_TRACE}" && set -x
 
-   log_info "Checking Objective-C project setup..."
-   
+   log_verbose "Diagnose git repository"
    check_git_repository
-   check_required_branches  
-   check_current_branch
+   log_verbose "Diagnose git remove"
    check_git_remotes
-   check_sourcetree
-   check_clib_json_freshness
+   log_verbose "Diagnose git branches"
+   check_required_branches  
+   log_verbose "Diagnose current git branch"
+   check_current_branch
+   log_verbose "Diagnose git status"
    check_git_status
+   log_verbose "Diagnose sourcetree"
+   check_sourcetree
+   log_verbose "Diagnose project version"
    check_project_version
+   log_verbose "Diagnose clib.json"
+   check_clib_json_freshness
+   log_verbose "Diagnose source version checks"
    check_versioncheck_freshness
+   log_verbose "Diagnose README.md"
    check_readme_freshness
 }
 

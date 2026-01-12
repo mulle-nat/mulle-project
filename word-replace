@@ -1,0 +1,119 @@
+#! /usr/bin/env mulle-bash
+#! MULLE_BASHFUNCTIONS_VERSION=<|MULLE_BASHFUNCTIONS_VERSION|>
+# shellcheck shell=bash
+#
+
+
+[ "${TRACE}" = 'YES' -o "${WORD_REPLACE_TRACE}" = 'YES' ] \
+&& set -x  \
+&& : "$0" "$@"
+
+#
+# Versioning of this script
+#
+MULLE_EXECUTABLE_VERSION="0.0.0"
+
+
+replace::print_flags()
+{
+   echo "   -f    : force operation"
+
+   ##
+   ## ADD YOUR FLAGS DESCRIPTIONS HERE
+   ##
+
+   options_technical_flags_usage \
+           "      : "
+}
+
+
+replace::usage()
+{
+   [ $# -ne 0 ] && log_error "$*"
+
+
+   cat <<EOF >&2
+Usage:
+   word-replace [flags]
+
+   ##
+   ## ADD YOUR USAGE DESCRIPTION HERE
+   ##
+
+Flags:
+EOF
+   replace::print_flags | LC_ALL=C sort >&2
+
+   exit 1
+}
+
+
+replace::main()
+{
+   #
+   # simple option/flag handling
+   #
+   local OPTION_VALUE
+
+   while [ $# -ne 0 ]
+   do
+      if options_technical_flags "$1"
+      then
+         shift
+         continue
+      fi
+
+      case "$1" in
+         -f|--force)
+            MULLE_FLAG_MAGNUM_FORCE='YES'
+         ;;
+
+         -h*|--help|help)
+            replace::usage
+         ;;
+
+         --value)
+            [ $# -eq 1 ] && match_list_usage "missing argument to $1"
+            shift
+
+            OPTION_VALUE="$1"
+         ;;
+
+         --version)
+            printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
+            exit 0
+         ;;
+
+
+         ##
+         ## ADD YOUR FLAGS HERE
+         ##
+
+         -*)
+            replace::usage "Unknown flag \"$1\""
+         ;;
+
+         *)
+            break
+         ;;
+      esac
+
+      shift
+   done
+
+   options_setup_trace "${MULLE_TRACE}" && set -x
+
+   ##
+   ## ADD YOUR CODE HERE
+   ##
+   log_info "Does nothing, but will soon"
+}
+
+#
+# You can also use the function `call_with_flags`, which has been defined
+# during mulle-boot. It lets you call 'replace::main'
+# with WORD_REPLACE_FLAGS interposed.
+#
+# call_with_flags "replace::main" "${WORD_REPLACE_FLAGS}" "$@"
+
+replace::main "$@"

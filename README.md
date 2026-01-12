@@ -25,7 +25,7 @@ Later on `mulle-project-sourcetree-doctor` and
 
 | Release Version                                       | Release Notes
 |-------------------------------------------------------|--------------
-| ![Mulle kybernetiK tag](https://img.shields.io/github/tag/mulle-nat/mulle-project.svg?branch=release)  | [RELEASENOTES](RELEASENOTES.md) |
+| ![Mulle kybernetiK tag](https://img.shields.io/github/tag/mulle-nat/mulle-project.svg)  | [RELEASENOTES](RELEASENOTES.md) |
 
 | Command                            | Description
 | -----------------------------------|-----------------------

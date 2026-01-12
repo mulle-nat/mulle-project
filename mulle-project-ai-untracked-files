@@ -1,0 +1,293 @@
+#! /usr/bin/env mulle-bash
+#! MULLE_BASHFUNCTIONS_VERSION=6.7.0
+# shellcheck shell=bash
+#
+#
+#  mulle-project-ai-untracked-files.sh
+#
+#  Copyright (c) 2026 nat
+#  All rights reserved.
+#
+#
+#  Redistribution and use in source and binary forms, with or without
+#  modification, are permitted provided that the following conditions are met:
+#
+#  Redistributions of source code must retain the above copyright notice, this
+#  list of conditions and the following disclaimer.
+#
+#  Redistributions in binary form must reproduce the above copyright notice,
+#  this list of conditions and the following disclaimer in the documentation
+#  and/or other materials provided with the distribution.
+#
+#  Neither the name of <ORGANIZATION> nor the names of its contributors
+#  may be used to endorse or promote products derived from this software
+#  without specific prior written permission.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+#  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+#  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+#  ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+#  LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+#  CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+#  SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+#  INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+#  CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+#  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+#  POSSIBILITY OF SUCH DAMAGE.
+#
+
+[ "${TRACE}" = 'YES' -o "${MULLE_PROJECT_AI_UNTRACKED_FILES_TRACE}" = 'YES' ] && set -x  && : "$0" "$@"
+
+### >> START OF mulle-boot.sh >>
+### << END OF mulle-boot.sh <<
+
+#
+# Versioning of this script
+#
+MULLE_EXECUTABLE_VERSION="0.0.0"
+
+
+### >> START OF mulle-bashfunctions-embed.sh >>
+### << END OF mulle-bashfunctions-embed.sh <<
+
+print_flags()
+{
+   echo "   -f    : force operation"
+
+   ##
+   ## ADD YOUR FLAGS DESCRIPTIONS HERE
+   ##
+
+   options_technical_flags_usage                 "         : "
+}
+
+
+usage()
+{
+   [ $# -ne 0 ] && log_error "$*"
+
+
+   cat <<EOF >&2
+Usage:
+   mulle-project-ai-untracked-files [flags]
+
+   Automatically and intelligently add untracked files to the git stage,
+   or put them into gitignore. Tmp and trash is moved into .graveyard.
+
+   A per project prompt is read from
+      ./mulle/{etc|share}/project/untracked-policy.md
+
+   Otherwise mulle-project-ai-untracked-files falls back to its generic
+   prompt.
+
+Flags:
+EOF
+   print_flags | LC_ALL=C sort >&2
+
+   exit 1
+}
+
+
+PROMPT='# AI Prompt: Manage Untracked Git Files
+
+You are an AI assistant that helps manage untracked files in git repositories.
+
+For background info read:
+
+``` bash
+mulle-sde help
+mulle-test run --help
+```
+
+Your first task is to get a list of all untracked files with:
+
+``` bash
+git ls-files --others --exclude-standard
+```
+## Task
+
+For each untracked file, you must decide to:
+
+1. **ADD** - Track the file in git
+2. **IGNORE** - Add to .gitignore
+3. **GRAVEYARD** - Move to .graveyard/ folder (which is gitignored)
+
+For each file you figure out the desired ACTION and execute it:
+
+**ADD**
+
+```bash
+git add <file>
+```
+
+**IGNORE**
+
+```bash
+mulle-gitignore <file>
+```
+
+**GRAVEYARD**
+
+```bash
+mkdir -p .graveyard && mv <file> .graveyard
+```
+
+---
+
+
+### Analysis Process
+
+First read project-specific rules from:
+
+- `.mulle/etc/project/untracked-policy.md` or as a fallback
+- `.mulle/share/etc/project/untracked-policy.md`
+
+As a fallback here are generic rules:
+
+#### Step 1: Project Type Detection
+
+First, identify the project type by looking for:
+
+- `.mulle/` directory (mulle-sde project)
+- `CMakeLists.txt` (C/Objective-C)
+- `package.json` (Node.js, but only if CMakeLists.txt is absent)
+- Other framework indicators
+
+#### Step 2: Testing Framework Detection
+
+Check for testing frameworks:
+
+- **mulle-test**: Look for `test/` directories with `.c/.m` files and companion `.stdout/.stderr/.args` files
+- Test files with `.stdout/.stderr/.args` companions in `test/` subdirs → **ADD**
+- `.stdout/.stderr/.args` files are reference data → **ADD**
+
+
+#### Step3: Documentation files
+
+If we have a `md` file and a `html` file of the same name, its more likely than
+not that the html should be ignored. Check sibling files with git though.
+
+#### Step 4: Apply General Rules
+
+If the file is unusually small or large its a likely not and ADD candidate
+unless another rule strongly implies it.
+
+**ADD** candidates are
+
+- `README.md`, `LICENSE.md`, `CHANGELOG.md`, `RELEASENOTES.md` in root → **ADD**
+- Configuration files (`.gitignore`, `.editorconfig`, `.mulle/etc`, `.mulle/share`, `cmake/`) → **ADD**
+- Source code files (`.c`, `.m`, `.h`, `.aam`, .js`, etc.) in proper directories, usually 'src' → **ADD**
+- Documentation in subdirectories 'cola' or 'dox' or 'assets' → **ADD**
+- Test files with `.stdout/.stderr/.args` companions in `test/` subdirs → **ADD**
+- Build scripts (`Makefile`, `CMakeLists.txt`) → **ADD**
+
+**GRAVEYARD** candidates are:
+
+- `.md` files in root directory (AI loves creating docs there) → **GRAVEYARD**
+- Test files outside `test/` directories  especially in the root directory → **GRAVEYARD**
+- Single letter filenames (without extension) and nonsensical filenames like xxx are STRONG indicators that they are temporary -> **GRAVEYARD**
+
+**IGNORE** candidates are:
+
+- Build artifacts (executables, `.o`, `.pyc`) → **IGNORE**
+- Generated output files → **IGNORE**
+- Temporary files (`.tmp`, `.bak`) → **IGNORE**
+
+When in doubt read it. Does it look meaningful in the context of this project ?
+'
+
+ai_add_untracked()
+{
+   exekutor github-copilot -- ${OPTION_SILENT} \
+                              --stream "${OPTION_STREAM:-off}" \
+                              --allow-all-tools \
+                              -p "$*"$'\n'"${PROMPT}"
+}
+
+
+main()
+{
+   #
+   # simple option/flag handling
+   #
+   local OPTION_STREAM
+   local OPTION_SILENT=--silent
+
+   while [ $# -ne 0 ]
+   do
+      if options_technical_flags "$1"
+      then
+         shift
+         continue
+      fi
+
+      case "$1" in
+         -f|--force)
+            MULLE_FLAG_MAGNUM_FORCE='YES'
+         ;;
+
+         -h*|--help|help)
+            usage
+         ;;
+
+         # --value)
+         #    [ $# -eq 1 ] && usage "missing argument to $1"
+         #    shift
+         #
+         #    OPTION_VALUE="$1"
+         # ;;
+         #
+         --stream)
+            OPTION_STREAM='on'
+            exit 0
+         ;;
+
+         --no-stream)
+            OPTION_STREAM='off'
+            exit 0
+         ;;
+
+         --version)
+            printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
+            exit 0
+         ;;
+
+
+         --)
+            shift
+            break
+         ;;
+
+
+         -*)
+            usage "Unknown flag \"$1\""
+         ;;
+
+         *)
+            break
+         ;;
+      esac
+
+      shift
+   done
+
+   options_setup_trace "${MULLE_TRACE}" && set -x
+
+   [ -d ".git" ] || fail "No git repo here"
+   [ -d ".graveyard" ] && fail "There is still a .graveyard here, you must delete it manually. Inspect it before losing data"
+
+   if [ "${MULLE_FLAG_LOG_VERBOSE}" = 'YES' ]
+   then
+      OPTION_SILENT=
+   fi
+
+   if git status --porcelain 2>/dev/null | grep -q '^??'
+   then
+      ai_add_untracked
+      return $?
+   fi
+
+   log_info "No untracked files found"
+}
+
+main "$@"

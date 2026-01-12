@@ -1,0 +1,310 @@
+#! /usr/bin/env mulle-bash
+#! MULLE_BASHFUNCTIONS_VERSION=6.7.0
+# shellcheck shell=bash
+#
+#
+#  mulle-project-ai-bash-completion.sh
+#
+#  Copyright (c) 2026 nat
+#  All rights reserved.
+#
+#
+#  Redistribution and use in source and binary forms, with or without
+#  modification, are permitted provided that the following conditions are met:
+#
+#  Redistributions of source code must retain the above copyright notice, this
+#  list of conditions and the following disclaimer.
+#
+#  Redistributions in binary form must reproduce the above copyright notice,
+#  this list of conditions and the following disclaimer in the documentation
+#  and/or other materials provided with the distribution.
+#
+#  Neither the name of <ORGANIZATION> nor the names of its contributors
+#  may be used to endorse or promote products derived from this software
+#  without specific prior written permission.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+#  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+#  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+#  ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+#  LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+#  CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+#  SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+#  INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+#  CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+#  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+#  POSSIBILITY OF SUCH DAMAGE.
+#
+
+[ "${TRACE}" = 'YES' -o "${MULLE_PROJECT_AI_BASH_COMPLETION_TRACE}" = 'YES' ] && set -x  && : "$0" "$@"
+
+### >> START OF mulle-boot.sh >>
+### << END OF mulle-boot.sh <<
+
+#
+# Versioning of this script
+#
+MULLE_EXECUTABLE_VERSION="0.0.0"
+
+
+### >> START OF mulle-bashfunctions-embed.sh >>
+### << END OF mulle-bashfunctions-embed.sh <<
+
+print_flags()
+{
+   echo "   -f    : force operation"
+
+   ##
+   ## ADD YOUR FLAGS DESCRIPTIONS HERE
+   ##
+
+   options_technical_flags_usage                 "         : "
+}
+
+
+usage()
+{
+   [ $# -ne 0 ] && log_error "$*"
+
+
+   cat <<EOF >&2
+Usage:
+   mulle-project-ai-bash-completion [flags]
+
+   ##
+   ## ADD YOUR USAGE DESCRIPTION HERE
+   ##
+
+Flags:
+EOF
+   print_flags | LC_ALL=C sort >&2
+
+   exit 1
+}
+
+
+ai_update()
+{
+   log_entry "ai_update" "$@"
+
+   local name="$1"
+   local ifexists="$2"
+
+   [ -z "${name}" ] && fail "could not figure out command name"
+
+   if [ "${ifexists}" = 'YES' ]
+   then
+      [ ! -f "${name}" ] && return 0
+   fi
+
+   PROMPT="# AI Prompt: Generate Comprehensive Bash Completion for ${name}
+
+## Task
+
+Create a complete, professional bash completion script for ${name} by
+analyzing the current codebase and understanding the command structure, options,
+and subcommands named \"${name}-completion.sh\".
+
+## Target Quality
+Generate production-ready bash completion that provides intelligent,
+context-aware completions for all commands, subcommands, options, and
+appropriate file/directory completions.
+
+## Analysis Requirements
+
+### 1. Deep Command Discovery
+- Read the main \`${name}\` script to find ALL commands in the dispatch
+- Identify command aliases (e.g., \`dep\` → \`dependency\`, \`lib\` → \`library\`)
+- Find hidden/undocumented commands that should still have completion
+- Understand command categories and relationships
+
+### 2. Subcommand Analysis
+For each major command, analyze the source files to discover:
+- All available subcommands (not just documented ones)
+- Subcommand aliases and variations
+- Which subcommands take file/directory arguments
+- Which subcommands have their own options
+
+### 3. Option Discovery
+- Parse option handling in each command file
+- Find both short (\`-h\`) and long (\`--help\`) options
+- Identify options that require arguments vs flags
+- Discover hidden/advanced options not in usage text
+
+### 4. Context-Aware Completion
+Understand what types of completions make sense:
+- **File completions**: Commands that work with source files
+- **Directory completions**: Commands that work with directories
+- **Dependency names**: Commands that reference dependencies
+- **Library names**: Commands that work with system libraries
+- **Pattern completions**: Commands that work with patterns
+- **Build targets**: Commands that work with build configurations
+
+## Current System Analysis
+The existing completion uses these strategies:
+1. **Dynamic discovery**: \`${name} commands\` and \`${name} <cmd> commands\`
+2. **Static fallbacks**: Hardcoded lists when dynamic fails
+3. **Option parsing**: Extract options from \`<cmd> -h\` output
+4. **Caching**: Cache results to avoid repeated calls
+
+## Required Completion Features
+
+### 1. Command Completion
+- Complete all main commands
+- Handle command aliases correctly
+- Provide descriptions if possible
+
+### 2. Subcommand Completion
+- Complete subcommands for each main command
+- Handle subcommand aliases
+- Context-sensitive subcommand completion
+
+### 3. Option Completion
+- Complete all options for each command/subcommand
+- Handle both short and long options
+- Complete option arguments where appropriate
+
+### 4. Intelligent File Completion
+- File completion for commands that work with files
+- Directory completion for commands that work with directories
+- Pattern-aware completion for pattern-related commands
+
+### 5. Dynamic Content Completion
+- Dependency names for dependency-related commands
+- Library names for library-related commands
+- Configuration names for config-related commands
+- Available extensions for extension commands
+
+## Implementation Requirements
+
+### Code Structure
+\`\`\`bash
+# Efficient caching system
+__mulle_sde_cached_*=
+
+# Helper functions for common operations
+__mulle_sde_commands()
+__mulle_sde_subcommands()
+__mulle_sde_options()
+__mulle_sde_complete_files()
+__mulle_sde_complete_dependencies()
+
+# Main completion function
+_mulle_sde_complete()
+
+# Registration
+complete -F _mulle_sde_complete mulle-sde
+\`\`\`
+
+### Performance Considerations
+- Cache expensive operations (command lists, help output)
+- Use dynamic discovery when possible, static fallbacks when needed
+- Minimize subprocess calls during completion
+- Handle completion timeouts gracefully
+
+### Quality Standards
+- **Complete coverage**: Every command and subcommand should complete
+- **Context awareness**: Appropriate completions for each context
+- **Performance**: Fast completion even in large projects
+- **Robustness**: Handle missing commands or errors gracefully
+- **Maintainability**: Easy to update when commands change
+
+## Success Criteria
+
+The completion should provide:
+1. **All commands** discovered from the main script
+2. **All subcommands** for each major command
+3. **All options** for commands and subcommands
+4. **Intelligent file/directory completion** based on command context
+5. **Dynamic content completion** for dependencies, libraries, etc.
+6. **Fast performance** with appropriate caching
+7. **Error resilience** when commands fail or are missing
+
+## Investigation Strategy
+
+1. **Read the main script** to understand the complete command structure
+2. **Analyze major command files** to find subcommands and options
+3. **Test dynamic discovery** to see what \`${name} commands\` provides
+4. **Understand file contexts** to provide appropriate file completions
+5. **Map command relationships** to provide context-aware completions
+
+Generate a comprehensive bash completion script that makes ${name}
+a pleasure to use interactively.
+"
+
+   exekutor github-copilot -- ${OPTION_SILENT} \
+                              --stream "${OPTION_STREAM:-off}" \
+                              --allow-all-tools \
+                              -p "$*"$'\n'"${PROMPT}"
+}
+
+
+main()
+{
+   #
+   # simple option/flag handling
+   #
+   local OPTION_PROJECT_NAME
+   local OPTION_IF_EXISTS
+
+   while [ $# -ne 0 ]
+   do
+      if options_technical_flags "$1"
+      then
+         shift
+         continue
+      fi
+
+      case "$1" in
+         -f|--force)
+            MULLE_FLAG_MAGNUM_FORCE='YES'
+         ;;
+
+         -h*|--help|help)
+            usage
+         ;;
+
+         --if-exists)
+            OPTION_IF_EXISTS='YES'
+         ;;
+
+         --project-name)
+            [ $# -eq 1 ] && usage "missing argument to $1"
+            shift
+
+            OPTION_PROJECT_NAME="$1"
+         ;;
+
+         --version)
+            printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
+            exit 0
+         ;;
+
+         -*)
+            usage "Unknown flag \"$1\""
+         ;;
+
+         *)
+            break
+         ;;
+      esac
+
+      shift
+   done
+
+   options_setup_trace "${MULLE_TRACE}" && set -x
+
+   local project_name
+
+   project_name="${OPTION_PROJECT_NAME:-${PROJECT_NAME}}"
+   project_name="${project_name:-$(basename -- "${PWD}")}"
+
+   if [ ! -x "${project_name}" ]
+   then
+      fail "${project_name} not found"
+   fi
+
+   ai_update "${OPTION_PROJECT_NAME}" "${OPTION_IF_EXISTS}"
+}
+
+main "$@"

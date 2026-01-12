@@ -72,6 +72,7 @@ Options:
    ++                    : shorthand for --increment-patch --write
    --add-patch <value>   : add value to patch version part, needs --write
    --custom-versioning   : use custom versioning (four numbers)
+   --diff                : output version jump type (none, patch, minor, major)
    --first-patch-one     : set patch to 1 for minor/major increments
    --first-patch-zero    : set patch to 0 for minor/major increments
    --increment-major     : add 1 to major versionpart, needs --write
@@ -597,6 +598,81 @@ verify_version()
 }
 
 
+diff_version()
+{
+   log_entry "diff_version" "$@"
+
+   local current="$1"
+   local last="$2"
+
+   if [ -z "${last}" ]
+   then
+      echo "none"
+      return 0
+   fi
+
+   if [ "${current}" = "${last}" ]
+   then
+      echo "none"
+      return 0
+   fi
+
+   # Use mulle-bashfunctions version parsing
+   local current_major current_minor current_patch
+   local last_major last_minor last_patch
+
+   # Parse current version
+   current_major="${current%%\.*}"
+   local temp="${current#*\.}"
+   if [ "${temp}" = "${current}" ]
+   then
+      current_minor=0
+      current_patch=0
+   else
+      current_minor="${temp%%\.*}"
+      temp="${temp#*\.}"
+      if [ "${temp}" = "${current_minor}" ]
+      then
+         current_patch=0
+      else
+         current_patch="${temp%%\.*}"
+      fi
+   fi
+
+   # Parse last version
+   last_major="${last%%\.*}"
+   temp="${last#*\.}"
+   if [ "${temp}" = "${last}" ]
+   then
+      last_minor=0
+      last_patch=0
+   else
+      last_minor="${temp%%\.*}"
+      temp="${temp#*\.}"
+      if [ "${temp}" = "${last_minor}" ]
+      then
+         last_patch=0
+      else
+         last_patch="${temp%%\.*}"
+      fi
+   fi
+
+   # Compare versions
+   if [ "${current_major}" != "${last_major}" ]
+   then
+      echo "major"
+   elif [ "${current_minor}" != "${last_minor}" ]
+   then
+      echo "minor"
+   elif [ "${current_patch}" != "${last_patch}" ]
+   then
+      echo "patch"
+   else
+      echo "none"
+   fi
+}
+
+
 main()
 {
    local OPTION_ADD_MAJOR="0"
@@ -620,6 +696,7 @@ main()
    local OPTION_IS_OK
    local OPTION_IF_NEEDED
    local OPTION_RELEASENOTES
+   local OPTION_DIFF
 
    local directory
 
@@ -679,6 +756,10 @@ main()
 
          --custom-versioning)
             OPTION_CUSTOM_VERSIONING='YES'
+         ;;
+
+         --diff)
+            OPTION_DIFF='YES'
          ;;
 
          --no-tag-warning)
@@ -928,6 +1009,13 @@ main()
    then
       status_version
       return $?
+   fi
+
+   if [ "${OPTION_DIFF}" = 'YES' ]
+   then
+      last="`rexekutor git tag -l --sort=-creatordate | grep -E -x '[0-9]*\.[0-9]*\.[0-9]*' | head -1`"
+      diff_version "${VERSION}" "${last}"
+      return 0
    fi
 
    if [ "${OPTION_IF_NEEDED}" = 'YES' ] && status_version

@@ -485,7 +485,6 @@ main()
                break
             ;;
 
-
             n|N|no|NO)
                log_info "Commit cancelled"
                remove_file_if_present "${stderr_output}"

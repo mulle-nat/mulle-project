@@ -1,0 +1,777 @@
+#! /usr/bin/env mulle-bash
+#! MULLE_BASHFUNCTIONS_VERSION=6.6.3
+# shellcheck shell=bash
+#
+#
+#  completion-sources-for-ai.sh
+#
+#  Copyright (c) 2025 mulle-kybernetik-tv
+#  All rights reserved.
+#
+#
+#  Redistribution and use in source and binary forms, with or without
+#  modification, are permitted provided that the following conditions are met:
+#
+#  Redistributions of source code must retain the above copyright notice, this
+#  list of conditions and the following disclaimer.
+#
+#  Redistributions in binary form must reproduce the above copyright notice,
+#  this list of conditions and the following disclaimer in the documentation
+#  and/or other materials provided with the distribution.
+#
+#  Neither the name of <ORGANIZATION> nor the names of its contributors
+#  may be used to endorse or promote products derived from this software
+#  without specific prior written permission.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+#  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+#  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+#  ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+#  LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+#  CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+#  SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+#  INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+#  CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+#  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+#  POSSIBILITY OF SUCH DAMAGE.
+#
+
+[ "${TRACE}" = 'YES' -o "${MULLE_AI_TRACE}" = 'YES' ] && set -x  && : "$0" "$@"
+
+### >> START OF mulle-boot.sh >>
+### << END OF mulle-boot.sh <<
+
+#
+# Versioning of this script
+#
+MULLE_EXECUTABLE_VERSION="0.0.1"
+
+OPENROUTER_MODEL_DEFAULT='x-ai/grok-code-fast-1'
+
+### >> START OF mulle-bashfunctions-embed.sh >>
+### << END OF mulle-bashfunctions-embed.sh <<
+
+print_flags()
+{
+   echo "   -f    : force operation"
+
+   options_technical_flags_usage   " : "
+}
+
+
+usage()
+{
+   [ $# -ne 0 ] && log_error "$*"
+
+   cat <<EOF >&2
+Usage:
+   ${MULLE_USAGE_NAME} [flags] <script> [<outfile>]
+
+   Send a prompt to OpenRouter AI, using script source to
+   construct prompts for completion.
+
+Flags:
+EOF
+   print_flags | LC_ALL=C sort >&2
+
+   cat <<EOF >&2
+
+Environment:
+   OPENROUTER_KEY          : API key (required)
+   OPENROUTER_MODEL        : AI model to use
+                             (default: x-ai/grok-code-fast-1)
+
+EOF
+   exit 1
+}
+
+
+print_flags()
+{
+   cat <<EOF
+   -f --force                      : force operation
+   -h --help                       : show usage
+   -o --output <arg>               : specify output file
+   --allow-empty                   : an empty response is OK
+   --no-src                        : omit script source files
+   --openrouter-key <arg>          : set OpenRouter API key
+   --openrouter-model <arg>        : set OpenRouter AI model
+   --prompt <arg>                  : set prompt file name
+   --prompt-aux <arg>              : set auxiliary prompt file
+   --prompt-dir <arg>              : set prompt directory/plugin
+   --prompt-intro <arg>            : set intro prompt file
+   --prompt-intro-aux <arg>        : set auxiliary intro prompt file
+   --prompt-output-extension <arg> : set output file extension
+   --prompt-output-suffix <arg>    : set output file suffix
+   --search-path <arg>             : set search path for prompt files
+   --script <arg>                  : set script file name
+   --type <arg>                    : set prompt type/plugin
+   --version                       : show version
+EOF
+
+   options_technical_flags_usage \
+                "                         : "
+}
+
+
+r_input_limit()
+{
+   log_entry "r_input_limit" "$@"
+
+   local model="$1"
+
+   case "${model}" in
+      'x-ai/grok-code-fast-1')
+         RVAL=$((256000))
+      ;;
+
+      'x-ai/grok-4')
+         RVAL=$((256000))
+      ;;
+
+      'openai/gpt-5')
+         RVAL=$((400000))
+      ;;
+
+      'anthropic/claude-sonnet-4')
+         RVAL=$((1000000))
+      ;;
+   esac
+
+   RVAL=$((RVAL * 4))
+}
+
+
+emit_prompt_file()
+{
+   log_entry "emit_prompt_file" "$@"
+
+   local prompt="$1"
+   local search_path="$2"
+   local prompt_dir="$3"
+   local optional="$4"
+
+   local dir 
+   local filename 
+
+   if is_absolutepath "${prompt}"
+   then
+      if [ -r "${filename}" ]
+      then
+         rexekutor cat "${filename}"
+         return $?
+      fi
+      return 1
+   fi
+
+   .foreachpath dir in ${search_path}
+   .do
+      r_filepath_concat "${dir}" "${prompt_dir}" "${prompt}"
+      filename="${RVAL}"
+      log_fluff "Checking \"${filename}\"..."
+
+      if [ -r "${filename}" ]
+      then 
+         rexekutor cat "${filename}"
+         return $?
+      fi
+   .done
+   
+   if [ -z "${optional}" ]
+   then
+      fail "\"${prompt}\" not found in prompt directory \"${prompt_dir}\" of \"${search_path}\" (or not readable)"
+   fi
+}
+
+
+dump_main()
+{
+   log_entry "dump_main" "$@"
+
+   local script="$1"
+   local minifier="${2:-cat}"
+
+   [ ! -r "${script}" ] && fail "${script} not found (or not executable)"
+
+   log_verbose "Found \"${script}\"..."
+
+   local text
+
+   text="`cat "${script}" | "${minifier}" `"
+
+   cat <<EOF
+===
+**MAIN_SCRIPT**:
+---
+${text}
+EOF
+}
+
+
+dump_src()
+{
+   log_entry "dump_src" "$@"
+
+   local script_src="$1"
+   local minifier="${2:-cat}"
+
+   shell_enable_nullglob
+
+   local filename
+   local text
+
+   for filename in ${script_src}/*.sh
+   do
+      log_verbose "Found \"${filename}\"..."
+
+      text="`cat "${filename}" | "${minifier}" `"
+   cat <<EOF
+===
+**${filename}**:
+--- 
+${text}
+EOF
+   done
+
+   shell_disable_nullglob
+}
+
+
+emit_prompt()
+{
+   log_entry "emit_prompt" "$@"
+ 
+   local minifier="$1"
+   shift
+
+   [ $# -eq 9 ] || fail "API fail"
+
+   local prompt_intro="$1"
+   local prompt_intro_aux="$2"
+   local prompt="$3"
+   local prompt_aux="$4"
+   local prompt_dir="$5"
+   local prompt_optional="$6"
+   local script="$7"
+   local script_src="$8"
+   local search_path="$9"
+
+   emit_prompt_file "${prompt_intro}"     "${search_path}" "${prompt_dir}" optional
+   emit_prompt_file "${prompt_intro_aux}" "${search_path}" "${prompt_dir}" optional
+   emit_prompt_file "${prompt}"           "${search_path}" "${prompt_dir}" ${prompt_optional}
+   emit_prompt_file "${prompt_aux}"       "${search_path}" "${prompt_dir}" optional
+
+   dump_main "${script}" "${minifier}"
+   if [ ! -z "${script_src}" ]
+   then
+      dump_src "${script_src}" "${minifier}"
+   fi
+}
+
+
+r_prompt()
+{
+   log_entry "r_prompt" "$@"
+
+   local input_limit="$1"
+   shift
+
+   local text
+
+   text="$(emit_prompt "" "$@")"
+
+   local prompt_size
+   local minified_size
+
+   prompt_size=${#text}
+   if [ ${prompt_size} -ge ${input_limit} ]
+   then
+      if [ "$(type -t prompt_minify)" = "function" ]
+      then
+         log_verbose "Minifying prompt"
+         text="$(emit_prompt "prompt_minify" "$@")"
+         minified_size=${#text}
+
+         if [ ${minified_size} -gt ${prompt_size} ]
+         then
+            fail "minifier exploded prompt instead"
+         fi
+
+          log_verbose "Minified prompt \"${filename}\"..."
+
+         if [ ${minified_size} -ge ${input_limit} ]
+         then
+            fail "Minified prompt exceeds input limit ${input_limit}: (${minified_size} bytes, minified from ${prompt_size} bytes)"
+         fi
+      else
+         fail "Prompt exceeds input limit ${input_limit}: (${minified_size} bytes), no prompt minifier available"
+      fi
+   fi
+
+   log_debug "Prompt has ${#text} bytes"
+   RVAL="${text}"
+}
+
+
+
+r_file_excerpt()
+{
+   log_entry "r_file_excerpt" "$@"
+
+   local filename="$1"
+
+   RVAL="$(head -10 "${filename}" | head -c 400
+   echo
+   echo "..."
+   tail -8 "${filename}" | tail -c 300)"
+}
+
+
+
+call_openrouter()
+{
+   log_entry "call_openrouter" "$@"
+
+   local openrouter_model="$1"
+   shift
+   local prompt="$*"
+
+   if [ -z "${OPENROUTER_KEY}" ]
+   then
+      OPENROUTER_KEY="$(rexekutor grep -v '^#' ~/.mulle/etc/openrouter-key.txt 2> /dev/null)"
+      if [ -z "${OPENROUTER_KEY}" ]
+      then
+         OPENROUTER_KEY="$(rexekutor grep -v '^#' ~/.openrouter-key.txt 2> /dev/null)"
+      fi
+      if [ -z "${OPENROUTER_KEY}" ]
+      then
+         fail "Need OPENROUTER_KEY to be set"
+      fi
+   fi
+
+   local json
+
+   r_make_tmp_file "payload" "json"
+   json="${RVAL}"
+
+   local rc
+
+   (
+      # Generate the JSON payload and write it to a temporary file
+      # allows this temporarily
+      MULLE_FLAG_EXEKUTOR_DRY_RUN=NO  \
+         redirect_exekutor "${json}" jq -nc \
+                                      --arg m "${openrouter_model}" \
+                                      --rawfile p <( printf "%s" "${prompt}" ) \
+                                      '{model:$m, messages:[{role:"user", content:$p}]}' || fail "Could not JSONify prompt"
+
+      local excerpt
+
+      r_file_excerpt "${json}"
+      excerpt="${RVAL}"
+      log_setting "JSON: ${excerpt}"
+      log_setting "JSON: `file_size_in_bytes "${json}"` bytes"
+
+      #
+      # can't executor this, because of KEY
+      #
+      if [ "${MULLE_FLAG_LOG_EXEKUTOR:-}" = 'YES' ]
+      then
+         _exekutor_trace "exekutor_print" curl -s https://openrouter.ai/api/v1/chat/completions \
+                                               -H "Authorization: Bearer <redacted>" \
+                                               -H "Content-Type: application/json" \
+                                               --data-binary @"${json}"
+      fi
+
+      if [ "${MULLE_FLAG_EXEKUTOR_DRY_RUN:-}" != 'YES' ]
+      then
+         local response
+
+         response="$(curl -s https://openrouter.ai/api/v1/chat/completions \
+                          -H "Authorization: Bearer ${OPENROUTER_KEY}" \
+                          -H "Content-Type: application/json" \
+                          --data-binary @"${json}")"
+         MULLE_EXEKUTOR_RVAL=$?
+
+
+         [ "${MULLE_EXEKUTOR_RVAL}" = "${MULLE_EXEKUTOR_STRACKTRACE_RVAL:-127}" ] && stacktrace
+         if [ "${MULLE_EXEKUTOR_RVAL}" -ne 0 ]
+         then
+            return 1
+         fi
+
+         local result
+
+         result="$(rexekutor jq -r '.choices[0].message.content' <<< "${response}")"
+         if [ "${result}" = 'null' ]
+         then
+            log_error "OpenRouter Error: $(jq 'del(.choices[0].message.content)' <<< "${response}")"
+            return 1
+         fi
+
+         if [ -z "${result}"  ]
+         then
+            log_error "Warning: ${openrouter_model} returned empty string: "${response}")"
+            return 1
+         fi
+
+         printf "%s\n" "${result}"
+      fi
+   )
+   rc=$?
+
+   if [ "${OPTION_KEEP_JSON}" != 'YES' ]
+   then
+      remove_file_if_present "${json}"
+   fi
+
+   return $rc
+}
+
+
+
+main()
+{
+   local OPTION_IF_MISSING
+   local OPTION_EMPTY_OK
+
+   local script
+   local script_src='src'
+   local prompt_intro="prompt-intro.txt"
+   local prompt_intro_aux="prompt-intro-aux.txt"
+   local prompt="prompt.txt"
+   local prompt_aux="prompt-aux.txt"
+   local prompt_output_suffix="DEFAULT"
+   local prompt_output_extension=".txt"
+   local prompt_type
+   local search_path="."
+   local output='DEFAULT'
+
+   local executablepath 
+   local executabledir
+
+   r_simplified_absolutepath "${MULLE_EXECUTABLE}"
+   executablepath="${RVAL}"
+
+   r_dirname "${executablepath}"
+   executabledir="${RVAL}"
+
+   r_colon_concat "${search_path}" "${executabledir}"
+   search_path="${RVAL}"
+
+   local executablename
+
+   r_basename "${executablepath}"
+   executablename="${RVAL}"
+
+   r_dirname "${executablepath}"
+   r_dirname "${RVAL}"
+   r_filepath_concat "${RVAL}" 'share'
+   r_filepath_concat "${RVAL}" "${executablename}"
+   r_colon_concat "${search_path}" "${RVAL}"
+   search_path="${RVAL}"
+
+   while [ $# -ne 0 ]
+   do
+      if options_technical_flags "$1"
+      then
+         shift
+         continue
+      fi
+
+      case "$1" in
+         -f|--force)
+            MULLE_FLAG_MAGNUM_FORCE='YES'
+         ;;
+
+         -h*|--help|help)
+            usage
+         ;;
+
+         --allow-empty)
+            OPTION_EMPTY_OK='YES'
+         ;;
+
+         --if-missing)
+            OPTION_IF_MISSING='YES'
+         ;;
+
+         --search-path)
+            [ $# -eq 1 ] && usage "missing argument to $1"
+            shift
+
+            SEARCH_PATH="$1"
+         ;;
+
+         --prompt)
+            [ $# -eq 1 ] && usage "missing argument to $1"
+            shift
+
+            PROMPT="$1"
+         ;;
+
+         --prompt-aux)
+            [ $# -eq 1 ] && usage "missing argument to $1"
+            shift
+
+            PROMPT_AUX="$1"
+         ;;
+
+         -t|--type|--prompt-dir|--plugin)
+            [ $# -eq 1 ] && usage "missing argument to $1"
+            shift
+
+            PROMPT_TYPE="$1"
+         ;;
+
+         --prompt-intro)
+            [ $# -eq 1 ] && usage "missing argument to $1"
+            shift
+
+            PROMPT_INTRO="$1"
+         ;;
+
+         --prompt-output-suffix)
+            [ $# -eq 1 ] && usage "missing argument to $1"
+            shift
+
+            PROMPT_OUTPUT_SUFFIX="$1"
+         ;;
+
+         --prompt-output-extension)
+            [ $# -eq 1 ] && usage "missing argument to $1"
+            shift
+
+            PROMPT_OUTPUT_EXTENSION=".${1#\.}"
+         ;;
+
+         --prompt-intro-aux)
+            [ $# -eq 1 ] && usage "missing argument to $1"
+            shift
+
+            PROMPT_INTRO_AUX="$1"
+         ;;
+
+         --openrouter-key)
+            [ $# -eq 1 ] && usage "missing argument to $1"
+            shift
+
+            OPENROUTER_KEY="$1"  # global
+         ;;
+
+         --model|--openrouter-model)
+            [ $# -eq 1 ] && usage "missing argument to $1"
+            shift
+
+            OPENROUTER_MODEL="$1"   # global
+         ;;
+
+         -o|--output)
+            [ $# -eq 1 ] && usage "missing argument to $1"
+            shift
+
+            OUTPUT="$1"
+         ;;
+
+         --keep-json)
+            OPTION_KEEP_JSON='YES'
+         ;;
+
+         --script)
+            [ $# -eq 1 ] && usage "missing argument to $1"
+            shift
+
+            SCRIPT="$1"
+         ;;
+
+         --no-src)
+            SCRIPT_SRC=''
+         ;;
+
+         --version)
+            printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
+            exit 0
+         ;;
+
+         -)
+            break
+         ;;
+
+         -*)
+            usage "Unknown flag \"$1\""
+         ;;
+
+         *)
+            break
+         ;;
+      esac
+
+      shift
+   done
+
+   options_setup_trace "${MULLE_TRACE}" && set -x
+
+   if [ $# -gt 0 ]
+   then
+      script="$1"
+      shift
+   fi
+
+   if [ $# -gt 0 ]
+   then
+      output="$1"
+      shift
+   fi
+
+   if [ $# -ne 0 ]
+   then
+      usage "Superflous arguments $*"
+   fi
+
+
+   local prompt_optional='optional'
+
+   if [ ! -z "${prompt_type}" ]
+   then
+      prompt_optional= # now required!
+
+      local plugin_dir
+
+      r_filepath_concat "${executabledir}" "${prompt_type}"
+      plugin_dir="${RVAL}"
+
+      if [ ! -d "${plugin_dir}" ]
+      then
+         fail "Plugin directory \"${plugin_dir}\" not found"
+      fi
+
+      if [ -x "${plugin_dir}/plugin.sh" ]
+      then
+         . "${plugin_dir}/plugin.sh" || exit 1
+      else
+         if [ -f "${plugin_dir}/plugin.sh" ]
+         then
+            fail "Must make \"${plugin_dir}/plugin.sh\" executable"
+         fi
+      fi
+   fi
+
+
+   local tmpfile
+
+   case "${script}" in
+      '')
+         r_basename "${MULLE_USER_PWD}"
+         script="${RVAL}"
+      ;;
+
+      '-')
+         r_make_tmp_file "ai-prompt" "txt"
+         tmpfile="${RVAL}"
+         script="${RVAL}"
+         script_src=''
+         cat > "${script}"
+      ;;
+   esac
+
+   local rc
+
+   (
+      case "${output}" in
+         '-'|'DEFAULT')
+            output='-'
+         ;;
+
+         '')
+            r_extensionless_basename "${script}"
+            output="${RVAL}-${prompt_output_suffix}${prompt_output_extension}"
+         ;;
+      esac
+
+      if [ "${OPTION_IF_MISSING}" = 'YES' -a "${output}" != '-' ] && [ -e "${output}" ]
+      then
+         log_verbose "${C_RESET_BOLD}${output}${C_VERBOSE} already exists"
+         exit 0
+      fi
+
+      log_setting "OUTPUT           : ${output}"
+      log_setting "PROMPT           : ${prompt}"
+      log_setting "PROMPT_AUX       : ${prompt_aux}"
+      log_setting "PROMPT_INTRO     : ${prompt_intro}"
+      log_setting "PROMPT_INTRO_AUX : ${prompt_intro_aux}"
+      log_setting "PROMPT_TYPE      : ${prompt_type}"
+      log_setting "SCRIPT           : ${script}"
+      log_setting "SCRIPT_SRC       : ${script_src}"
+      log_setting "SEARCH_PATH      : ${search_path}"
+
+      log_fluff "Creating prompt"
+
+      local input_limit
+
+      r_input_limit "${OPENROUTER_MODEL}"
+      input_limit="${RVAL}"
+
+      if [ -z "${input_limit}" -o "${input_limit}" -eq 0 ]
+      then
+         log_warning "Unsupported model \"${OPENROUTER_MODEL}"
+         input_limit=$((128000 * 4))
+      fi
+
+      local ai_prompt
+
+      r_prompt "${input_limit}"       \
+               "${prompt_intro}"      \
+               "${prompt_intro_aux}"  \
+               "${prompt}"            \
+               "${prompt_aux}"        \
+               "${prompt_type}"       \
+               "${prompt_optional}"   \
+               "${script}"            \
+               "${script_src}"        \
+               "${search_path}" || exit 1
+      ai_prompt="${RVAL}"
+
+
+      log_info "${OPENROUTER_INFO:-Ruminating} for ${C_RESET_BOLD}${output}${C_INFO} with ${C_MAGENTA}${C_BOLD}${OPENROUTER_MODEL}"
+
+      local text
+
+      text=$(call_openrouter "${OPENROUTER_MODEL}" \
+                             "${ai_prompt}") || fail "openrouter call failed"
+
+
+      log_debug "text: ${text}"
+
+      if [ -z "${text}" -a "${OPTION_EMPTY_OK}" != 'YES' ]
+      then
+         fail "Lazy AI ${OPENROUTER_MODEL} did not bother to return any text"
+      fi
+
+      # plugin
+      if [ "$(type -t text_filter)" = "function" ]
+      then
+         log_fluff "Filtering text"
+         text="$(rexekutor text_filter <<< "${text}")"
+         log_debug "text: ${text}"
+      fi
+
+      log_setting "PROMPT_OUTPUT_SUFFIX     : ${prompt_output_suffix}"
+      log_setting "PROMPT_OUTPUT_EXTENSION  : ${prompt_output_extension}"
+
+      case "${output}" in
+         '-')
+            printf "%s\n" "${text}"
+            return 0
+         ;;
+      esac
+
+      redirect_exekutor "${output}" printf "%s\n" "${text}"
+   )
+   rc=$?
+
+   remove_file_if_present "${tmpfile}"
+
+   return $rc
+}
+
+main "$@"

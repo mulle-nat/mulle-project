@@ -219,7 +219,7 @@ check_repo()
 
          if find_line "${done_branches}" "${branch}"
          then
-            log_debug "Ignoring ${conclusion} for ${branch} as we have a more recent result"
+            log_debug "Ignoring ${conclusion} for branch ${branch} as we have a more recent result"
             continue
          fi
 
@@ -234,16 +234,16 @@ check_repo()
 
          case "${conclusion}" in 
             'success')
-               log_verbose "Success for ${branch}"
+               log_verbose "Workflow success for ${C_MAGENTA}${C_BOLD}${branch}${C_VERBOSE}"
             ;;
 
             '')
-               log_warning "${branch} failed"
+               log_warning "Workflows for ${C_MAGENTA}${C_BOLD}${branch}${C_WARNING} failed"
                rval=2
             ;;
 
             *)
-               log_warning "${branch} failed with ${conclusion}"
+               log_warning "Workflows of ${C_MAGENTA}${C_BOLD}${branch}${C_WARNING} failed with \"${conclusion}\""
                rval=2
             ;;
          esac

@@ -1,0 +1,63 @@
+#! /bin/sh
+
+OLD_VERSION="${1:-17.0.6.0}"
+NEW_VERSION="${2:-17.0.6.2}"
+
+OLD_CODENAME="bookworm"
+NEW_CODENAME="bookworm"
+
+OLD_ARCH="amd64"
+NEW_ARCH="amd64"
+
+FILES="Dockerfile
+*/Dockerfile
+dox/*.md
+bin/*
+cola/*.bud"
+
+
+if [ "${OLD_VERSION}" = "${NEW_VERSION}" ]
+then
+   exe="`basename -- $0`"
+
+   cat <<EOF >&2
+Usage:
+   ${exe} <old-version> <new-version> \\
+          [old-codename] [new-codename] \\
+          [old-arch] [new-arch]
+
+   Change URLs and other definitions of the mulle-clang-project version
+   in Dockerfiles, README.md and installer files.
+
+   OLD_VERSION="${OLD_VERSION}"
+   OLD_CODENAME="${OLD_CODENAME}"
+   OLD_ARCH="${OLD_ARCH}"
+
+Example:
+   ${exe} 14.0.6.2 16.0.0.0 bullseye bookworm
+
+
+EOF
+   exit 1
+fi
+
+
+for file in ${FILES}
+do
+   if [ -f "${file}" ]
+   then
+      echo "$file" >&2
+
+      mulle-replace "github.com/mulle-cc/mulle-clang-project/releases/download/${OLD_VERSION}/" \
+                    "github.com/mulle-cc/mulle-clang-project/releases/download/${NEW_VERSION}/" \
+                    "${file}"
+
+      mulle-replace "mulle-clang-${OLD_VERSION}-${OLD_CODENAME}-${OLD_ARCH}.deb" \
+                    "mulle-clang-${NEW_VERSION}-${NEW_CODENAME}-${NEW_ARCH}.deb" \
+                    "${file}"
+
+      mulle-replace "\${MULLE_CLANG_VERSION:-${OLD_VERSION}}" \
+                    "\${MULLE_CLANG_VERSION:-${NEW_VERSION}}" \
+                    "${file}"
+   fi
+done

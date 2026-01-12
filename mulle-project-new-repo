@@ -516,7 +516,12 @@ new_repo::main()
       log_verbose "Check clean state of project"
       if ! rexekutor project::git::is_clean
       then
-         fail "Repository is tainted with uncommitted files"
+         if [ "${MULLE_FLAG_MAGNUM_FORCE}" != 'YES' ]
+         then
+            fail "Repository is tainted with uncommitted files"
+         else
+            log_warning "Repository is tainted with uncommitted files"
+         fi
       fi
    fi
 

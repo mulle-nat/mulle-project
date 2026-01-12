@@ -18,6 +18,7 @@ print_flags()
 {
    echo "   -f    : force operation"
    echo "   --fix : fix detected problems automatically"
+   echo "   --ignore : add problematic nodes to ignore file"
    ##
    ## ADD YOUR FLAGS DESCRIPTIONS HERE
    ##
@@ -114,31 +115,38 @@ __doctor_repo_nodeline()
    # Check if this is a mulle GitHub org that should be tar, not git
    case "${_evaledurl}" in
       */github.com/*)
-         (
-            eval `rexekutor mulle-domain parse-url --domain github "${_evaledurl}" `
+         local scheme domain host scm user repo branch tag
+         eval `rexekutor mulle-domain parse-url --domain github "${_evaledurl}" `
 
-            case "${user}" in
+         case "${user}" in
                mulle-c|mulle-cc|mulle-gfx|mulle-objc|mulle-core|\
 mulle-concurrent|MulleEOF|MulleWeb|MulleFoundation|MulleUI)
+                  # Skip conversion if branch has a default (indicates intentional git repo)
+                  case "${_branch}" in
+                     *:-*\})
+                        log_fluff "${_address}: mulle GitHub org \"${user}\" uses git with branch, keeping as-is"
+                        return 0
+                     ;;
+                  esac
+                  
                   local needs_fix='NO'
                   
                   if [ "${_evalednodetype}" != "tar" ]
                   then
-                     log_warning "${_address}: mulle GitHub org \"${user}\" should use nodetype 'tar', not '${_evalednodetype}'"
+                     doctor_log_warning "${_address}" "warning: ${_address}: mulle GitHub org \"${user}\" should use nodetype 'tar', not '${_evalednodetype}'"
                      needs_fix='YES'
                   fi
                   
                   if [ "${_evaledtag}" != "latest" ]
                   then
-                     log_warning "${_address}: mulle GitHub org \"${user}\" should use tag 'latest', not '${_evaledtag}'"
-                     needs_fix='YES'
+                     doctor_log_info "${_address}" "${_address}: mulle GitHub org \"${user}\" uses tag '${_evaledtag}', not 'latest'"
                   fi
                   
                   case "${_evaledurl}" in
                      https://github.com/${user}/${repo}/archive/*)
                      ;;
                      *)
-                        log_warning "${_address}: mulle GitHub org \"${user}\" should use URL pattern 'https://github.com/${user}/${repo}/archive/\${MULLE_TAG}.tar.gz'"
+                        doctor_log_warning "${_address}" "warning: ${_address}: mulle GitHub org \"${user}\" should use URL pattern 'https://github.com/${user}/${repo}/archive/\${MULLE_TAG}.tar.gz'"
                         needs_fix='YES'
                      ;;
                   esac
@@ -149,7 +157,6 @@ mulle-concurrent|MulleEOF|MulleWeb|MulleFoundation|MulleUI)
                   fi
                ;;
             esac
-         )
       ;;
    esac
 }
@@ -171,7 +178,7 @@ __doctor_archive_nodeline()
    expect="\${${upcaseid}_NODETYPE:-${defvalue}}"
    if [ "${_nodetype}" != "${expect}" ]
    then
-      log_warning "${_address}: nodetype is \"${_nodetype}\" not \"${expect}\""
+      doctor_log_warning "${_address}" "warning: ${_address}: nodetype is \"${_nodetype}\" not \"${expect}\""
    fi
 
    expect="\${${upcaseid}_URL:-"
@@ -180,113 +187,101 @@ __doctor_archive_nodeline()
       ;;
 
       *)
-         log_warning "${_address}: url \"${_url}\" does not start with \"${expect}\""
+         doctor_log_warning "${_address}" "warning: ${_address}: url \"${_url}\" does not start with \"${expect}\""
       ;;
    esac
 
    # Only check for "latest" tag on mulle organizations
    case "${_evaledurl}" in
       */github.com/*)
-         (
-            eval `rexekutor mulle-domain parse-url --domain github "${_evaledurl}" `
-            case "${user}" in
-               mulle-c|mulle-cc|mulle-gfx|mulle-objc|mulle-core|\
+         local scheme domain host scm user repo branch tag
+         eval `rexekutor mulle-domain parse-url --domain github "${_evaledurl}" `
+         case "${user}" in
+            mulle-c|mulle-cc|mulle-gfx|mulle-objc|mulle-core|\
 mulle-concurrent|MulleEOF|MulleWeb|MulleFoundation|MulleUI)
-                  # Use the actual upcaseid that was passed in
-                  expect="\${${upcaseid}_TAG:-latest}"
-                  if [ "${_tag}" != "${expect}" ]
-                  then
-                     log_warning "${_address}: tag is \"${_tag}\" not \"${expect}\""
-                     if [ "${OPTION_FIX}" = 'YES' ]
-                     then
-                        __doctor_fix_mulle_org_archive "${_address}" "${upcaseid}"
-                     fi
-                  fi
-               ;;
-            esac
-         )
+               # Use the actual upcaseid that was passed in
+               expect="\${${upcaseid}_TAG:-latest}"
+               if [ "${_tag}" != "${expect}" ]
+               then
+                  doctor_log_info "${_address}" "${_address}: tag is \"${_tag}\" not \"${expect}\""
+               fi
+            ;;
+         esac
       ;;
    esac
 
-   expect="\${${upcaseid}_BRANCH}"
-   if [ "${_branch}" != "${expect}" ]
-   then
-      # Check for empty default pattern
-      case "${_branch}" in
-         *:-\})
-            log_warning "${_address}: branch is \"${_branch}\" not \"${expect}\""
-            if [ "${OPTION_FIX}" = 'YES' ]
-            then
-               __doctor_fix_empty_default "${_address}" "branch" "${_branch}"
-            fi
-         ;;
-         *)
-            log_warning "${_address}: branch is \"${_branch}\" not \"${expect}\""
-         ;;
-      esac
-   fi
+   # Check branch format (having a default is fine)
+   case "${_branch}" in
+      \$\{*_BRANCH*\})
+         # Branch is properly formatted, whether with or without default
+      ;;
+      *)
+         if [ ! -z "${_branch}" ]
+         then
+            doctor_log_info "${_address}" "${_address}: branch \"${_branch}\" could be formatted as \${${upcaseid}_BRANCH} or \${${upcaseid}_BRANCH:-${_branch}}"
+         fi
+      ;;
+   esac
 
    case "${_url}" in
       *\${MULLE_TAG\}*)
       ;;
 
       *\${MULLE_*)
-         log_warning "${_address}: URL \"${_url}\" should use \"\${MULLE_TAG}\" without a default"
+         doctor_log_warning "${_address}" "warning: ${_address}: URL \"${_url}\" should use \"\${MULLE_TAG}\" without a default"
       ;;
 
       *)
-         log_warning "${_address}: URL \"${_url}\" should use \"\${MULLE_TAG}\" in URL"
+         doctor_log_warning "${_address}" "warning: ${_address}: URL \"${_url}\" should use \"\${MULLE_TAG}\" in URL"
       ;;
    esac
 
    case "${_evaledurl}" in
       "")
-         log_warning "${_address}: URL \"${_url}\" evaluates to empty"
+         doctor_log_warning "${_address}" "warning: ${_address}: URL \"${_url}\" evaluates to empty"
       ;;
 
       */github.com/*)
-         (
-            eval `rexekutor mulle-domain parse-url --domain github "${_evaledurl}" `
+         local scheme domain host scm user repo branch tag
+         eval `rexekutor mulle-domain parse-url --domain github "${_evaledurl}" `
 
-            if [ -z "${repo}" ]
-            then
-               log_warning "${_address}: URL \"${_url} specifies no github repository\""
-            fi
+         if [ -z "${repo}" ]
+         then
+            doctor_log_warning "${_address}" "warning: ${_address}: URL \"${_url} specifies no github repository\""
+         fi
 
-            case "${user}" in
-               mulle-c|mulle-cc|mulle-gfx|mulle-objc|mulle-core|\
+         case "${user}" in
+            mulle-c|mulle-cc|mulle-gfx|mulle-objc|mulle-core|\
 mulle-concurrent|MulleEOF|MulleWeb|MulleFoundation|MulleUI)
-               ;;
+            ;;
 
-               codeon-gmbh)
-                  log_warning "${_address}: URL \"${_url} specifies obsolete github user \"${user}\""
-               ;;
+            codeon-gmbh)
+               doctor_log_warning "${_address}" "warning: ${_address}: URL \"${_url} specifies obsolete github user \"${user}\""
+            ;;
 
-               mulle-nat)
-                  case "${repo}" in
-                     libexpat)
-                     ;;
+            mulle-nat)
+               case "${repo}" in
+                  libexpat)
+                  ;;
 
-                     *)
-                        log_warning "${_address}: URL \"${_url} references mulle-nat"
-                     ;;
-                  esac
-               ;;
+                  *)
+                     doctor_log_warning "${_address}" "warning: ${_address}: URL \"${_url} references mulle-nat"
+                  ;;
+               esac
+            ;;
 
+            ""|"."|"..")
+               doctor_log_warning "${_address}" "warning: ${_address}: URL \"${_url} specifies no github user"
+            ;;
 
-               ""|"."|"..")
-                  log_warning "${_address}: URL \"${_url} specifies no github user"
-               ;;
-
-               *)
-                  log_info "${_address}: URL \"${_url} specifies non-mulle github user \"${user}\""
-               ;;
-            esac
-         )
+            *)
+               doctor_log_info "${_address}" "${_address}: URL \"${_url} specifies non-mulle github user \"${user}\""
+            ;;
+         esac
       ;;
 
       *)
-         log_info "${_address}: URL \"${_url} is not on github"
+         doctor_log_info "${_address}" "${_address}: URL \"${_url} is not on github"
       ;;
    esac
 }
@@ -356,7 +351,7 @@ doctor_check_environment_variables()
                # Check if variable is set in environment
                if ! printenv "${var}" >/dev/null 2>&1
                then
-                  log_warning "${address}: environment variable \${${var}} is not defined"
+                  log_warning "warning: ${address}: environment variable \${${var}} is not defined"
                   
                   if [ "${OPTION_FIX}" = 'YES' ]
                   then
@@ -367,6 +362,120 @@ doctor_check_environment_variables()
          .done
       fi
    done
+}
+
+
+# Wrapper functions to track problematic addresses
+doctor_log_warning()
+{
+   local address="$1"
+   shift
+   
+   track_problematic_address "${address}"
+   log_warning "$@"
+}
+
+doctor_log_info()
+{
+   local address="$1" 
+   shift
+   
+   track_problematic_address "${address}"
+   log_info "$@"
+}
+
+
+# Global variables for ignore functionality
+IGNORED_ADDRESSES=""
+IGNORED_UUIDS=""
+PROBLEMATIC_ADDRESSES=""
+
+# Add function to load ignore file
+load_ignore_file()
+{
+   log_entry "load_ignore_file" "$@"
+   
+   local ignore_file=".mulle/etc/project/sourcetree-doctor-ignore"
+   
+   if [ -f "${ignore_file}" ]
+   then
+      local line
+      while IFS= read -r line
+      do
+         # Skip comments and empty lines
+         case "${line}" in
+            \#*|"")
+               continue
+            ;;
+            *-*-*-*-*)
+               # Looks like UUID
+               r_add_line "${IGNORED_UUIDS}" "${line}"
+               IGNORED_UUIDS="${RVAL}"
+            ;;
+            *)
+               # Treat as address
+               r_add_line "${IGNORED_ADDRESSES}" "${line}"
+               IGNORED_ADDRESSES="${RVAL}"
+            ;;
+         esac
+      done < "${ignore_file}"
+   fi
+}
+
+# Add function to check if should ignore
+should_ignore_node()
+{
+   log_entry "should_ignore_node" "$@"
+   
+   local address="$1"
+   local uuid="$2"
+   
+   # Check if address is ignored
+   if find_line "${IGNORED_ADDRESSES}" "${address}"
+   then
+      return 0
+   fi
+   
+   # Check if UUID is ignored
+   if [ ! -z "${uuid}" ] && find_line "${IGNORED_UUIDS}" "${uuid}"
+   then
+      return 0
+   fi
+   
+   return 1
+}
+
+# Add function to add address to ignore file
+add_to_ignore_file()
+{
+   log_entry "add_to_ignore_file" "$@"
+   
+   local address="$1"
+   local ignore_file=".mulle/etc/project/sourcetree-doctor-ignore"
+   
+   # Create directory if needed
+   mkdir -p "`dirname "${ignore_file}"`"
+   
+   # Add address if not already present
+   if [ ! -f "${ignore_file}" ] || ! grep -q "^${address}$" "${ignore_file}"
+   then
+      echo "${address}" >> "${ignore_file}"
+      log_info "Added ${address} to ignore file"
+   fi
+}
+
+# Track problematic addresses
+track_problematic_address()
+{
+   log_entry "track_problematic_address" "$@"
+   
+   local address="$1"
+   
+   if ! find_line "${PROBLEMATIC_ADDRESSES}" "${address}"
+   then
+      r_add_line "${PROBLEMATIC_ADDRESSES}" "${address}"
+      PROBLEMATIC_ADDRESSES="${RVAL}"
+   fi
 }
 
 
@@ -475,7 +584,7 @@ doctor_check_variable_wrapping()
                # Already a variable, don't suggest wrapping
             ;;
             *)
-               log_warning "${address}: nodetype \"${_nodetype}\" should be wrapped as \${${upcaseid}_NODETYPE:-${_nodetype}}"
+               log_warning "warning: ${address}: nodetype \"${_nodetype}\" should be wrapped as \${${upcaseid}_NODETYPE:-${_nodetype}}"
                if [ "${OPTION_FIX}" = 'YES' ]
                then
                   __doctor_fix_variable_wrapping "${address}" "nodetype" "${_nodetype}" "${upcaseid}"
@@ -499,7 +608,7 @@ doctor_check_variable_wrapping()
                   # Already a variable, don't suggest wrapping
                ;;
                *)
-                  log_warning "${address}: tag \"${_tag}\" should be wrapped as \${${upcaseid}_TAG:-${_tag}}"
+                  log_warning "warning: ${address}: tag \"${_tag}\" should be wrapped as \${${upcaseid}_TAG:-${_tag}}"
                   if [ "${OPTION_FIX}" = 'YES' ]
                   then
                      __doctor_fix_variable_wrapping "${address}" "tag" "${_tag}" "${upcaseid}"
@@ -524,7 +633,7 @@ doctor_check_variable_wrapping()
                   # Already a variable, don't suggest wrapping
                ;;
                *)
-                  log_warning "${address}: branch \"${_branch}\" should be wrapped as \${${upcaseid}_BRANCH:-${_branch}}"
+                  log_warning "warning: ${address}: branch \"${_branch}\" should be wrapped as \${${upcaseid}_BRANCH:-${_branch}}"
                   if [ "${OPTION_FIX}" = 'YES' ]
                   then
                      __doctor_fix_variable_wrapping "${address}" "branch" "${_branch}" "${upcaseid}"
@@ -535,14 +644,14 @@ doctor_check_variable_wrapping()
             # Check for empty default that should be removed
             case "${_branch}" in
                *:-\})
-                  log_warning "${address}: branch \"${_branch}\" should be wrapped as \${${upcaseid}_BRANCH}"
+                  log_warning "warning: ${address}: branch \"${_branch}\" should be wrapped as \${${upcaseid}_BRANCH}"
                   if [ "${OPTION_FIX}" = 'YES' ]
                   then
                      __doctor_fix_empty_default "${address}" "branch" "${_branch}"
                   fi
                ;;
                *)
-                  log_warning "${address}: branch \"${_branch}\" should be wrapped as \${${upcaseid}_BRANCH}"
+                  log_warning "warning: ${address}: branch \"${_branch}\" should be wrapped as \${${upcaseid}_BRANCH}"
                   if [ "${OPTION_FIX}" = 'YES' ]
                   then
                      __doctor_fix_variable_wrapping "${address}" "branch" "" "${upcaseid}"
@@ -565,7 +674,7 @@ doctor_check_variable_wrapping()
                # Already a variable, don't suggest wrapping
             ;;
             *)
-               log_warning "${address}: url \"${_url}\" should be wrapped as \${${upcaseid}_URL:-${_url}}"
+               log_warning "warning: ${address}: url \"${_url}\" should be wrapped as \${${upcaseid}_URL:-${_url}}"
                if [ "${OPTION_FIX}" = 'YES' ]
                then
                   __doctor_fix_variable_wrapping "${address}" "url" "${_url}" "${upcaseid}"
@@ -631,9 +740,16 @@ doctor_nodeline()
 
    sourcetree::nodeline::parse "${nodeline}"
 
+   # Check if this node should be ignored
+   if should_ignore_node "${_address}" "${_uuid}"
+   then
+      log_verbose "Ignoring ${_address} (found in sourcetree-doctor-ignore)"
+      return 0
+   fi
+
    if ! is_balanced_character_pair "${_branch}" "{}"
    then
-      log_warning "${_address}: branch ${_branch} has unbalanced {} characters"
+      doctor_log_warning "${_address}" "warning: ${_address}: branch ${_branch} has unbalanced {} characters"
       if [ "${OPTION_FIX}" = 'YES' ]
       then
          __doctor_fix_unbalanced_braces "${_address}" "branch" "${_branch}"
@@ -641,7 +757,7 @@ doctor_nodeline()
    fi
    if ! is_balanced_character_pair "${_tag}" "{}"
    then
-      log_warning "${_address}: tag ${_tag} has unbalanced {} characters"
+      doctor_log_warning "${_address}" "warning: ${_address}: tag ${_tag} has unbalanced {} characters"
       if [ "${OPTION_FIX}" = 'YES' ]
       then
          __doctor_fix_unbalanced_braces "${_address}" "tag" "${_tag}"
@@ -649,7 +765,7 @@ doctor_nodeline()
    fi
    if ! is_balanced_character_pair "${_nodetype}" "{}"
    then
-      log_warning "${_address}: nodetype ${_nodetype} has unbalanced {} characters"
+      doctor_log_warning "${_address}" "warning: ${_address}: nodetype ${_nodetype} has unbalanced {} characters"
       if [ "${OPTION_FIX}" = 'YES' ]
       then
          __doctor_fix_unbalanced_braces "${_address}" "nodetype" "${_nodetype}"
@@ -657,7 +773,7 @@ doctor_nodeline()
    fi
    if ! is_balanced_character_pair "${_url}" "{}"
    then
-      log_warning "${_address}: url ${_url} has unbalanced {} characters"
+      doctor_log_warning "${_address}" "warning: ${_address}: url ${_url} has unbalanced {} characters"
       if [ "${OPTION_FIX}" = 'YES' ]
       then
          __doctor_fix_unbalanced_braces "${_address}" "url" "${_url}"
@@ -686,7 +802,7 @@ doctor_nodeline()
 
    if find_line "${UPCASEIDS}" "${upcaseid}"
    then
-      log_warning "${_address}: ${upcaseid} might be a duplicate of another address"
+      doctor_log_warning "${_address}" "warning: ${_address}: ${upcaseid} might be a duplicate of another address"
    else
       r_add_line "${UPCASEIDS}" "${upcaseid}"
       UPCASEIDS="${RVAL}"
@@ -735,6 +851,10 @@ main()
             OPTION_FIX='YES'
          ;;
 
+         --ignore)
+            OPTION_IGNORE='YES'
+         ;;
+
          -h*|--help|help)
             usage
          ;;
@@ -758,6 +878,8 @@ main()
 
    options_setup_trace "${MULLE_TRACE}" && set -x
 
+   load_ignore_file
+
    include "sourcetree::environment"
 
    sourcetree::environment::setup "${OPTION_SHAREDIR}"
@@ -774,6 +896,21 @@ main()
    .do
       doctor_nodeline "${nodeline}"
    .done
+   
+   # Handle --ignore option
+   if [ "${OPTION_IGNORE}" = 'YES' ]
+   then
+      log_debug "PROBLEMATIC_ADDRESSES: '${PROBLEMATIC_ADDRESSES}'"
+      if [ ! -z "${PROBLEMATIC_ADDRESSES}" ]
+      then
+         local address
+         .foreachline address in ${PROBLEMATIC_ADDRESSES}
+         .do
+            log_debug "Adding to ignore: '${address}'"
+            add_to_ignore_file "${address}"
+         .done
+      fi
+   fi
 }
 
 

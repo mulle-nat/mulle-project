@@ -20,3 +20,5 @@ mulle-markdown-preview-*.html
 build-*/
 *.bak
 .mulle/etc/make/build-dir
+dox.unreleased
+.graveyard/
