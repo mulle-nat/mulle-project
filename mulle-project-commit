@@ -17,6 +17,7 @@ fi
 print_flags()
 {
    echo "   -f                 : force operation"
+   echo "   --                 : arguments after -- are passed to the git commit"
    echo "   --always-amend     : always amend the commit [dangerous]"
    echo "   --boring           : all files are considered to be boring"
    echo "   --ignore-untracked : ignore untracked files"
@@ -282,13 +283,17 @@ ${C_RESET}${interesting_changes# }"
    then
       local commit_options
 
-      project::git::r_commit_options "${OPTION_AMEND}" "" "$*"
+      project::git::r_commit_options "${OPTION_AMEND}" ""
       commit_options="${RVAL}"
 
       log_verbose "Add changes and commit..."
 
-      exekutor git add -u &&
-      eval_exekutor git commit ${commit_options}
+      exekutor git add -u || exit 1
+
+      set -- git commit "$@"
+      set -- "$@" ${commit_options}
+
+      exekutor "$@"
    else
       if project::git::can_amend
       then

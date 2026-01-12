@@ -1,0 +1,200 @@
+#! /usr/bin/env mulle-bash
+#! MULLE_BASHFUNCTIONS_VERSION=6.6.3
+# shellcheck shell=bash
+#
+#
+#  mulle-project-ai-project-version.sh
+#
+#  Copyright (c) 2025 nat
+#  All rights reserved.
+#
+#
+#  Redistribution and use in source and binary forms, with or without
+#  modification, are permitted provided that the following conditions are met:
+#
+#  Redistributions of source code must retain the above copyright notice, this
+#  list of conditions and the following disclaimer.
+#
+#  Redistributions in binary form must reproduce the above copyright notice,
+#  this list of conditions and the following disclaimer in the documentation
+#  and/or other materials provided with the distribution.
+#
+#  Neither the name of <ORGANIZATION> nor the names of its contributors
+#  may be used to endorse or promote products derived from this software
+#  without specific prior written permission.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+#  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+#  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+#  ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+#  LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+#  CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+#  SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+#  INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+#  CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+#  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+#  POSSIBILITY OF SUCH DAMAGE.
+#
+
+[ "${TRACE}" = 'YES' -o "${MULLE_PROJECT_AI_PROJECT_VERSION_TRACE}" = 'YES' ] && set -x  && : "$0" "$@"
+
+### >> START OF mulle-boot.sh >>
+### << END OF mulle-boot.sh <<
+
+#
+# Versioning of this script
+#
+MULLE_EXECUTABLE_VERSION="0.0.0"
+
+
+### >> START OF mulle-bashfunctions-embed.sh >>
+### << END OF mulle-bashfunctions-embed.sh <<
+
+print_flags()
+{
+   options_technical_flags_usage \
+                "         : "
+}
+
+
+AI="github-copilot"
+
+
+usage()
+{
+   [ $# -ne 0 ] && log_error "$*"
+
+   cat <<EOF >&2
+Usage:
+   mulle-project-ai-project-version [flags] <stage> [additional text]
+
+   Use AI to bump the version number of a project under mulle-project-version
+   control. Run mulle-project-version first to ensure setup is correct.
+
+   To see the command without executing, use: -lx -n
+
+Flags:
+EOF
+   print_flags | LC_ALL=C sort >&2
+
+   exit 1
+}
+
+
+PROMPT_TEXT='I need you to prepare this repository for release.
+
+Get familiar with the project, read the README.md and peruse some sources
+to understand what this project is about
+
+## About the project version
+
+Every project MUST have a version. If there is none, BAIL!
+
+Use `NO_COLOR=YES mulle-project-version 2>&1` to figure out the current version
+(stderr is important). Here are some example outputs and what to do:
+
+
+```
+Version is 0.1.0. Last git tag is 0.0.3.
+Last RELEASENOTES.md version is 0.0.3
+0.1.0
+```
+
+Here the version has already been bumped. We trust this and do nothing further.
+
+Next example:
+
+```
+0.4.0 already exists as a git tag, but has commits
+Last RELEASENOTES.md version is 0.4.0
+0.4.0
+```
+
+The current version need to be bumped as we have commits.
+If there are no commits all would be fine.
+
+### Determine what to part of the version needs a bump
+
+Peruse the git log until you find the tag.
+Examine the commit messages Then change the version according to:
+
+* `mulle-project-version --increment-major --write` for breaking changes
+* `mulle-project-version --increment-minor --write` for added functionality
+* `mulle-project-version --increment-patch --write` for just build system maintenance and documentation and wording and bug fixes
+
+## Update cola/properties.plist
+
+Our versioning should be reflected in the cola/properties.plist. If it exists.
+
+When everything is done. Give a short summary and call it a day.'
+
+
+
+r_generate_ai_prompt()
+{
+   log_entry "r_generate_ai_prompt" "$@"
+
+   local prompt_text="$1"
+   shift
+   
+   printf -v prompt "%q" "${prompt_text}"$'\n'"$*"
+   RVAL="${prompt}"
+}
+
+
+main()
+{
+   while [ $# -ne 0 ]
+   do
+      if options_technical_flags "$1"
+      then
+         shift
+         continue
+      fi
+
+      case "$1" in
+         -h*|--help|help)
+            usage
+         ;;
+
+         --version)
+            printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
+            exit 0
+         ;;
+
+         --)
+            shift
+            break
+         ;;
+
+         -*)
+            usage "Unknown flag \"$1\""
+         ;;
+
+         *)
+            break
+         ;;
+      esac
+
+      shift
+   done
+
+   options_setup_trace "${MULLE_TRACE}" && set -x
+
+   local prompt
+   
+   r_generate_ai_prompt "${PROMPT_TEXT}" "$@"
+   prompt="${RVAL}"
+   
+   case "`mulle-project-version --diff`" in
+      'none')
+         exekutor "${AI}" -- --allow-all-tools --no-color -p "${prompt}"
+      ;;
+
+      *)
+         log_info "Already bumped"
+      ;;
+   esac
+}
+
+main "$@"
