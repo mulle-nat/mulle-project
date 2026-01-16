@@ -540,6 +540,7 @@ project::git::assert_not_on_release_branch()
 }
 
 
+# returns options as lines
 project::git::r_commit_options()
 {
    log_entry project::git::r_commit_options "$@"
@@ -563,13 +564,14 @@ project::git::r_commit_options()
             _log_warning "Last commit was tagged or merged or pushed. You may \
 need to force push to remotes now."
          fi
-         r_concat "${options}" "--amend --no-edit"
+         r_add_line "${options}" "--amend"
+         r_add_line "${RVAL}" "--no-edit"
          options="${RVAL}"
       ;;
 
       'NO')
-         r_escaped_singlequotes "${message}"
-         r_concat "${options}" "-m '${RVAL}'"
+         r_add_line "${options}" "-m"
+         r_add_line "${RVAL}" "${message}"
          options="${RVAL}"
       ;;
 
@@ -579,11 +581,12 @@ need to force push to remotes now."
             _log_verbose "Will create a new commit as the last commit has been \
 tagged or merged or pushed"
 
-            r_escaped_singlequotes "${message}"
-            r_concat "${options}" "-m '${RVAL}'"
+            r_add_line "${options}" "-m"
+            r_add_line "${RVAL}" "${message}"
             options="${RVAL}"
          else
-            r_concat "${options}" "--amend --no-edit"
+            r_add_line "${options}" "--amend"
+            r_add_line "${RVAL}" "--no-edit"
             options="${RVAL}"
          fi
       ;;
@@ -593,7 +596,8 @@ tagged or merged or pushed"
          then
             fail "Can not amend last commit as its been tagged or merged or pushed"
          fi
-         r_concat "${options}" "--amend --no-edit"
+         r_add_line "${options}" "--amend"
+         r_add_line "${RVAL}" "--no-edit"
          options="${RVAL}"
       ;;
 

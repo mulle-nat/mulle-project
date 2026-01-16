@@ -305,7 +305,16 @@ main()
       commit_options="${RVAL}"
 
 
-      eval_exekutor git commit ${commit_options}
+      set -- git commit 
+
+      local option 
+      
+      .foreachline option in ${commit_options}
+      .do
+         set -- "$@" "${option}"
+      .done
+
+      exekutor "$@"      
       rval=$?
       if [ $rval -ne 0 ]
       then

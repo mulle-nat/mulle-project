@@ -1,0 +1,328 @@
+#! /usr/bin/env mulle-bash
+#! MULLE_BASHFUNCTIONS_VERSION=6.7.0
+# shellcheck shell=bash
+#
+#
+#  mulle-project-ai-api-toc.sh
+#
+#  Copyright (c) 2026 nat
+#  All rights reserved.
+#
+#
+#  Redistribution and use in source and binary forms, with or without
+#  modification, are permitted provided that the following conditions are met:
+#
+#  Redistributions of source code must retain the above copyright notice, this
+#  list of conditions and the following disclaimer.
+#
+#  Redistributions in binary form must reproduce the above copyright notice,
+#  this list of conditions and the following disclaimer in the documentation
+#  and/or other materials provided with the distribution.
+#
+#  Neither the name of <ORGANIZATION> nor the names of its contributors
+#  may be used to endorse or promote products derived from this software
+#  without specific prior written permission.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+#  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+#  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+#  ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+#  LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+#  CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+#  SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+#  INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+#  CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+#  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+#  POSSIBILITY OF SUCH DAMAGE.
+#
+
+[ "${TRACE}" = 'YES' -o "${MULLE_PROJECT_AI_API_TOC_TRACE}" = 'YES' ] && set -x  && : "$0" "$@"
+
+### >> START OF mulle-boot.sh >>
+### << END OF mulle-boot.sh <<
+
+#
+# Versioning of this script
+#
+MULLE_EXECUTABLE_VERSION="0.0.0"
+
+
+### >> START OF mulle-bashfunctions-embed.sh >>
+### << END OF mulle-bashfunctions-embed.sh <<
+
+print_flags()
+{
+   echo "   -f    : force operation"
+
+   ##
+   ## ADD YOUR FLAGS DESCRIPTIONS HERE
+   ##
+
+   options_technical_flags_usage                 "         : "
+}
+
+
+usage()
+{
+   [ $# -ne 0 ] && log_error "$*"
+
+
+   cat <<EOF >&2
+Usage:
+   mulle-project-ai-api-toc [flags]
+
+   Create an \`assets/dox/TOC.md\` file that gives an AI a quick overview
+   over the API without overloading the context.
+
+   A per project prompt is read from
+      ./mulle/{etc|share}/project/api-toc.md
+
+   Otherwise mulle-project-ai-api-toc falls back to its generic
+   prompt.
+
+Flags:
+EOF
+   print_flags | LC_ALL=C sort >&2
+
+   exit 1
+}
+
+
+PROMPT=$(cat <<'EOF'
+You are an AI assistant that helps other AIs find the information they need
+without overloading their awareness with excessive text length:
+
+# HOWTO: Write a TOC.md
+
+You will write a `assets/dox/TOC.md` file for an individual project.
+
+The target audience for the final `assets/dox/TOC.md` is an AI assistant
+(yourself).
+The goal is to create a self-contained guide for each library that enables an
+AI to understand its capabilities, API, and intended usage patterns without
+needing to read the source code for every query.
+
+
+## Mandatory first step
+
+Get familiar with the project.
+
+Read `mulle-sde help`
+
+
+## Primary Information Sources
+
+To construct an good and detailed enough `TOC.md`, consult the following
+resources in order of priority:
+
+1.  **Public Header Files (`.h`):** This is the absolute source of truth for the public API, including data structures, function signatures, and inline documentation.
+2.  **Test Directory (`test/`):** This is the best source for practical, working examples. The tests demonstrate the intended API lifecycle (create, use, destroy), illustrate edge cases, and provide concrete, compilable code for the "Integration Examples" section. Assertions in tests serve as machine-readable documentation of expected behavior.
+3.  **README.md:** The project `README.md` usually provides a high-level overview that is perfect for the "Introduction & Purpose" section.
+4.  **.mulle/etc/sourcetree/config:** This file is the definitive source for identifying the direct dependencies for the "Dependencies" section.
+5.  **Implementation Files (`.c`):** Use these only as a last resort to clarify behavior that is not obvious from the headers or tests. The focus should remain on the public API.
+
+## General Guidelines
+
+*   **Audience:** Write for an AI. Be precise, explicit, and structured.
+*   **Scope:** Focus only on the specific project. Do not describe other dependency projects.
+*   **Detail:** Describe the main API and mention each public symbol with a very short description of what it does.
+
+---
+
+## `TOC.md` Template
+
+Below is the template to be used for each projects `assets/dox/TOC.md` file.
+
+---
+
+# [Subproject Name] Library Documentation for AI
+
+## 1. Introduction & Purpose
+
+- A concise paragraph summarizing the primary function.
+- What problem does it solve?
+- What are its key features at a high level?
+- Mention its relationship to other libraries if it is a core
+  dependency or component (e.g., "A foundational part of `mulle-core`," "Depends on `mulle-allocator`").
+
+## 2. Key Concepts & Design Philosophy
+
+- Explain the core ideas and design principles behind the library.
+- Describe any important architectural patterns used.
+- (e.g., For `mulle-buffer`: discuss dynamic vs. fixed-size buffers, the role of the allocator, the concept of a "flex" point).
+- (e.g., For `mulle-container`: explain the callback mechanism for keys and values).
+
+## 3. Core API & Data Structures
+
+This is the most critical section. It should be organized by header files or by major data structures.
+
+### 3.1. `[header_file_1.h]`
+
+#### `struct [major_struct_name]`
+- **Purpose:** What is this struct used for?
+- **Key Fields:** Briefly describe important public fields an AI might need to know about.
+- **Lifecycle Functions:**
+  - `_create` / `_init`: How to create/initialize an instance.
+  - `_destroy` / `_done`: How to destroy/deinitialize it.
+- **Core Operations:**
+  - Group related functions (e.g., add, remove, get, set).
+  - For each function or group, provide a brief description of what it does.
+- **Inspection Functions:**
+  - Functions for getting size, count, state, etc.
+
+#### `[Other structs or standalone functions in this header]`
+- Follow a similar pattern for other elements in the header.
+
+### 3.2. `[header_file_2.h]`
+... (repeat for other public headers) ...
+
+## 4. Performance Characteristics
+
+- Describe the performance profile of the main data structures and algorithms.
+- Use Big O notation where applicable (e.g., "O(1) for insertion," "O(log n) for search").
+- Mention any trade-offs made (e.g., memory vs. speed).
+- Discuss thread-safety characteristics (e.g., "Not thread-safe," "Lock-free," "Requires external locking").
+
+## 5. AI Usage Recommendations & Patterns
+
+- Provide actionable advice for using the library correctly.
+- **Best Practices:**
+  - e.g., "Always use the provided lifecycle functions."
+  - e.g., "Prefer using the `_do` macros for automatic resource management."
+- **Common Pitfalls:**
+  - e.g., "Do not access internal `_` prefixed fields directly."
+  - e.g., "Be aware that this function returns a borrowed pointer; do not free it."
+- **Idiomatic Usage:**
+  - Show the "mulle-sde way" of doing things with this library.
+
+## 6. Integration Examples
+
+- Provide several clear, concise, and complete code examples.
+- Each example should demonstrate a key feature or usage pattern.
+- Use comments to explain the important steps in the code.
+- Examples should be self-contained and compilable if possible.
+- When writing examples they should be in the coding style of the library,
+which is: Use 3-space indent, Allman braces, aligned declarations, and C89 var rules. return( expr);, no dot-syntax in Obj-C. One var per line, no in-line init unless allowed. Columnar assignments.
+- Objective C examples must not use alloc/init or retain/release except in -init or -dealloc methods
+
+### Example 1: [Descriptive Title, e.g., "Creating and Populating a Buffer"]
+
+```c
+// Code example here
+```
+
+### Example 2: [Descriptive Title, e.g., "Using a Custom Allocator"]
+
+```c
+// Code example here
+```
+
+## 7. Dependencies
+
+- List the direct `mulle-sde` library dependencies.
+- This helps establish the position in the project hierarchy.
+- Example:
+  - `mulle-c11`
+  - `mulle-allocator`
+EOF
+)
+
+ai_api_toc()
+{
+   exekutor github-copilot -- ${OPTION_SILENT} \
+                              --stream "${OPTION_STREAM:-off}" \
+                              --allow-all-tools \
+                              -p "$*"$'\n'"${PROMPT}"
+}
+
+
+main()
+{
+   #
+   # simple option/flag handling
+   #
+   local OPTION_STREAM
+   local OPTION_SILENT=--silent
+
+   while [ $# -ne 0 ]
+   do
+      if options_technical_flags "$1"
+      then
+         shift
+         continue
+      fi
+
+      case "$1" in
+         -f|--force)
+            MULLE_FLAG_MAGNUM_FORCE='YES'
+         ;;
+
+         -h*|--help|help)
+            usage
+         ;;
+
+         # --value)
+         #    [ $# -eq 1 ] && usage "missing argument to $1"
+         #    shift
+         #
+         #    OPTION_VALUE="$1"
+         # ;;
+         #
+         --stream)
+            OPTION_STREAM='on'
+            exit 0
+         ;;
+
+         --no-stream)
+            OPTION_STREAM='off'
+            exit 0
+         ;;
+
+         --version)
+            printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
+            exit 0
+         ;;
+
+
+         --)
+            shift
+            break
+         ;;
+
+
+         -*)
+            usage "Unknown flag \"$1\""
+         ;;
+
+         *)
+            break
+         ;;
+      esac
+
+      shift
+   done
+
+   options_setup_trace "${MULLE_TRACE}" && set -x
+
+   [ -d ".git" ] || fail "No git repo here"
+   [ -d ".graveyard" ] && fail "There is still a .graveyard here, you must delete it manually. Inspect it before losing data"
+
+   if [ "${MULLE_FLAG_LOG_VERBOSE}" = 'YES' ]
+   then
+      OPTION_SILENT=
+   fi
+
+   r_mkdir_parent_if_missing "assets/dox/TOC.md"
+   ai_api_toc
+
+   # its easier to get the AI to write the file, then deal with the verbosity
+   #
+   # text="$(ai_api_toc)"
+   # if [ -z "${text}" ]
+   # then
+   #    fail "No response"
+   # fi
+   # redirect_exekutor "assets/dox/TOC.md"  printf "%s\n" "${text}"
+}
+
+main "$@"

@@ -1,13 +1,20 @@
 #! /bin/sh
 
-OLD_VERSION="${1:-17.0.6.0}"
-NEW_VERSION="${2:-17.0.6.2}"
+CMD="${1:-help}"
 
-OLD_CODENAME="bookworm"
-NEW_CODENAME="bookworm"
+case "${CMD}" in 
+   [0-9]*|v*)
+      CMD="patch"
+   ;;
 
-OLD_ARCH="amd64"
-NEW_ARCH="amd64"
+   *)
+      shift
+   ;;
+esac 
+
+NEW_VERSION="${1:-17.0.6.2}"
+NEW_CODENAME="${2:-bookworm}"
+NEW_ARCH="${3-amd64}"
 
 FILES="Dockerfile
 */Dockerfile
@@ -15,16 +22,27 @@ dox/*.md
 bin/*
 cola/*.bud"
 
+OLD_VERSION=
+OLD_CODENAME=
+OLD_ARCH=
 
-if [ "${OLD_VERSION}" = "${NEW_VERSION}" ]
-then
-   exe="`basename -- $0`"
+eval "$(
+grep -RhoE 'mulle-clang-[^-]+-[^-]+-[^.]+\.deb' ${FILES} 2>/dev/null |
+sed -E '
+  s/mulle-clang-//;
+  s/\.deb//;
+  s/^([^-]+)-([^-]+)-(.+)$/OLD_VERSION=\1\nOLD_CODENAME=\2\nOLD_ARCH=\3/
+'
+)"
 
-   cat <<EOF >&2
+
+case "${CMD}" in 
+   '--help')
+      exe="`basename -- $0`"
+
+      cat <<EOF >&2
 Usage:
-   ${exe} <old-version> <new-version> \\
-          [old-codename] [new-codename] \\
-          [old-arch] [new-arch]
+   ${exe} <new-version> [new-codename] [new-arch]
 
    Change URLs and other definitions of the mulle-clang-project version
    in Dockerfiles, README.md and installer files.
@@ -34,12 +52,22 @@ Usage:
    OLD_ARCH="${OLD_ARCH}"
 
 Example:
-   ${exe} 14.0.6.2 16.0.0.0 bullseye bookworm
-
+   ${exe} 16.0.0.0 bullseye bookworm
 
 EOF
-   exit 1
-fi
+   ;;
+
+   'list'|'--list')
+      echo "OLD_VERSION=$OLD_VERSION"
+      echo "OLD_CODENAME=$OLD_CODENAME"
+      echo "OLD_ARCH=$OLD_ARCH"
+      exit 0
+   ;;
+esac
+
+echo "VERSION=$OLD_VERSION -> ${NEW_VERSION}"
+echo "OLD_CODENAME=$OLD_CODENAME -> ${NEW_CODENAME}"
+echo "OLD_ARCH=$OLD_ARCH -> ${NEW_ARCH}"
 
 
 for file in ${FILES}

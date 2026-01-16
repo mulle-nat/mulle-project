@@ -81,6 +81,7 @@ main()
    local OPTION_BORING
    local OPTION_MESSAGE
 
+   local pass_args
    #
    # simple flag handling
    #
@@ -154,6 +155,7 @@ main()
          ;;
 
          --)
+            pass_args='YES'
             shift
             break
          ;;
@@ -173,7 +175,7 @@ main()
    options_setup_trace "${MULLE_TRACE}" && set -x
 
    # Check for unused arguments (not after --)
-   if [ $# -ne 0 ]
+   if [ $# -ne 0 -a "${pass_args}" != 'YES' ]
    then
       fail "Unexpected arguments: $*. Use -- to pass arguments to git commit, or -m for commit message."
    fi
@@ -306,7 +308,13 @@ ${C_RESET}${interesting_changes# }"
       exekutor git add -u || exit 1
 
       set -- git commit "$@"
-      set -- "$@" ${commit_options}
+
+      local option
+
+      .foreachline option in ${commit_options}
+      .do
+         set -- "$@" "${option}"
+      .done
 
       exekutor "$@"
    else

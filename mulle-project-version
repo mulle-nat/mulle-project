@@ -607,7 +607,7 @@ diff_version()
 
    if [ -z "${last}" ]
    then
-      echo "none"
+      echo "init"
       return 0
    fi
 

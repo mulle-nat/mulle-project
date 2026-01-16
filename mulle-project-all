@@ -58,11 +58,11 @@ print_flags()
    ##
    cat <<EOF
    --all               : execute in all projects,subprojects,tests
-   --cmd-file <file>   : read command from file (use - for stdin)
+   --cmd-file <file>   : read commands from file (- is stdin, implies --exec)
    --directory <dir>   : enter subdirectory, before executing project command
    --exec ...          : do not expand command line arguments
-   --if-exists <file>  : ignore project if <file> does not exist
-   --if <expr>         : ignore project if shell expression evaluates to false
+   --if-exists <file>  : enter project if <file> exists
+   --if <expr>         : only enter project if shell expression is true
    --ignore <name>     : ignore a project from REPOS, multiples are possible
    --others            : also execute in other projects, like demo
    --parallel          : execute operations in parallel
@@ -76,7 +76,9 @@ EOF
    then
       cat <<EOF
    --eval ...          : a less convenient legacy variant of exec
-   --if-not-exists <file> : ignore project if <file> exists
+   --exec-verbatim     : do not expand arguments
+   --exec-expand       : expand arguments (default)
+   --if-not-exists <f> : skip project if file <f> exists
    --lenient           : lenient operation, errors don't preempt (default)
    --main-project      : also execute in main project
    --no-cd             : do not change to project directory
@@ -106,7 +108,7 @@ usage()
    [ $# -ne 0 ] && log_error "$*"
 
 
-   cat <<EOF >&2
+   cat <<EOT >&2
 Usage:
    mulle-project-all [flags] ...
 
@@ -140,10 +142,15 @@ Examples:
    Generate include statements for all projects (expansion only with \${}):
       mulle-project-all -s --exec printf '%s\\n' '#include <\${NAME}.h>'
 
-   If there is no "REPOS" file, mulle-project-all will look for mulle-sde
-   projects that reside in the current working directory (excluding the working
-   directory itself) . Specialities like --tests, --subprojects, --others will
-   likely only make sense with mulle-sde projects.
+   Do more complex scripting with --cmdfile - <<'EOF' (sic!)
+      mulle-project-all --cmdfile - <<'EOF'
+      if [ -f .git ]
+      then
+          git remote -v
+      fi
+      ls README*
+      EOF
+EOT
 
 Flags:
 EOF
@@ -349,7 +356,7 @@ shell_it()
             esac
          fi
 
-         if [ "${OPTION_EVAL}" != 'YES' ]
+         if [ "${OPTION_EVAL}" != 'YES' -a "${OPTION_VERBATIM}" != 'YES' ]
          then
             r_expanded_string "${arg}"
             arg="${RVAL}"
@@ -395,7 +402,7 @@ shell_it()
 
 project_it()
 {
-   log_entry "project_it" "$1" "$2" ...
+   log_entry "project_it" "$1" "$2" "$3" ...
 
    local project="$1"
    local mode="$2"
@@ -467,7 +474,7 @@ project_it()
          local tests 
          local test 
 
-         tests="`( cd "${project}" ; mulle-env --search-here environment \
+         tests="`( cd "${project}" ; rexekutor mulle-env --search-here environment \
                                        get --lenient MULLE_SDE_TEST_PATH 2> /dev/null )`"
          tests="${tests:-test}"
 
@@ -768,6 +775,7 @@ main()
    local OPTION_START_WITH
    local OPTION_PRINT
    local OPTION_SUBLIME
+   local OPTION_VERBATIM
 
    #
    # simple flag handling
@@ -795,6 +803,8 @@ main()
             shift
 
             OPTION_CMD_FILE="$1"
+            OPTION_EXEC='YES'
+            OPTION_VERBATIM='YES'
          ;;
 
          -d|--directory)
@@ -824,7 +834,7 @@ main()
             [ $# -eq 1 ] && fail "missing parameter for \"$1\""
             shift
 
-            r_concat "${OPTION_IF}" "$1" "&&"
+            r_concat "${OPTION_IF}" "$1" " && "
             OPTION_IF="${RVAL}"
          ;;
 
@@ -832,7 +842,7 @@ main()
             [ $# -eq 1 ] && fail "missing parameter for \"$1\""
             shift
 
-            r_concat "${OPTION_IF}" "[ -e \"$1\" ]"
+            r_concat "${OPTION_IF}" "[ -e \"$1\" ]" " && "
             OPTION_IF="${RVAL}"
          ;;
 
@@ -840,10 +850,9 @@ main()
             [ $# -eq 1 ] && fail "missing parameter for \"$1\""
             shift
 
-            r_concat "${OPTION_IF}" "[ ! -e \"$1\" ]"
+            r_concat "${OPTION_IF}" "[ ! -e \"$1\" ]" " && "
             OPTION_IF="${RVAL}"
          ;;
-
 
          -l|--lenient)
             OPTION_LENIENT='YES'
@@ -966,6 +975,14 @@ main()
             OPTION_MODE="${RVAL}"
          ;;
 
+         --exec-verbatim)
+           OPTION_VERBATIM='YES'
+         ;;
+
+         --exec-expand)
+           OPTION_VERBATIM='NO'
+         ;;
+
          --version)
             printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
             exit 0
@@ -982,6 +999,7 @@ main()
 
       shift
    done
+
 
    options_setup_trace "${MULLE_TRACE}" && set -x
 
@@ -1047,6 +1065,12 @@ main()
       fi
       exit 1
    fi
+
+   log_setting "OPTION_IF=${OPTION_IF}"
+   log_setting "OPTION_EXEC=${OPTION_EXEC}"
+   log_setting "OPTION_VERBATIM=${OPTION_VERBATIM}"
+   log_setting "OPTION_PARALLEL=${OPTION_PARALLEL}"
+   log_setting "ARGS=$*"
 
    if [ "${OPTION_PARALLEL}" = 'YES' ]
    then

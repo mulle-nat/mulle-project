@@ -164,7 +164,7 @@ delete_line()
 
    if [ "${unprotect}" = 'YES' ]
    then
-      permissions="`lso "${filename}"`"
+      permissions="`rexekutor lso "${filename}"`"
       exekutor chmod +w "${filename}"
    fi
 
@@ -265,7 +265,7 @@ replace()
 
    if [ "${unprotect}" = 'YES' ]
    then
-      permissions="`lso "${filename}"`"
+      permissions="`rexekutor lso "${filename}"`"
       exekutor chmod +w "${filename}"
    fi
 

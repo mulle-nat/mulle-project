@@ -118,7 +118,8 @@ If there are no commits all would be fine.
 Peruse the git log until you find the tag.
 Examine the commit messages Then change the version according to:
 
-* `mulle-project-version --increment-major --write` for breaking changes
+
+* `mulle-project-version --increment-major --write` for breaking changes (unless the old major is zero, do not increment the major is zero, increment minor installed)
 * `mulle-project-version --increment-minor --write` for added functionality
 * `mulle-project-version --increment-patch --write` for just build system maintenance and documentation and wording and bug fixes
 
