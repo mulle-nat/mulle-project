@@ -334,7 +334,7 @@ check_readme_freshness()
    then
       log_warning "Files in cola/ are newer than README.md:"
       printf "%s\n" "${newer_files}" | sed 's/^/   /'
-      log_info "Consider running 'mulle-readme-cmd' to update README.md"
+      log_info "Consider running 'mulle-readme-cms' to update README.md"
    else
       log_verbose "README.md is up to date with cola/ files"
    fi

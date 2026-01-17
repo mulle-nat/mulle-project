@@ -63,9 +63,14 @@ print_flags()
    --exec ...          : do not expand command line arguments
    --if-exists <file>  : enter project if <file> exists
    --if <expr>         : only enter project if shell expression is true
-   --ignore <name>     : ignore a project from REPOS, multiples are possible
+   --ignore <pattern>  : ignore projects matching wildcard pattern, multiples are possible
+   --match <pattern>   : only include projects matching wildcard pattern
+   --others            : also execute in other projects, like demo
    --others            : also execute in other projects, like demo
    --parallel          : execute operations in parallel
+   --buffered          : buffer stdout and stderr, display after completion
+   --buffered-stdout   : buffer only stdout, display after completion
+   --buffered-stderr   : buffer stdout and stderr separately, display after completion
    --repos-file <f>    : REPOS file to use (shortcut: -r)
    --sde               : only execute in mulle-sde projects
    --from <s>          : skip projects in REPOS until <s>
@@ -149,11 +154,10 @@ Examples:
           git remote -v
       fi
       ls README*
-      EOF
+EOF
 EOT
 
 Flags:
-EOF
    print_flags | LC_ALL=C sort >&2
 
    if [ -z "${MULLE_TRACE}" ]
@@ -237,6 +241,21 @@ shell_it()
 
    [ -z "${DIRECTORY}" ] && return
 
+   local tmpout tmperr
+
+   if [ "${OPTION_BUFFERED}" = 'YES' ]
+   then
+      tmpout=$(mktemp)
+      tmperr="${tmpout}"
+   elif [ "${OPTION_BUFFERED_STDOUT}" = 'YES' ]
+   then
+      tmpout=$(mktemp)
+   elif [ "${OPTION_BUFFERED_STDERR}" = 'YES' ]
+   then
+      tmpout=$(mktemp)
+      tmperr=$(mktemp)
+   fi
+
    (
       r_physicalpath "${DIRECTORY}"
       DIRNAME="${RVAL}"
@@ -277,36 +296,39 @@ shell_it()
          fi
       fi
 
-      case ",${OPTION_ADORN}," in
-         *,no-bar,*|*,no-top-bar,*|*,none,*)
-         ;;
+      if [ -z "${tmpout}" ]
+      then
+         case ",${OPTION_ADORN}," in
+            *,no-bar,*|*,no-top-bar,*|*,none,*)
+            ;;
 
-         *)
-            log_title_verbose "${dashes}"
-         ;;
-      esac
+            *)
+               log_title_verbose "${dashes}"
+            ;;
+         esac
 
-      case ",${OPTION_ADORN}," in
-         *,no-echo,*|*,no-printf,*|*,none,*)
-         ;;
+         case ",${OPTION_ADORN}," in
+            *,no-echo,*|*,no-printf,*|*,none,*)
+            ;;
 
-         *,printf,*)
-            printf "%s " "$1"
-         ;;
+            *,printf,*)
+               printf "%s " "$1"
+            ;;
 
-         *)
-            log_title "$1"
-         ;;
-      esac
+            *)
+               log_title "$1"
+            ;;
+         esac
 
-      case ",${OPTION_ADORN}," in
-         *,no-bar,*|*,no-bottom-bar,*|*,none,*)
-         ;;
+         case ",${OPTION_ADORN}," in
+            *,no-bar,*|*,no-bottom-bar,*|*,none,*)
+            ;;
 
-         *)
-            log_title_verbose "${dashes}"
-         ;;
-      esac
+            *)
+               log_title_verbose "${dashes}"
+            ;;
+         esac
+      fi
 
       shift
 
@@ -326,7 +348,20 @@ shell_it()
       # shortcut if ez
       if [ "${OPTION_EVAL}" = 'NO' -a "${OPTION_EXEC}" = 'NO' -a "${OPTION_SDE_REPLACE}" = 'NO' ]
       then
-         exekutor "$@"
+         if [ ! -z "${tmpout}" ]
+         then
+            if [ ! -z "${tmperr}" -a "${tmpout}" != "${tmperr}" ]
+            then
+               exekutor "$@" > "${tmpout}" 2> "${tmperr}"
+            elif [ ! -z "${tmperr}" ]
+            then
+               exekutor "$@" > "${tmpout}" 2>&1
+            else
+               exekutor "$@" > "${tmpout}"
+            fi
+         else
+            exekutor "$@"
+         fi
          return $?
       fi
 
@@ -384,19 +419,89 @@ shell_it()
          log_debug "eval command: $*"
       fi
 
-      eval_exekutor NAME="'${NAME}'" \
-                    DIRECTORY="'${DIRECTORY}'" \
-                    DIRNAME="'${DIRNAME}'" \
-                    PROJECT_NAME="'${PROJECT_NAME}'" \
-                    SUBPROJECT_NAME="'${SUBPROJECT_NAME}'" \
-                    OTHER_NAME="'${OTHER_NAME}'" \
-                    TEST_NAME="'${TEST_NAME}'" \
-                    GITHUB_NAME="'${GITHUB_NAME}'" \
-                    MULLE_PROJECT_ALL="${MULLE_EXECUTABLE_VERSION}" \
-                    OLD_MULLE_USER_PWD="${MULLE_USER_PWD}" \
-                    MULLE_USER_PWD='' \
-                    "$@"
+      if [ ! -z "${tmpout}" ]
+      then
+         if [ ! -z "${tmperr}" -a "${tmpout}" != "${tmperr}" ]
+         then
+            eval_exekutor NAME="'${NAME}'" \
+                          DIRECTORY="'${DIRECTORY}'" \
+                          DIRNAME="'${DIRNAME}'" \
+                          PROJECT_NAME="'${PROJECT_NAME}'" \
+                          SUBPROJECT_NAME="'${SUBPROJECT_NAME}'" \
+                          OTHER_NAME="'${OTHER_NAME}'" \
+                          TEST_NAME="'${TEST_NAME}'" \
+                          GITHUB_NAME="'${GITHUB_NAME}'" \
+                          MULLE_PROJECT_ALL="${MULLE_EXECUTABLE_VERSION}" \
+                          OLD_MULLE_USER_PWD="${MULLE_USER_PWD}" \
+                          MULLE_USER_PWD='' \
+                          "$@" > "${tmpout}" 2> "${tmperr}"
+         elif [ ! -z "${tmperr}" ]
+         then
+            eval_exekutor NAME="'${NAME}'" \
+                          DIRECTORY="'${DIRECTORY}'" \
+                          DIRNAME="'${DIRNAME}'" \
+                          PROJECT_NAME="'${PROJECT_NAME}'" \
+                          SUBPROJECT_NAME="'${SUBPROJECT_NAME}'" \
+                          OTHER_NAME="'${OTHER_NAME}'" \
+                          TEST_NAME="'${TEST_NAME}'" \
+                          GITHUB_NAME="'${GITHUB_NAME}'" \
+                          MULLE_PROJECT_ALL="${MULLE_EXECUTABLE_VERSION}" \
+                          OLD_MULLE_USER_PWD="${MULLE_USER_PWD}" \
+                          MULLE_USER_PWD='' \
+                          "$@" > "${tmpout}" 2>&1
+         else
+            eval_exekutor NAME="'${NAME}'" \
+                          DIRECTORY="'${DIRECTORY}'" \
+                          DIRNAME="'${DIRNAME}'" \
+                          PROJECT_NAME="'${PROJECT_NAME}'" \
+                          SUBPROJECT_NAME="'${SUBPROJECT_NAME}'" \
+                          OTHER_NAME="'${OTHER_NAME}'" \
+                          TEST_NAME="'${TEST_NAME}'" \
+                          GITHUB_NAME="'${GITHUB_NAME}'" \
+                          MULLE_PROJECT_ALL="${MULLE_EXECUTABLE_VERSION}" \
+                          OLD_MULLE_USER_PWD="${MULLE_USER_PWD}" \
+                          MULLE_USER_PWD='' \
+                          "$@" > "${tmpout}"
+         fi
+      else
+         eval_exekutor NAME="'${NAME}'" \
+                       DIRECTORY="'${DIRECTORY}'" \
+                       DIRNAME="'${DIRNAME}'" \
+                       PROJECT_NAME="'${PROJECT_NAME}'" \
+                       SUBPROJECT_NAME="'${SUBPROJECT_NAME}'" \
+                       OTHER_NAME="'${OTHER_NAME}'" \
+                       TEST_NAME="'${TEST_NAME}'" \
+                       GITHUB_NAME="'${GITHUB_NAME}'" \
+                       MULLE_PROJECT_ALL="${MULLE_EXECUTABLE_VERSION}" \
+                       OLD_MULLE_USER_PWD="${MULLE_USER_PWD}" \
+                       MULLE_USER_PWD='' \
+                       "$@"
+      fi
    )
+
+   local exitcode=$?
+
+   if [ ! -z "${tmpout}" ]
+   then
+      log_title "${DIRECTORY}"
+      if [ -s "${tmpout}" ]
+      then
+         cat "${tmpout}"
+      fi
+      if [ ! -z "${tmperr}" -a "${tmpout}" != "${tmperr}" ]
+      then
+         if [ -s "${tmperr}" ]
+         then
+            log_title "${DIRECTORY}" >&2
+            cat "${tmperr}" >&2
+         fi
+         rm -f "${tmpout}" "${tmperr}"
+      else
+         rm -f "${tmpout}"
+      fi
+   fi
+
+   return ${exitcode}
 }
 
 
@@ -758,6 +863,9 @@ EOF
 main()
 {
    local OPTION_ADORN
+   local OPTION_BUFFERED
+   local OPTION_BUFFERED_STDOUT
+   local OPTION_BUFFERED_STDERR
    local OPTION_CD='YES'
    local OPTION_CMD_FILE
    local OPTION_LENIENT='YES'
@@ -768,9 +876,10 @@ main()
    local OPTION_SDE_TEST='NO'
    local OPTION_SDE_REPLACE='YES'
    local OPTION_EVAL
-   local OPTION_EXEC
+   local OPTION_EXEC='YES'
    local OPTION_IF
    local OPTION_IGNORE
+   local OPTION_MATCH
    local OPTION_SKIP_FROM
    local OPTION_START_WITH
    local OPTION_PRINT
@@ -798,6 +907,18 @@ main()
             OPTION_MODE="main-project,subprojects,tests,others"
          ;;
 
+         --buffered)
+            OPTION_BUFFERED='YES'
+         ;;
+
+         --buffered-stdout)
+            OPTION_BUFFERED_STDOUT='YES'
+         ;;
+
+         --buffered-stderr)
+            OPTION_BUFFERED_STDERR='YES'
+         ;;
+
          --cmd-file)
             [ $# -eq 1 ] && fail "missing parameter for \"$1\""
             shift
@@ -815,6 +936,7 @@ main()
          ;;
 
          --eval)
+            OPTION_EXEC='NO'
             OPTION_EVAL='YES'
          ;;
 
@@ -828,6 +950,14 @@ main()
 
             r_add_line "${OPTION_IGNORE}" "$1"
             OPTION_IGNORE="${RVAL}"
+         ;;
+
+         --match)
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
+            shift
+
+            r_add_line "${OPTION_MATCH}" "$1"
+            OPTION_MATCH="${RVAL}"
          ;;
 
          --if)
@@ -1087,9 +1217,46 @@ main()
 
    .foreachline i in ${repos}
    .do
-      if find_line "${OPTION_IGNORE}" "${i}"
+      if [ ! -z "${OPTION_IGNORE}" ]
       then
-         .continue
+         local pattern
+         local ignored='NO'
+
+         .foreachline pattern in ${OPTION_IGNORE}
+         .do
+            case "${i}" in
+               ${pattern})
+                  ignored='YES'
+                  .break
+               ;;
+            esac
+         .done
+
+         if [ "${ignored}" = 'YES' ]
+         then
+            .continue
+         fi
+      fi
+
+      if [ ! -z "${OPTION_MATCH}" ]
+      then
+         local pattern
+         local matched='NO'
+
+         .foreachline pattern in ${OPTION_MATCH}
+         .do
+            case "${i}" in
+               ${pattern})
+                  matched='YES'
+                  .break
+               ;;
+            esac
+         .done
+
+         if [ "${matched}" = 'NO' ]
+         then
+            .continue
+         fi
       fi
 
       project_it "$i" "${OPTION_MODE}" "$@"

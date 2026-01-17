@@ -44,9 +44,16 @@ Usage:
    Automatically commit with \`--amend\` the current changes, if the changes 
    are due to a mulle-sde upgrade. In more technical terms, changes in "share"
    and "reflect" folders are considered boring.
-
    It is checked that only a commit is amended, that hasn't been tagged
-   or pushed yet.
+   or pushed yet. Otherwise a regular commit is created, that needs a
+   commit message.
+
+   Specify a commit message with \`-m <message>\` like you would with git,
+   not needed for \`--only-amend\` though, the default. The commit message
+   will only be used for new commits.
+
+Example:
+      mulle-project-commit -m "boring changes to mulle-sde files"
 
 Flags:
 EOF
@@ -118,7 +125,7 @@ main()
          ;;
 
          --safe-amend)
-            OPTION_AMEND='DEFAULT'
+            OPTION_AMEND='SAFE'
          ;;
 
          --only-amend)
@@ -270,24 +277,31 @@ ${C_RESET}${bad_changes# }"
             MULLE_EXECUTABLE_FAIL_PREFIX=""
          fi
 
-         log_warning "There are possibly interesting changes that may need a commit message:
+         if [ -z "${OPTION_MESSAGE}" ]
+         then
+            log_warning "There are possibly interesting changes that may need a commit message:
 ${C_RESET}${interesting_changes# }"
 
-         if [ "${OPTION_DIFF}" = 'YES' ]
-         then
-            local line
+            if [ "${OPTION_DIFF}" = 'YES' ]
+            then
+               local line
 
-            .foreachline line in ${interesting_changes}
-            .do
-               r_trim_whitespace "${line#*\ }"
-               rexekutor git diff -r HEAD -- "${RVAL}"
-            .done
+               .foreachline line in ${interesting_changes}
+               .do
+                  r_trim_whitespace "${line#*\ }"
+                  rexekutor git diff -r HEAD -- "${RVAL}"
+               .done
+            fi
+
+            if [ "${MULLE_FLAG_MAGNUM_FORCE}" != 'YES' ]
+            then
+               fail "Not proceeding because of diffs (use -f to override)"
+            fi
          fi
 
-         if [ "${MULLE_FLAG_MAGNUM_FORCE}" != 'YES' ]
-         then
-            fail "Not proceeding because of diffs (use -f to override)"
-         fi
+         # change to regular commit
+         log_verbose "Interesting changes detected, will not amend (would have ammended with --boring)"
+         OPTION_AMEND='NO'
       fi
    fi
 
@@ -302,6 +316,18 @@ ${C_RESET}${interesting_changes# }"
 
       project::git::r_commit_options "${OPTION_AMEND}" "" "${OPTION_MESSAGE}"
       commit_options="${RVAL}"
+
+      case "${commit_options}" in
+         *--amend*)
+         ;;
+
+         *)
+            if [ -z "${OPTION_MESSAGE}" ]
+            then
+               fail "Need a commit message for this commit"
+            fi
+         ;;
+      esac
 
       log_verbose "Add changes and commit..."
 

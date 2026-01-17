@@ -1,3 +1,34 @@
+## 4.4.0
+
+feature: add buffered output and pattern matching to mulle-project-all
+
+* mulle-project-all supports `--buffered` output modes for cleaner multi-project execution
+* new `--match` flag allows positive pattern filtering alongside existing `--ignore`
+* mulle-project-commit now accepts `-m `<message>`` for explicit commit messages
+* mulle-project-commit automatically creates new commits when interesting changes detected
+
+
+
+* --cmd-file option to mulle-project-all
+* -m option for mulle-project-commit
+* --fallback-commit option for mulle-project-releasenotes
+
+
+feature: add AI-assisted commit message generation
+
+* new mulle-project-ai tool for AI-powered project management tasks
+* AI-assisted commit message generation following project conventions
+* ignore list support in sourcetree-doctor to exclude problematic nodes
+* version diff capability to determine semantic version changes
+* new word-replace utility for text manipulation
+
+
+* new AI scripts
+
+* much improved demo runner
+* `new_repo` now supports codeberg
+
+
 ## 4.3.0
 
 * --cmd-file option to mulle-project-all
