@@ -35,7 +35,6 @@ mulle-project-demo
 mulle-project-distcheck
 mulle-project-distribute
 mulle-project-dockerhub
-mulle-project-extension-versions
 mulle-project-git-edit-comment.sh
 mulle-project-github-ci-status.sh
 mulle-project-github-description
@@ -69,6 +68,7 @@ mulle-project-travis-ci-prerelease
 mulle-project-untag
 mulle-project-upgrade-cmake
 mulle-project-version
+mulle-project-version-extensions
 mulle-project-versioncheck
 mulle-strip-whitespace
 )
