@@ -483,6 +483,12 @@ shell_it()
 
    if [ ! -z "${tmpout}" ]
    then
+      local lockdir="/tmp/mulle-project-all-$$"
+      while ! mkdir "${lockdir}" 2>/dev/null
+      do
+         very_short_sleep 100000
+      done
+
       log_title "${DIRECTORY}"
       if [ -s "${tmpout}" ]
       then
@@ -499,6 +505,8 @@ shell_it()
       else
          rm -f "${tmpout}"
       fi
+
+      rmdir "${lockdir}"
    fi
 
    return ${exitcode}
@@ -1205,6 +1213,8 @@ main()
    if [ "${OPTION_PARALLEL}" = 'YES' ]
    then
       include "parallel"
+
+      rmdir "/tmp/mulle-project-all-$$" 2>/dev/null
 
       parallel_execute_argument_first "${repos}" \
                                       "${OPTION_MODE}" \

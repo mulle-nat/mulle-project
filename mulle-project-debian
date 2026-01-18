@@ -261,7 +261,6 @@ main()
    [ $# -eq 0 ] || shift  # ARCHIVE_URL
    [ $# -eq 0 ] || shift  # DEBIAN_DEPENDENCIES
 
-   # we are not really using DEBIAN_REPOSITORY anywhere ?
    DEBIAN_REPOSITORY="${1:-${DEBIAN_REPOSITORY}}" ; [ $# -eq 0 ] || shift  # DEBIAN_REPOSITORY
    DEBIAN_REPOSITORY="${DEBIAN_REPOSITORY:-main}"
    [ $# -eq 0 ] || shift  # TAG

@@ -169,7 +169,6 @@ main()
    mkdir -p "${share}" || installer_fail "could not create ${share}"
    mkdir -p "${libexec}" || installer_fail "could not create ${libexec}"
 
-
    for i in mulle-project-*
    do
       case "${i}" in

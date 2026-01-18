@@ -1,3 +1,8 @@
+## 4.5.0
+
+Various small improvements
+
+
 ## 4.4.0
 
 feature: add buffered output and pattern matching to mulle-project-all

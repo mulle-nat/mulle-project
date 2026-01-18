@@ -1,6 +1,6 @@
 cmake_minimum_required( VERSION 3.13...99.99)
 
-project( mulle-project VERSION 4.4.0 LANGUAGES NONE)
+project( mulle-project VERSION 4.5.0 LANGUAGES NONE)
 
 option( MULLE_PROJECT_EMBED_BASHFUNCTIONS "Make some scripts independent from mulle-bash" ON)
 
@@ -15,6 +15,7 @@ version-info.sh.template)
 set( LIBRARY_SCRIPTS
 src/mulle-project-git.sh
 src/mulle-project-homebrew.sh
+src/mulle-project-settings.sh
 src/mulle-project-sourcetree-parser.sh
 src/mulle-project-user-files-settings.sh
 src/mulle-project-user-files.sh
@@ -49,6 +50,7 @@ mulle-project-init
 mulle-project-local-travis
 mulle-project-mulle-clang-version
 mulle-project-new-repo
+mulle-project-objc-doctor
 mulle-project-package-json
 mulle-project-pacman-pkg
 mulle-project-prerelease
@@ -75,6 +77,7 @@ mulle-strip-whitespace
 
 
 set( EMBEDDING_SCRIPTS
+mulle-clion-test
 mulle-find-symbol
 mulle-gitignore
 mulle-project-all
