@@ -22,3 +22,4 @@ build-*/
 .mulle/etc/make/build-dir
 dox.unreleased
 .graveyard/
+.mulle/etc/todo

@@ -230,24 +230,30 @@ run()
 
    if [ "${suppress}" = 'YES' -o "${boldmarker}" = 'YES' ]
    then
-      #
-      # if somethings funny, lets just bold it
-      # sanity check that version tag are parseable...
-      #
       case "${version};${tag}" in
          *\.*\.*\;*\.*\.*)
             include "version"
 
-            r_version_distance "${tag}" "${version}"
-            if [ "$RVAL" -lt "${boring_distance}" ]
+            r_get_version_major "${version}"
+            local v_major="${RVAL}"
+            r_get_version_minor "${version}"
+            local v_minor="${RVAL}"
+            
+            r_get_version_major "${tag}"
+            local t_major="${RVAL}"
+            r_get_version_minor "${tag}"
+            local t_minor="${RVAL}"
+            
+            if [ "${v_major}" = "${t_major}" -a "${v_minor}" = "${t_minor}" ]
             then
-               # check that both are reasonably valid tags
-               log_fluff "Just a patch version distance ($RVAL) in \"${PWD#${MULLE_USER_PWD}/}\", skipping"
+               log_fluff "Just a patch version change in \"${PWD#${MULLE_USER_PWD}/}\", skipping"
                return
             fi
-
-            if [ "$RVAL" -lt 1048576 ]
+            
+            if [ "${v_major}" != "${t_major}" ]
             then
+               boldmarker="${OPTION_BOLD_MARKER}"
+            else
                boldmarker=""
             fi
          ;;

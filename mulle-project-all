@@ -54,7 +54,6 @@ MULLE_EXECUTABLE_VERSION="0.0.1"
 
 print_flags()
 {
-
    ##
    cat <<EOF
    --all               : execute in all projects,subprojects,tests
@@ -154,10 +153,10 @@ Examples:
           git remote -v
       fi
       ls README*
-EOF
-EOT
 
 Flags:
+EOT
+
    print_flags | LC_ALL=C sort >&2
 
    if [ -z "${MULLE_TRACE}" ]
@@ -241,6 +240,50 @@ shell_it()
 
    [ -z "${DIRECTORY}" ] && return
 
+   # Evaluate --if condition before creating temp files
+   if [ ! -z "${OPTION_IF}" ]
+   then
+      (
+         r_physicalpath "${DIRECTORY}"
+         local DIRNAME="${RVAL}"
+
+         if [ "${OPTION_CD}" = 'YES' ]
+         then
+            cd "${DIRECTORY}" || exit 1
+         else
+            [ -d "${DIRECTORY}" ] || exit 1
+         fi
+
+         r_dirname "${DIRNAME}"
+         DIRNAME="${RVAL}"
+
+         r_basename "${DIRECTORY}"
+         local NAME="$RVAL"
+
+         r_basename "${DIRNAME}"
+         local GITHUB_NAME="${RVAL}/${NAME}"
+
+         NAME="'${NAME}'" \
+         DIRECTORY="'${DIRECTORY}'" \
+         DIRNAME="'${DIRNAME}'" \
+         PROJECT_NAME="'${PROJECT_NAME}'" \
+         SUBPROJECT_NAME="'${SUBPROJECT_NAME}'" \
+         OTHER_NAME="'${OTHER_NAME}'" \
+         TEST_NAME="'${TEST_NAME}'" \
+         GITHUB_NAME="'${GITHUB_NAME}'" \
+         MULLE_PROJECT_ALL="${MULLE_EXECUTABLE_VERSION}" \
+         OLD_MULLE_USER_PWD="${MULLE_USER_PWD}" \
+         MULLE_USER_PWD='' \
+         eval_exekutor "${OPTION_IF}"
+      )
+
+      if [ $? -ne 0 ]
+      then
+         log_info "Skip ${C_RESET_BOLD}$1"
+         return
+      fi
+   fi
+
    local tmpout tmperr
 
    if [ "${OPTION_BUFFERED}" = 'YES' ]
@@ -275,26 +318,6 @@ shell_it()
 
       r_basename "${DIRNAME}"
       GITHUB_NAME="${RVAL}/${NAME}"
-
-      if [ ! -z "${OPTION_IF}" ]
-      then
-         if ! NAME="'${NAME}'" \
-              DIRECTORY="'${DIRECTORY}'" \
-              DIRNAME="'${DIRNAME}'" \
-              PROJECT_NAME="'${PROJECT_NAME}'" \
-              SUBPROJECT_NAME="'${SUBPROJECT_NAME}'" \
-              OTHER_NAME="'${OTHER_NAME}'" \
-              TEST_NAME="'${TEST_NAME}'" \
-              GITHUB_NAME="'${GITHUB_NAME}'" \
-              MULLE_PROJECT_ALL="${MULLE_EXECUTABLE_VERSION}" \
-              OLD_MULLE_USER_PWD="${MULLE_USER_PWD}" \
-              MULLE_USER_PWD='' \
-              eval_exekutor "${OPTION_IF}"
-         then
-            log_info "Skip ${C_RESET_BOLD}$1"
-            return
-         fi
-      fi
 
       if [ -z "${tmpout}" ]
       then

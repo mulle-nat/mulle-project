@@ -1,3 +1,9 @@
+### 4.5.1
+
+
+* mulle-project-all now evaluates --if condition before creating temp files
+* improved performance by skipping unnecessary work for filtered items
+
 ## 4.5.0
 
 Various small improvements

@@ -71,7 +71,7 @@ usage()
 Usage:
    mulle-project-ai-api-toc [flags]
 
-   Create an \`assets/dox/TOC.md\` file that gives an AI a quick overview
+   Create an \`asset/dox/TOC.md\` file that gives an AI a quick overview
    over the API without overloading the context.
 
    A per project prompt is read from
@@ -94,9 +94,9 @@ without overloading their awareness with excessive text length:
 
 # HOWTO: Write a TOC.md
 
-You will write a `assets/dox/TOC.md` file for an individual project.
+You will write a `asset/dox/TOC.md` file for an individual project.
 
-The target audience for the final `assets/dox/TOC.md` is an AI assistant
+The target audience for the final `asset/dox/TOC.md` is an AI assistant
 (yourself).
 The goal is to create a self-contained guide for each library that enables an
 AI to understand its capabilities, API, and intended usage patterns without
@@ -131,7 +131,7 @@ resources in order of priority:
 
 ## `TOC.md` Template
 
-Below is the template to be used for each projects `assets/dox/TOC.md` file.
+Below is the template to be used for each projects `asset/dox/TOC.md` file.
 
 ---
 
@@ -312,7 +312,7 @@ main()
       OPTION_SILENT=
    fi
 
-   r_mkdir_parent_if_missing "assets/dox/TOC.md"
+   r_mkdir_parent_if_missing "asset/dox/TOC.md"
    ai_api_toc
 
    # its easier to get the AI to write the file, then deal with the verbosity
@@ -322,7 +322,7 @@ main()
    # then
    #    fail "No response"
    # fi
-   # redirect_exekutor "assets/dox/TOC.md"  printf "%s\n" "${text}"
+   # redirect_exekutor "asset/dox/TOC.md"  printf "%s\n" "${text}"
 }
 
 main "$@"

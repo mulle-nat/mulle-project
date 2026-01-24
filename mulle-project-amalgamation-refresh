@@ -262,6 +262,8 @@ reamalgamate()
 
 search_local_repos()
 {
+   log_entry "search_local_repos" "$@"
+
    local repos="$1"
 
    include "parallel"
@@ -273,6 +275,8 @@ search_local_repos()
 
 refresh()
 {
+   log_entry "refresh" "$@"
+
    local nodes
    local node
 
@@ -282,7 +286,7 @@ refresh()
                                        --marks Amalgamated \
                                        --output-no-header \
           | grep -E '^src/' \
-          | sed -e 's/^src//' `"
+          | sed -e 's/^src\///' `"
 
    log_debug "nodes: ${nodes}"
    if [ -z "${nodes}" ]

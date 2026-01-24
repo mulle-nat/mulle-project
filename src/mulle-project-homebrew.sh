@@ -367,7 +367,7 @@ project::homebrew::formula_push()
    local tag="$5"
 
    HOMEBREW_TAP_BRANCH="${HOMEBREW_TAP_BRANCH:-${GIT_DEFAULT_BRANCH:-master}}"
-   HOMEBREW_TAP_REMOTE="${HOMEBREW_TAP_REMOTE:-origin}"
+   HOMEBREW_TAP_REMOTE="${HOMEBREW_TAP_REMOTE:-github}"
 
    #
    # this may fail if the formula didn't change (during untag/tag)
