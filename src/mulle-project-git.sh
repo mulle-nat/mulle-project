@@ -252,6 +252,28 @@ project::git::_check_remote()
 }
 
 
+project::git::untag()
+{
+   log_entry "project::git::untag" "$@"
+
+   local tag="$1"
+   local remote
+
+   log_info "Trying to remove local tag \"${tag}\""
+   exekutor git tag -d "$tag"
+
+   # Only remove from origin and github
+   for remote in origin github
+   do
+      if [ -d ".git/refs/remotes/${remote}" ]
+      then
+         log_info "Trying to remove tag \"${tag}\" on remote \"${remote}\""
+         exekutor git push "${remote}" ":${tag}" # failure is OK
+      fi
+   done
+}
+
+
 project::git::untag_all()
 {
    log_entry "project::git::untag_all" "$@"
@@ -478,7 +500,7 @@ project::git::_commit_main()
    if [ ! -z "${latesttag}" ]
    then
       log_info "Untag \"${dstbranch}\" with \"${latesttag}\""
-      project::git::untag_all "${latesttag}"
+      project::git::untag "${latesttag}"
 
       log_info "Tag \"${dstbranch}\" with \"${latesttag}\""
       exekutor git tag "${latesttag}"         || ${return_or_continue_if_dry_run} 1
@@ -530,12 +552,18 @@ project::git::verify_main()
 project::git::assert_not_on_release_branch()
 {
    local branch
+   local default_branch
 
    branch="`exekutor git rev-parse --abbrev-ref HEAD`"
    branch="${branch:-${GIT_DEFAULT_BRANCH:-develop}}" # for dry run
-   if [ "${branch}" = "master" ]
+   
+   # Get configured default branch, fallback to "master"
+   default_branch="$(git config --get init.defaultBranch 2>/dev/null)"
+   default_branch="${default_branch:-master}"
+   
+   if [ "${branch}" = "${default_branch}" ]
    then
-      fail "Don't call it from master branch"
+      fail "Don't call it from ${default_branch} branch"
    fi
 }
 
@@ -614,23 +642,29 @@ project::git::main()
    log_entry "project::git::main" "$@"
 
    local branch
-   local rval
+   local rc
+   local default_branch
 
    branch="`exekutor git rev-parse --abbrev-ref HEAD`"
    branch="${branch:-${GIT_DEFAULT_BRANCH:-develop}}" # for dry run
-   if [ "${branch}" = "master" ]
+   
+   # Get configured default branch, fallback to "master"
+   default_branch="$(git config --get init.defaultBranch 2>/dev/null)"
+   default_branch="${default_branch:-master}"
+   
+   if [ "${branch}" = "${default_branch}" ]
    then
-      fail "Don't call it from master branch"
+      fail "Don't call it from ${default_branch} branch"
    fi
 
    project::git::_commit_main "${branch}" "$@"
-   rval=$?
+   rc=$?
 
    # not sure why I didn't do this always before
    log_verbose "Checkout \"${branch}\" again"
    exekutor git checkout "${branch}"
 
-   return $rval
+   return $rc
 }
 
 :

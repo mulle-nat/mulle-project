@@ -921,11 +921,11 @@ main()
       fi
    else
       local result
-      local rval
+      local rc
 
       result="`merged_releasenotes "${markers}" "${notes}" "${VERSION}"`"
-      rval=$?
-      case $rval in
+      rc=$?
+      case $rc in
          0)
          ;;
 

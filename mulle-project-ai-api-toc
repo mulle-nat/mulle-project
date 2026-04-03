@@ -126,6 +126,20 @@ resources in order of priority:
 *   **Audience:** Write for an AI. Be precise, explicit, and structured.
 *   **Scope:** Focus only on the specific project. Do not describe other dependency projects.
 *   **Detail:** Describe the main API and mention each public symbol with a very short description of what it does.
+*   **Keywords:** It's crucial that this is the below the title. Each keyword should be single word.  The number of keywords should not exceed seven.
+
+<!-- Keywords: keyword1, keyword2 --> comment that provides quick context about what the library does.
+
+The keywords are designed to be:
+- **Short and helpful** - typically 4-7 keywords per library
+- **Descriptive** - capturing the core purpose of each library
+- **Useful for quick scanning** - helping you quickly understand what each library provides
+
+For example:
+- Low-level C libraries focus on their technical domain (memory, threads, unicode, etc.)
+- Concurrent libraries emphasize "lock-free" as a key characteristic
+- Foundation libraries highlight their Objective-C nature and specific functionality
+- Amalgamation libraries are marked as such to distinguish them from component libraries
 
 ---
 
@@ -136,7 +150,7 @@ Below is the template to be used for each projects `asset/dox/TOC.md` file.
 ---
 
 # [Subproject Name] Library Documentation for AI
-
+<!-- Keywords: keyword1, keyword2, keyword3, keyword4, keyword5 -->
 ## 1. Introduction & Purpose
 
 - A concise paragraph summarizing the primary function.

@@ -192,9 +192,9 @@ check_repo()
    local done_branches 
 
    (
-      local rval
+      local rc
 
-      rval=0
+      rc=0
       while :
       do
          if ! read -r branch 
@@ -239,16 +239,16 @@ check_repo()
 
             '')
                log_warning "Workflows for ${C_MAGENTA}${C_BOLD}${branch}${C_WARNING} failed"
-               rval=2
+               rc=2
             ;;
 
             *)
                log_warning "Workflows of ${C_MAGENTA}${C_BOLD}${branch}${C_WARNING} failed with \"${conclusion}\""
-               rval=2
+               rc=2
             ;;
          esac
       done 
-      exit $rval
+      exit $rc
    ) <<< "${filtered}" 
    return $?
 }

@@ -48,31 +48,25 @@ usage()
    [ "$#" -ne 0 ] && log_error "$1"
 
    cat <<EOF >&2
-Usage: mulle-project-version [options] [projectname]
+Usage: mulle-project-version <command> [options] [projectname]
 
-   Get or increment the project version. The version must be readable from
-   a variable or constant in  either of two formats:
+   Manage project version information.
 
-   \`major.minor.patch\` or \`((major << 20) | (minor << 8) | patch)\`, where
-   other shift integer values are possible.
+Commands:
+   get                   : show current version (default)
+   set <version>         : set version (use --write to persist)
+   try <version>         : preview version change without writing
+   init                  : create version-info.sh configuration
+   add <file>            : add version mirror file
+   remove <file>         : remove version mirror file
+   list                  : show current configuration
+   status                : check if version needs a bump
+   diff                  : output version jump type (none, patch, minor, major)
 
-   Major : incompatible API changes
-   Minor : API additions
-   Patch : Fixes
-
-   Examples:
-      static int   version = ((1 << 16) | (2 << 5) | 3)
-      VERSION="1.2.3"
-      #define VERSION   "1.2.3"
-
-   For special purposed like mulle-gdb you can have an additional custom
-   part makeing the version look like this "1.2.3.4"
-
-Options:
+Get/Set Options:
    ++                    : shorthand for --increment-patch --write
    --add-patch <value>   : add value to patch version part, needs --write
    --custom-versioning   : use custom versioning (four numbers)
-   --diff                : output version jump type (none, patch, minor, major)
    --first-patch-one     : set patch to 1 for minor/major increments
    --first-patch-zero    : set patch to 0 for minor/major increments
    --increment-major     : add 1 to major versionpart, needs --write
@@ -88,12 +82,13 @@ Options:
    --releasenotes        : read RELEASENOTES.md version
    --no-releasenotes     : ignore RELEASENOTES.md version
    --read-xcode-version  : read version from Xcode project
-   --set <value>         : set version, needs --write to persist change
-   --status              : prints. if project version needs a bump. Preempts.
-   --versionname <name>  : version variable name
    --write               : update versionfile with new version
    --write-xcode-version : write version to Xcode project
    --xcodeproj <dir>     : specify path of .xcodeproj directory
+
+Init Options:
+   --file <path>         : version file path
+   --name <varname>      : version variable name
 
 Environment:
    VERSIONFILE           : File to look for master version number
@@ -168,7 +163,8 @@ get_version()
          VERSIONFILE="`project::version::get_header_from_project "${PROJECT_NAME}" "${LANGUAGE}"`"
       fi
 
-      if [ -z "${VERSIONNAME}" ]
+      # Don't auto-generate VERSIONNAME for CMakeLists.txt
+      if [ -z "${VERSIONNAME}" -a "${VERSIONFILE}" != "CMakeLists.txt" ]
       then
          include "case"
 
@@ -196,7 +192,17 @@ get_version()
             VERSIONNAME=""
          fi
       else
-         VERSION="`project::version::get_project_version "${VERSIONFILE}" "${VERSIONNAME}" "${VERSIONCUSTOM}"`"
+         # Special handling for CMakeLists.txt with empty VERSIONNAME
+         if [ "${VERSIONFILE}" = "CMakeLists.txt" -a -z "${VERSIONNAME}" ]
+         then
+            VERSION="`rexekutor grep -A10 "^project" "${VERSIONFILE}" \
+                      | grep -E "project|VERSION"        \
+                      | sed -n 's/.*VERSION[[:space:]]*"\([0-9]\+\.[0-9]\+\.[0-9]\+\)".*/\1/p' \
+                      | head -n1`"
+         else
+            VERSION="`project::version::get_project_version "${VERSIONFILE}" "${VERSIONNAME}" "${VERSIONCUSTOM}"`"
+         fi
+         
          if [ -z "${VERSION}" ]
          then
             VERSION="`project::version::get_project_version "src/version.h" "${VERSIONNAME}" "${VERSIONCUSTOM}"`"
@@ -204,6 +210,16 @@ get_version()
             then
                VERSIONFILE="src/version.h"
             fi
+         fi
+      fi
+
+      if [ -z "${VERSION}" -a -f "package.json" ]
+      then
+         VERSION="`grep -E '"version"[[:space:]]*:' "package.json" | sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\)".*/\1/p' | head -1`"
+         if [ ! -z "${VERSION}" ]
+         then
+            VERSIONFILE="package.json"
+            VERSIONNAME="version"
          fi
       fi
    else
@@ -499,7 +515,7 @@ emit_patched_cmakelists_txt()
          then
             case "$line" in
                *VERSION*)
-                  line=$(sed -E "s/(VERSION[[:space:]]*)[0-9]+\.[0-9]+\.[0-9]+/\1$version/" <<< "${line}")
+                  line=$(sed -E "s/(VERSION[[:space:]]*\"?)[0-9]+\.[0-9]+\.[0-9]+(\"?)/\1$version\2/" <<< "${line}")
                   found=1
                ;;
             esac
@@ -543,11 +559,15 @@ write_version()
 
       if [ ! -z "${VERSIONFILE}" ]
       then
-         # set mirrors first before "real", which is nicer in case of fails
-         project::version::set "${VERSION}" \
-                               "${VERSIONFILE}" \
-                               "${VERSIONNAME}" \
-                               "${VERSIONCUSTOM}" || exit 1
+         # Skip project::version::set for CMakeLists.txt with empty VERSIONNAME
+         # It will be handled by emit_patched_cmakelists_txt
+         if [ "${VERSIONFILE}" != "CMakeLists.txt" -o ! -z "${VERSIONNAME}" ]
+         then
+            project::version::set "${VERSION}" \
+                                  "${VERSIONFILE}" \
+                                  "${VERSIONNAME}" \
+                                  "${VERSIONCUSTOM}" || exit 1
+         fi
       fi
    fi
 
@@ -673,6 +693,170 @@ diff_version()
 }
 
 
+cmd_init()
+{
+   log_entry "cmd_init" "$@"
+
+   local versionfile="$1"
+   local versionname="$2"
+
+   local infofile=".mulle/etc/project/version-info.sh"
+
+   if [ -f "${infofile}" ]
+   then
+      fail "Version info file already exists: ${infofile}"
+   fi
+
+   mkdir -p ".mulle/etc/project" || fail "Failed to create .mulle/etc/project"
+
+   cat > "${infofile}" <<EOF
+# -- Version Info --
+#
+# Keep these commented out, if the automatic detection works well
+# enough for you.
+#
+
+EOF
+
+   if [ ! -z "${versionfile}" ]
+   then
+      echo "VERSIONFILE=\"${versionfile}\"" >> "${infofile}"
+   else
+      echo "# VERSIONFILE=\"src/version.h\"" >> "${infofile}"
+   fi
+
+   if [ ! -z "${versionname}" ]
+   then
+      echo "VERSIONNAME=\"${versionname}\"" >> "${infofile}"
+   else
+      echo "# VERSIONNAME=\"VERSION\"" >> "${infofile}"
+   fi
+
+   cat >> "${infofile}" <<EOF
+
+#
+# Other files that get the version written into. Write only. Linefeed separated.
+#
+# VERSIONMIRRORNAME=version
+# VERSIONFILEMIRRORS="
+#src/version.txt"
+EOF
+
+   log_info "Created ${infofile}"
+}
+
+
+cmd_add()
+{
+   log_entry "cmd_add" "$@"
+
+   local mirrorfile="$1"
+   local infofile=".mulle/etc/project/version-info.sh"
+
+   [ -z "${mirrorfile}" ] && fail "No mirror file specified"
+   [ ! -f "${infofile}" ] && fail "Version info file not found. Run 'init' first."
+
+   if grep -q "^VERSIONFILEMIRRORS=" "${infofile}"
+   then
+      # Check if already exists
+      if grep -A100 "^VERSIONFILEMIRRORS=" "${infofile}" | grep -q "^${mirrorfile}\""
+      then
+         log_warning "Mirror file already exists: ${mirrorfile}"
+         return 0
+      fi
+      
+      # Add before the closing quote
+      local tmpfile
+      local text
+      
+      r_make_tmp_file "version-info"
+      tmpfile="${RVAL}"
+      
+      text="$(awk -v mirror="${mirrorfile}" '
+         /^VERSIONFILEMIRRORS=/ { 
+            print
+            in_mirrors=1
+            next
+         }
+         in_mirrors && /"$/ { 
+            print mirror
+            in_mirrors=0
+         }
+         { print }
+      ' "${infofile}")"
+      
+      redirect_exekutor "${tmpfile}" printf "%s\n" "${text}"
+      exekutor mv "${tmpfile}" "${infofile}"
+   else
+      # Create new VERSIONFILEMIRRORS entry
+      redirect_append_exekutor "${infofile}" echo ""
+      redirect_append_exekutor "${infofile}" echo "VERSIONFILEMIRRORS=\""
+      redirect_append_exekutor "${infofile}" echo "${mirrorfile}\""
+   fi
+
+   log_info "Added mirror file: ${mirrorfile}"
+}
+
+
+cmd_remove()
+{
+   log_entry "cmd_remove" "$@"
+
+   local mirrorfile="$1"
+   local infofile=".mulle/etc/project/version-info.sh"
+
+   [ -z "${mirrorfile}" ] && fail "No mirror file specified"
+   [ ! -f "${infofile}" ] && fail "Version info file not found"
+
+   if ! grep -q "^VERSIONFILEMIRRORS=" "${infofile}"
+   then
+      log_warning "No mirror files configured"
+      return 0
+   fi
+
+   # Use awk to remove the mirror line
+   local tmpfile
+   local text
+   
+   r_make_tmp_file "version-info"
+   tmpfile="${RVAL}"
+   
+   text="$(awk -v mirror="${mirrorfile}" '
+      $0 == mirror { next }
+      { print }
+   ' "${infofile}")"
+   
+   redirect_exekutor "${tmpfile}" printf "%s\n" "${text}"
+   exekutor mv "${tmpfile}" "${infofile}"
+   
+   # If VERSIONFILEMIRRORS is now empty (ends with just "), remove it
+   if grep -A1 '^VERSIONFILEMIRRORS="$' "${infofile}" | tail -1 | grep -q '^"$'
+   then
+      inplace_sed '/^VERSIONFILEMIRRORS="$/,/^"$/d' "${infofile}"
+   fi
+   
+   log_info "Removed mirror file: ${mirrorfile}"
+}
+
+
+cmd_list()
+{
+   log_entry "cmd_list" "$@"
+
+   local infofile=".mulle/etc/project/version-info.sh"
+
+   if [ ! -f "${infofile}" ]
+   then
+      log_info "No version-info.sh found (using auto-detection)"
+      return 0
+   fi
+
+   log_info "Configuration from ${infofile}:"
+   echo ""
+   exekutor cat "${infofile}"
+}
+
+
 main()
 {
    local OPTION_ADD_MAJOR="0"
@@ -697,7 +881,10 @@ main()
    local OPTION_IF_NEEDED
    local OPTION_RELEASENOTES
    local OPTION_DIFF
+   local OPTION_STATUS
+   local OPTION_VERSION_SET
 
+   local COMMAND=""
    local directory
 
    if [ -f ".mulle/etc/project/.first_patch" ]
@@ -705,12 +892,7 @@ main()
       OPTION_FIRST_PATCH="`cat ".mulle/etc/project/.first_patch"`"
    fi
 
-   # clobber some environment variables...
-   LANGUAGE=
-
-#   options_technical_flags "-ls"
-#   options_technical_flags "-ld"
-
+   # Parse technical flags and options FIRST
    while [ $# -ne 0 ]
    do
       if options_technical_flags "$1"
@@ -758,10 +940,6 @@ main()
             OPTION_CUSTOM_VERSIONING='YES'
          ;;
 
-         --diff)
-            OPTION_DIFF='YES'
-         ;;
-
          --no-tag-warning)
             OPTION_TAG_WARNING='NO'
          ;;
@@ -800,13 +978,6 @@ main()
             OPTION_FIRST_PATCH="0"
          ;;
 
-         --set|--set-version)
-            [ $# -eq 1 ] && fail "missing argument to $1"
-            shift
-
-            OPTION_VERSION_SET="$1"
-         ;;
-
          --first-patch-one)
             OPTION_FIRST_PATCH="1"
          ;;
@@ -827,10 +998,6 @@ main()
             shift
 
             OPTION_ADD_CUSTOM="$1"
-         ;;
-
-         --status)
-            OPTION_STATUS='YES'
          ;;
 
          --write)
@@ -874,16 +1041,16 @@ main()
             LANGUAGE="$1"
          ;;
 
-         --versionname)
-            [ $# -eq 1 ] && fail "missing argument to $1"
-            shift
-            OPTION_VERSIONNAME="$1"
-         ;;
-
-         --versionfile)
+         --file|--versionfile)
             [ $# -eq 1 ] && fail "missing argument to $1"
             shift
             OPTION_VERSIONFILE="$1"
+         ;;
+
+         --name|--versionname)
+            [ $# -eq 1 ] && fail "missing argument to $1"
+            shift
+            OPTION_VERSIONNAME="$1"
          ;;
 
          --reset) # stupid option for verify must be last in command line
@@ -911,6 +1078,92 @@ main()
    done
 
    options_setup_trace "${MULLE_TRACE}" && set -x
+
+   # Now parse command
+   if [ $# -gt 0 ]
+   then
+      case "$1" in
+         get|set|try|init|add|remove|list|status|diff)
+            COMMAND="$1"
+            shift
+         ;;
+      esac
+   fi
+
+   # For backward compatibility, default to get
+   [ -z "${COMMAND}" ] && COMMAND="get"
+
+   # Handle subcommands that don't need project setup
+   case "${COMMAND}" in
+      init)
+         local init_file=""
+         local init_name=""
+         
+         while [ $# -ne 0 ]
+         do
+            case "$1" in
+               --file)
+                  [ $# -eq 1 ] && fail "missing argument to $1"
+                  shift
+                  init_file="$1"
+               ;;
+               --name)
+                  [ $# -eq 1 ] && fail "missing argument to $1"
+                  shift
+                  init_name="$1"
+               ;;
+               *)
+                  usage "Unknown option $1 for init"
+               ;;
+            esac
+            shift
+         done
+         
+         cmd_init "${init_file}" "${init_name}"
+         return $?
+      ;;
+
+      add)
+         [ $# -eq 0 ] && usage "add requires a file argument"
+         cmd_add "$1"
+         return $?
+      ;;
+
+      remove)
+         [ $# -eq 0 ] && usage "remove requires a file argument"
+         cmd_remove "$1"
+         return $?
+      ;;
+
+      list)
+         cmd_list
+         return $?
+      ;;
+   esac
+
+   # Handle set/try commands - extract version argument
+   case "${COMMAND}" in
+      set|try)
+         [ $# -eq 0 ] && usage "${COMMAND} requires a version argument"
+         OPTION_VERSION_SET="$1"
+         shift
+         
+         if [ "${COMMAND}" = "set" ]
+         then
+            OPTION_WRITE='YES'
+         else
+            OPTION_WRITE='NO'
+         fi
+      ;;
+      
+      status)
+         OPTION_STATUS='YES'
+      ;;
+      
+      diff)
+         OPTION_DIFF='YES'
+      ;;
+   esac
 
 
    local PROJECT_NAME
@@ -969,6 +1222,12 @@ main()
    VERSIONCUSTOM="${OPTION_CUSTOM_VERSIONING:-${VERSIONCUSTOM}}"
    VERSIONXCODEPROJ="${OPTION_XCODEPROJ:-${VERSIONXCODEPROJ}}"
 
+   # Handle NONE sentinel for CMakeLists.txt (convert before get_version)
+   if [ "${VERSIONNAME}" = "NONE" ]
+   then
+      VERSIONNAME=""
+   fi
+
    if [ "${OPTION_WRITE}" = "${DEFAULT}" ]
    then
       OPTION_WRITE="NO"
@@ -1026,8 +1285,8 @@ main()
 
    if [ ! -z "${OPTION_VERSION_SET}" ]
    then
-      VERSION="${OPTION_VERSION_SET}"
       OLDVERSION="${VERSION}"
+      VERSION="${OPTION_VERSION_SET}"
    else
       OLDVERSION="${VERSION}"
       edit_version

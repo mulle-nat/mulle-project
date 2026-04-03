@@ -537,6 +537,7 @@ main()
    then
       exit 1
    fi
+   demos="`sort <<< "${demos}"`"
 
    local src 
    local exe
@@ -644,6 +645,8 @@ main()
 
          local EXECUTABLE="${exe_path}"
          local MULLE_VIRTUAL_ROOT="${MULLE_VIRTUAL_ROOT:-$PWD}"
+         local MULLE_VIRTUAL_ROOT_ID="$(shasum -a 256 <<< "${MULLE_VIRTUAL_ROOT}")"
+         MULLE_VIRTUAL_ROOT_ID="${MULLE_VIRTUAL_ROOT_ID:1:12}"
 
          commandline="`mulle-sde env get MULLE_SDE_RUN`"
 

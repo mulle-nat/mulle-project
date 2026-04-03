@@ -153,7 +153,7 @@ __environment_main()
       [ ! -z "${VERSIONNAME}" ] && version_options="${version_options} --versionname \"${VERSIONNAME}\""
       [ ! -z "${VERSIONFILE}" ] && version_options="${version_options} --versionfile \"${VERSIONFILE}\""
 
-      VERSION="`eval mulle-project-version ${version_options} "${PROJECT}"`" || exit 1
+      VERSION="`eval mulle-project-version ${version_options} get \"${PROJECT}\"`" || exit 1
    fi
 
 
@@ -351,8 +351,13 @@ __environment_main()
    # git remote to push to, usually github, can be empty
    GITHUB="${GITHUB:-github}"
 
-   # git branch to master to, source is always current
-   BRANCH="${BRANCH:-master}"
+   # git branch to push to, source is always current
+   # Use configured default branch, fallback to "master"
+   if [ -z "${BRANCH}" ]
+   then
+      BRANCH="$(git config --get init.defaultBranch 2>/dev/null)"
+      BRANCH="${BRANCH:-master}"
+   fi
 
 
    # --- HOMEBREW TAP ---

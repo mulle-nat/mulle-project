@@ -79,7 +79,14 @@ new_repo::change_default_branch()
    local repo="$2"
    local remote="$3"
    local branch="$4"
-   local master="${5:-master}"
+   local master="${5}"
+   
+   # If master not provided, try to detect from git config or use "master"
+   if [ -z "${master}" ]
+   then
+      master="$(git config --get init.defaultBranch 2>/dev/null)"
+      master="${master:-master}"
+   fi
 
    if ! exekutor git pull --no-edit --allow-unrelated-histories "${remote}" "${master}"
    then
@@ -202,8 +209,7 @@ new_repo::codeberg()
       new_repo::change_default_branch "${user}" \
                                       "${repo}" \
                                       "${remote}" \
-                                      "${branch}" \
-                                      "master"
+                                      "${branch}"
    fi
    # don't push
 }
@@ -263,8 +269,7 @@ new_repo::github()
       new_repo::change_default_branch "${user}" \
                                       "${repo}" \
                                       "${remote}" \
-                                      "${branch}" \
-                                      "master"
+                                      "${branch}"
    fi
    # don't push
 }
@@ -375,6 +380,17 @@ new_repo::main()
    local OPTION_INIT='YES'
    local OPTION_BRANCH='master'
    local OPTION_PUSH='NO'
+
+   # If we're in a git repo, use the configured default branch
+   if [ -d .git ]
+   then
+      local default_branch
+      default_branch="$(git config --get init.defaultBranch 2>/dev/null)"
+      if [ ! -z "${default_branch}" ]
+      then
+         OPTION_BRANCH="${default_branch}"
+      fi
+   fi
 
    local name
 

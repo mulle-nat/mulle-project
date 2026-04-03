@@ -71,7 +71,7 @@ project::sourcetree_parser::is_matching_wildcards()
    [ -z "${match_strings}" ] && return 0
 
    local match
-   local rval
+   local rc
 
    shell_disable_glob ; IFS=$':'
    for match in ${match_strings}
@@ -79,16 +79,16 @@ project::sourcetree_parser::is_matching_wildcards()
       # need noglob here for match
       shell_disable_glob ; IFS="${DEFAULT_IFS}"
 
-      rval=0
+      rc=0
       if [ "${match:0:1}" = '!' ]
       then
          match="${match:1}"
-         rval=1
+         rc=1
       fi
 
       case "${string}" in
          ${match})
-            return $rval
+            return $rc
          ;;
       esac
    done

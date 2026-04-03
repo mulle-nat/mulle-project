@@ -186,7 +186,7 @@ resolve_symlinks::main()
             resolve_symlinks::usage
          ;;
 
-         -r|--recursive)
+         -r|--recursive|--recurse)
 #            [ $# -eq 1 ] && match_list_usage "missing argument to $1"
 #            shift
 

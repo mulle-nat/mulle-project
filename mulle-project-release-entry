@@ -108,8 +108,9 @@ emit_line()
       ;;
    esac
 
-   # hardcoded for now
-   branch="master"
+   # Get configured default branch, fallback to "master"
+   branch="$(git config --get init.defaultBranch 2>/dev/null)"
+   branch="${branch:-master}"
 
    echo "| ${marker}[${repo}](//github.com/${user}/${repo}/blob/${branch}/RELEASENOTES.md)${marker} | ${marker}${version}${marker} | ${tag:--} |"
 }

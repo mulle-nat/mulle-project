@@ -54,9 +54,13 @@ usage()
 
    cat <<EOF >&2
 Usage:
-   mulle-project-untag <tag>
+   mulle-project-untag [options] <tag>
 
-   Remove <tag> from local clone and all remotes.
+   Remove <tag> from local clone and specified remotes (default: origin, github).
+
+Options:
+   --all-remotes    : remove tag from all remotes (not just origin and github)
+   -f, --force      : continue even if local tag removal fails
 EOF
    exit 1
 }
@@ -66,6 +70,7 @@ main()
 {
    local ORIGIN="origin"
    local OPTION_FORCE='NO'
+   local OPTION_ALL_REMOTES='NO'
 
    while [ $# -ne 0 ]
    do
@@ -80,18 +85,22 @@ main()
             usage
          ;;
 
-         -f)
+         -f|--force)
             OPTION_FORCE='YES'
+         ;;
+
+         --all-remotes)
+            OPTION_ALL_REMOTES='YES'
+         ;;
+
+         -*)
+            usage "Unknown option $1"
          ;;
 
          --origin)
             [ $# -eq 1 ] && usage "Missing argument to \"$1\""
             shift
             ORIGIN="$1"
-         ;;
-
-         -*)
-            usage "Unknown option \"$1\""
          ;;
 
          *)
@@ -124,13 +133,27 @@ main()
    local i
    local remote
 
-   for i in .git/refs/remotes/*
-   do
-      r_basename "${i}"
-      remote="${RVAL}"
-      log_info "Trying to remove tag \"${TAG}\" on remote \"${remote}\""
-      exekutor git push "${remote}" ":${TAG}" # failure is OK
-   done
+   if [ "${OPTION_ALL_REMOTES}" = 'YES' ]
+   then
+      # Remove from all remotes
+      for i in .git/refs/remotes/*
+      do
+         r_basename "${i}"
+         remote="${RVAL}"
+         log_info "Trying to remove tag \"${TAG}\" on remote \"${remote}\""
+         exekutor git push "${remote}" ":${TAG}" # failure is OK
+      done
+   else
+      # Only remove from origin and github
+      for remote in origin github
+      do
+         if [ -d ".git/refs/remotes/${remote}" ]
+         then
+            log_info "Trying to remove tag \"${TAG}\" on remote \"${remote}\""
+            exekutor git push "${remote}" ":${TAG}" # failure is OK
+         fi
+      done
+   fi
 
    return 0
 }

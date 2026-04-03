@@ -266,11 +266,11 @@ main()
    #
    # Go to develop, we only push from develop (for now)
    #
-   local rval
+   local rc
 
    exekutor git checkout -q develop
-   rval=$?
-   if [ $rval -ne 0 ]
+   rc=$?
+   if [ $rc -ne 0 ]
    then
       fail "Could not checkout develop"
    fi
@@ -291,10 +291,10 @@ main()
       fi
 
       exekutor git add -u
-      rval=$?
-      if [ $rval -ne 0 ]
+      rc=$?
+      if [ $rc -ne 0 ]
       then
-         fail "git add -u failed ($rval)"
+         fail "git add -u failed ($rc)"
       fi
 
       local commit_options
@@ -315,10 +315,10 @@ main()
       .done
 
       exekutor "$@"      
-      rval=$?
-      if [ $rval -ne 0 ]
+      rc=$?
+      if [ $rc -ne 0 ]
       then
-         fail "Sloppy commit failed ($rval)"
+         fail "Sloppy commit failed ($rc)"
       fi
 
       if ! project::git::is_clean
@@ -397,14 +397,14 @@ main()
    #
    local have_github
    local have_origin
-   local rval
+   local rc
 
    if [ ! -z "${GITHUB}" ]
    then
       project::git::_check_remote "${GITHUB}"
-      rval=$?
+      rc=$?
 
-      case $rval in
+      case $rc in
          0|2)
             have_github='YES'
          ;;
@@ -418,9 +418,9 @@ main()
    if [ ! -z "${ORIGIN}" ]
    then
       project::git::_check_remote "${ORIGIN}"
-      rval=$?
+      rc=$?
 
-      case $rval in
+      case $rc in
          0|2)
             have_origin='YES'
          ;;
@@ -440,7 +440,7 @@ main()
    #
    # Update prerelease branch from develop
    #
-   local rval
+   local rc
 
    if [ "${justpush}" != 'YES' ]
    then
@@ -449,18 +449,18 @@ main()
          if [ "${doesexist}" = 'YES' ]
          then
             exekutor git branch -q -D "${BRANCH}"
-            rval=$?
-            if [ $rval -ne 0 ]
+            rc=$?
+            if [ $rc -ne 0 ]
             then
-               fail "\"${BRANCH}\" branch deletion failed ($rval)"
+               fail "\"${BRANCH}\" branch deletion failed ($rc)"
             fi
          fi
 
          exekutor git checkout -q -b "${BRANCH}"
-         rval=$?
-         if [ $rval -ne 0 ]
+         rc=$?
+         if [ $rc -ne 0 ]
          then
-            fail "\"${BRANCH}\" branch creation failed ($rval)"
+            fail "\"${BRANCH}\" branch creation failed ($rc)"
          fi
       else
          local checkoutflags
@@ -471,26 +471,26 @@ main()
          fi
 
          exekutor git checkout -q ${checkoutflags} "${BRANCH}"
-         rval=$?
-         if [ $rval -ne 0 ]
+         rc=$?
+         if [ $rc -ne 0 ]
          then
-            fail "\"${BRANCH}\" checkout failed ($rval)"
+            fail "\"${BRANCH}\" checkout failed ($rc)"
          fi
 
          exekutor git rebase develop
-         rval=$?
-         if [ $rval -ne 0 ]
+         rc=$?
+         if [ $rc -ne 0 ]
          then
-            fail "\"${BRANCH}\" rebase to \"develop\" failed ($rval)"
+            fail "\"${BRANCH}\" rebase to \"develop\" failed ($rc)"
             return 1
          fi
       fi
    else
       exekutor git checkout -q "${BRANCH}"
-      rval=$?
-      if [ $rval -ne 0 ]
+      rc=$?
+      if [ $rc -ne 0 ]
       then
-         fail "\"${BRANCH}\" checkout failed ($rval)"
+         fail "\"${BRANCH}\" checkout failed ($rc)"
       fi
    fi
 
@@ -511,19 +511,19 @@ main()
       then
          log_info "Pushing to \"${ORIGIN}/${BRANCH}\""
          exekutor git push ${pushflags} "${ORIGIN}" "${BRANCH}"
-         rval=$?
-         if [ $rval -ne 0 ]
+         rc=$?
+         if [ $rc -ne 0 ]
          then
-            return $rval
+            return $rc
          fi
       
 		   if [ ! -z "${OPTION_TAG}" ]
 		   then
          	exekutor git push -f "${ORIGIN}" "${OPTION_TAG}"
-	         rval=$?
-	         if [ $rval -ne 0 ]
+	         rc=$?
+	         if [ $rc -ne 0 ]
 	         then
-	            return $rval
+	            return $rc
 	         fi
 	      fi
       else
@@ -537,19 +537,19 @@ main()
       then
          log_info "Pushing to \"${GITHUB}/${BRANCH}\""
          exekutor git push ${pushflags} "${GITHUB}" "${BRANCH}"
-         rval=$?
-         if [ $rval -ne 0 ]
+         rc=$?
+         if [ $rc -ne 0 ]
          then
-            return $rval
+            return $rc
          fi
 
 		   if [ ! -z "${OPTION_TAG}" ]
 		   then
          	exekutor git push -f "${GITHUB}" "${OPTION_TAG}"
-	         rval=$?
-	         if [ $rval -ne 0 ]
+	         rc=$?
+	         if [ $rc -ne 0 ]
 	         then
-	            return $rval
+	            return $rc
 	         fi
 	      fi
       else
@@ -558,8 +558,8 @@ main()
    fi
 
    exekutor git checkout -q develop
-   rval=$?
-   if [ $rval -ne 0 ]
+   rc=$?
+   if [ $rc -ne 0 ]
    then
       fail "Could not checkout develop"
    fi

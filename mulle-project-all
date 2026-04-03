@@ -429,16 +429,15 @@ shell_it()
          esac
       done
 
+      # printf with an array does funny things
+
+      printf -v cmd '%q ' "$@"
       if [ "${OPTION_EXEC}" = 'YES' ]
       then
-         printf -v cmd '%q ' "$@"
-
-         # printf with an array does funny things
-
          set -- "${cmd}"
          log_debug "exec command: $*"
       else
-         set -- eval "$@"
+         set -- eval "${cmd}"
          log_debug "eval command: $*"
       fi
 
@@ -1189,6 +1188,11 @@ main()
       fi
 
       set -- "${BASH:-sh}" -c "${cmd_content}"
+   fi
+
+   if [ "${OPTION_LENIENT}" = 'NO' -a "${OPTION_PARALLEL}" = 'YES' ]
+   then
+      fail "Option --strict does not work with --parallel"
    fi
 
    if [ ! -z "${OPTION_SKIP_PAST}" -a ! -z "${OPTION_START_WITH}" ]

@@ -102,9 +102,15 @@ check_git_repository()
 
 check_required_branches()
 {
-   if ! project::git::branch_exists "master"
+   local default_branch
+   
+   # Get configured default branch, fallback to "master"
+   default_branch="$(git config --get init.defaultBranch 2>/dev/null)"
+   default_branch="${default_branch:-master}"
+   
+   if ! project::git::branch_exists "${default_branch}"
    then
-      fail "Missing 'master' branch"
+      fail "Missing '${default_branch}' branch"
    fi
    
    if ! project::git::branch_exists "develop"
@@ -112,7 +118,7 @@ check_required_branches()
       fail "Missing 'develop' branch"
    fi
    
-   log_verbose "Required branches (master, develop) found"
+   log_verbose "Required branches (${default_branch}, develop) found"
 }
 
 

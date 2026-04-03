@@ -52,6 +52,7 @@ MULLE_EXECUTABLE_VERSION="0.0.0"
 
 print_flags()
 {
+   echo "   -f           : force commit only staged files"
    echo "   -b, --batch  : commit automatically without user approval (non-interactive)"
    echo "   -u, --update : run 'git add -u' before generating commit message"
    echo "   --no-commit  : show generated commit message but don't commit"
@@ -333,6 +334,7 @@ main()
    local OPTION_INTERACTIVE='YES'
    local OPTION_ADD_UPDATED='NO'
    local OPTION_AMEND='NO'
+   local MULLE_FLAG_MAGNUM_FORCE='NO'
 
    while [ $# -ne 0 ]
    do
@@ -345,6 +347,10 @@ main()
       case "$1" in
          -h*|--help|help)
             usage
+         ;;
+
+         -f)
+            MULLE_FLAG_MAGNUM_FORCE='YES'
          ;;
 
          --version)
@@ -431,7 +437,7 @@ main()
       fail "No staged changes. Use 'git add' first or use -u to add updated files."
    fi
 
-   if [ -n "$(git diff --name-only)" ]
+   if [ "${MULLE_FLAG_MAGNUM_FORCE}" != 'YES' -a -n "$(git diff --name-only)" ]
    then
       fail "You have unstaged changes. Stage them with 'git add' or use -u to add updated files, or commit them separately first."
    fi

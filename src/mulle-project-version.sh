@@ -88,9 +88,7 @@ project::version::get_project_version()
       return 1
    fi
 
-   match="`grep -F -s -w "${versionname}" "${filename}" | head -2`"
-   # get rid of an ifdef
-   match="`grep -E -v '^#if' <<< "${match}" | head -1`"
+   match="`grep -F -s -w "${versionname}" "${filename}" | grep -E -v '^#' | head -1`"
 
    if [ -z "${match}" ]
    then
@@ -484,9 +482,48 @@ ${C_INFO}Use either 1.2.3[.4] or ((1 << 20) | (2 << 8) | 3)"
    esac
 
    # Check for separate version component variables
-   local major_name="${versionname}_MAJOR"
-   local minor_name="${versionname}_MINOR"
-   local patch_name="${versionname}_PATCH"
+   # Determine case style from versionname
+   local major_suffix minor_suffix patch_suffix
+   
+   if [ ! -z "${versionname}" ]
+   then
+      local first_char="${versionname:0:1}"
+      local second_char="${versionname:1:1}"
+      
+      # Check case of first two characters
+      if [ "${first_char}" = "${first_char,,}" ] && [ "${second_char}" = "${second_char,,}" ]
+      then
+         # Both lowercase: use _minor
+         major_suffix="_major"
+         minor_suffix="_minor"
+         patch_suffix="_patch"
+      elif [ "${first_char}" = "${first_char^^}" ] && [ "${second_char}" = "${second_char^^}" ]
+      then
+         # Both uppercase: use _MINOR
+         major_suffix="_MAJOR"
+         minor_suffix="_MINOR"
+         patch_suffix="_PATCH"
+      elif [ "${first_char}" = "${first_char^^}" ] && [ "${second_char}" = "${second_char,,}" ]
+      then
+         # Upper then lower: use Minor (no underscore)
+         major_suffix="Major"
+         minor_suffix="Minor"
+         patch_suffix="Patch"
+      else
+         # Default to uppercase
+         major_suffix="_MAJOR"
+         minor_suffix="_MINOR"
+         patch_suffix="_PATCH"
+      fi
+   else
+      major_suffix="_MAJOR"
+      minor_suffix="_MINOR"
+      patch_suffix="_PATCH"
+   fi
+   
+   local major_name="${versionname}${major_suffix}"
+   local minor_name="${versionname}${minor_suffix}"
+   local patch_name="${versionname}${patch_suffix}"
    
    inplace_sed -e "${sed_script}" \
                -e "s/\(${major_name}[^0-9]*\)[0-9][0-9]*/\1${major}/" \

@@ -279,7 +279,7 @@ ${C_RESET}${bad_changes# }"
 
          if [ -z "${OPTION_MESSAGE}" ]
          then
-            log_warning "There are possibly interesting changes that may need a commit message:
+            _log_warning "There are possibly interesting changes that may need a commit message:
 ${C_RESET}${interesting_changes# }"
 
             if [ "${OPTION_DIFF}" = 'YES' ]
