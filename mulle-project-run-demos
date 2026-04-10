@@ -645,7 +645,7 @@ main()
 
          local EXECUTABLE="${exe_path}"
          local MULLE_VIRTUAL_ROOT="${MULLE_VIRTUAL_ROOT:-$PWD}"
-         local MULLE_VIRTUAL_ROOT_ID="$(shasum -a 256 <<< "${MULLE_VIRTUAL_ROOT}")"
+         local MULLE_VIRTUAL_ROOT_ID="$(PATH='/bin:/usr/bin:/usr/local/bin' shasum -a 256 <<< "${MULLE_VIRTUAL_ROOT}")"
          MULLE_VIRTUAL_ROOT_ID="${MULLE_VIRTUAL_ROOT_ID:1:12}"
 
          commandline="`mulle-sde env get MULLE_SDE_RUN`"

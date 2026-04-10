@@ -63,7 +63,7 @@ print_flags()
 
 
 AI="github-copilot"
-AI_FLAGS="--allow-all-tools --no-color -p"
+AI_FLAGS="--allow-all-tools --no-color --effort medium --model gpt-5-mini -p"
 
 usage()
 {
@@ -116,7 +116,7 @@ IMPORTANT: If changes are ONLY version bumps, config files, or dotfiles with no 
 create only a very short commit message entirely without bullet points.
 
 UNDERSTANDING THE PROJECT:
-1. Get familiar with the project, read the README.md and peruse some sources to understand what this project is about
+1. Get familiar with the project, read the README.md and maybe peruse some sources to understand what this project is about
 2. Identify the project type (C library? Shell tool? Python package?)
 3. Focus on changes relevant to that project type
 4. For a C library: .c/.h files matter

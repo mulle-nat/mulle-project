@@ -458,7 +458,7 @@ main()
    if [ -z "${MULLE_VIRTUAL_ROOT}" ]
    then
       MULLE_VIRTUAL_ROOT="`PATH=/bin:/usr/bin pwd -P`"
-      MULLE_VIRTUAL_ROOT_ID="$(shasum -a 256 <<< "${MULLE_VIRTUAL_ROOT}")"
+      MULLE_VIRTUAL_ROOT_ID="$(PATH='/bin:/usr/bin:/usr/local/bin' shasum -a 256 <<< "${MULLE_VIRTUAL_ROOT}")"
       MULLE_VIRTUAL_ROOT_ID="${MULLE_VIRTUAL_ROOT_ID:1:12}"
       MULLE_SHELL_MODE="" . ".mulle/share/env/environment.sh" || exit 1
    fi

@@ -62,6 +62,10 @@ print_flags()
 }
 
 
+AI="github-copilot"
+AI_FLAGS="--allow-all-tools --no-color --effort medium --model gpt-5-mini -p"
+
+
 usage()
 {
    [ $# -ne 0 ] && log_error "$*"
@@ -128,7 +132,7 @@ resources in order of priority:
 *   **Detail:** Describe the main API and mention each public symbol with a very short description of what it does.
 *   **Keywords:** It's crucial that this is the below the title. Each keyword should be single word.  The number of keywords should not exceed seven.
 
-<!-- Keywords: keyword1, keyword2 --> comment that provides quick context about what the library does.
+<!-- Keywords: keyword1, keyword2, keyword3, keyword4, keyword5 --> comment that provides quick context about what the library does.
 
 The keywords are designed to be:
 - **Short and helpful** - typically 4-7 keywords per library
@@ -238,16 +242,26 @@ which is: Use 3-space indent, Allman braces, aligned declarations, and C89 var r
 - Example:
   - `mulle-c11`
   - `mulle-allocator`
+
+
+## 8. Shortcut
+
+If a TOC.md already exists. Figure out when it was committed. Then you need
+to consider only the changes since that commit.
+
 EOF
 )
 
+
+
 ai_api_toc()
 {
-   exekutor github-copilot -- ${OPTION_SILENT} \
-                              --stream "${OPTION_STREAM:-off}" \
-                              --allow-all-tools \
-                              -p "$*"$'\n'"${PROMPT}"
+   exekutor ${AI} -- ${OPTION_SILENT} \
+                     --stream "${OPTION_STREAM:-off}" \
+                     ${AI_FLAGS} \
+                     "$*"$'\n'"${PROMPT}"
 }
+
 
 
 main()

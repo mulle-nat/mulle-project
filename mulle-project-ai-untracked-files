@@ -62,6 +62,10 @@ print_flags()
 }
 
 
+AI="github-copilot"
+AI_FLAGS="--allow-all-tools --no-color --effort medium --model gpt-5-mini -p"
+
+
 usage()
 {
    [ $# -ne 0 ] && log_error "$*"
@@ -198,10 +202,10 @@ When in doubt read it. Does it look meaningful in the context of this project ?
 
 ai_add_untracked()
 {
-   exekutor github-copilot -- ${OPTION_SILENT} \
-                              --stream "${OPTION_STREAM:-off}" \
-                              --allow-all-tools \
-                              -p "$*"$'\n'"${PROMPT}"
+   exekutor ${AI} -- ${OPTION_SILENT} \
+                     --stream "${OPTION_STREAM:-off}" \
+                     ${AI_FLAGS} \
+                     "$*"$'\n'"${PROMPT}"
 }
 
 
@@ -274,7 +278,7 @@ main()
    options_setup_trace "${MULLE_TRACE}" && set -x
 
    [ -d ".git" ] || fail "No git repo here"
-   [ -d ".graveyard" ] && fail "There is still a .graveyard here, you must delete it manually. Inspect it before losing data"
+   [ -d ".graveyard" ] && log_warning "There is still a .graveyard here, you must delete it manually. Inspect it before losing data"
 
    if [ "${MULLE_FLAG_LOG_VERBOSE}" = 'YES' ]
    then

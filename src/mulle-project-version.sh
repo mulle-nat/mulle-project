@@ -81,6 +81,7 @@ project::version::get_project_version()
    local printtype="${4:-NO}"
 
    local version
+   local value_part
 
    if [ ! -f "${filename}" ]
    then
@@ -88,7 +89,7 @@ project::version::get_project_version()
       return 1
    fi
 
-   match="`grep -F -s -w "${versionname}" "${filename}" | grep -E -v '^#' | head -1`"
+   match="`grep -F -s -w "${versionname}" "${filename}" | head -1`"
 
    if [ -z "${match}" ]
    then
@@ -96,6 +97,12 @@ project::version::get_project_version()
    fi
 
    log_debug "match=${match}"
+
+   value_part="${match}"
+   if [ ! -z "${versionname}" ]
+   then
+      value_part="${match#*"${versionname}"}"
+   fi
 
    case "${match}" in
       *"<<"*)
@@ -135,12 +142,12 @@ project::version::get_project_version()
          version=""
          if [ "${versioncustom}" = 'YES' ]
          then
-            version="`sed -n 's/^[^0-9]*\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*$/\1/p' <<< "${match}"`"
+            version="`sed -n 's/^[^0-9]*\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*$/\1/p' <<< "${value_part}"`"
          fi
 
          if [ -z "${version}" ]
          then
-            version="`sed -n 's/^[^0-9]*\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*$/\1/p' <<< "${match}"`"
+            version="`sed -n 's/^[^0-9]*\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*$/\1/p' <<< "${value_part}"`"
             if [ -z "${version}" ]
             then
                if [ "${printtype}" = 'YES' ]
@@ -148,10 +155,10 @@ project::version::get_project_version()
                   return 1
                fi
 
-               version="`sed -n 's/^[^0-9]*\([0-9][0-9]*\.[0-9][0-9]*\).*$/\1/p' <<< "${match}"`"
+               version="`sed -n 's/^[^0-9]*\([0-9][0-9]*\.[0-9][0-9]*\).*$/\1/p' <<< "${value_part}"`"
                if [ -z "${version}" ]
                then
-                  version="`sed -n 's/^[^0-9]*\([0-9][0-9]*\).*$/\1/p' <<< "${match}"`"
+                  version="`sed -n 's/^[^0-9]*\([0-9][0-9]*\).*$/\1/p' <<< "${value_part}"`"
                fi
             fi
          fi
@@ -531,4 +538,3 @@ ${C_INFO}Use either 1.2.3[.4] or ((1 << 20) | (2 << 8) | 3)"
    -e "s/\(${patch_name}[^0-9]*\)[0-9][0-9]*/\1${patch}/" \
    "${versionfile}"
 }
-

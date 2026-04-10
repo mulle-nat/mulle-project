@@ -58,6 +58,7 @@ print_flags()
 
 
 AI="github-copilot"
+AI_FLAGS="--allow-all-tools --no-color --effort medium --model gpt-5-mini -p"
 
 
 usage()
@@ -187,9 +188,9 @@ main()
    r_generate_ai_prompt "${PROMPT_TEXT}" "$@"
    prompt="${RVAL}"
    
-   case "`mulle-project-version --diff`" in
+   case "`mulle-project-version diff`" in
       'none')
-         exekutor "${AI}" -- --allow-all-tools --no-color -p "${prompt}"
+         exekutor "${AI}" -- ${AI_FLAGS} "${prompt}"
       ;;
 
       *)

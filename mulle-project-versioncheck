@@ -94,6 +94,12 @@ emit_version_check()
    r_get_version_patch "${version}"
    patch="${RVAL}"
 
+   if [ ! -d ".mulle/etc" ]
+   then
+      log_verbose "`basename "${PWD}"` is not a mulle-sde project (no .mulle/etc)"
+      return
+   fi
+
    local type
 
    type="`mulle-sde environment get PROJECT_TYPE`"
