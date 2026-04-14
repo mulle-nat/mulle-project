@@ -66,7 +66,7 @@ print_flags()
    ## ADD YOUR FLAGS DESCRIPTIONS HERE
    ##
 
-   options_technical_flags_usage                 "         : "
+   options_technical_flags_usage " : "
 }
 
 
@@ -144,38 +144,76 @@ check_sourcetree()
       log_warning "mulle-project-sourcetree-doctor not found, skipping sourcetree check"
       return
    fi
-   
-   if [ ! -d ".mulle/etc/sourcetree" ]
-   then
-      log_verbose "No sourcetree directory found, skipping sourcetree check"
-      return
-   fi
-   
-   local config_files
-   config_files="`find .mulle/etc/sourcetree -maxdepth 1 -type f 2>/dev/null`"
-   
-   if [ -z "${config_files}" ]
-   then
-      log_verbose "No sourcetree config files found"
-      return
-   fi
-   
-   local config
-   local failed=0
-   
-   while IFS= read -r config
-   do
-      local config_name
-      r_basename "${config}"
-      config_name="${RVAL}"
-      
-      log_verbose "Checking sourcetree config: ${config_name}"
-      if ! SOURCETREE_CONFIG_NAME="${config_name}" exekutor mulle-project-sourcetree-doctor "/"
+
+   check_sourcetree_in_directory()
+   {
+      local directory="$1"
+      local role="$2"
+      local config_files
+      local config
+      local failed=0
+
+      if [ ! -d "${directory}/.mulle/etc/sourcetree" ]
       then
-         failed=1
+         log_verbose "No sourcetree directory found for ${role} (${directory}), skipping"
+         return 0
       fi
-   done <<< "${config_files}"
-   
+
+      config_files="`find "${directory}/.mulle/etc/sourcetree" -maxdepth 1 -type f 2>/dev/null`"
+      if [ -z "${config_files}" ]
+      then
+         log_verbose "No sourcetree config files found for ${role} (${directory})"
+         return 0
+      fi
+
+      if [ "${role}" != "main" ]
+      then
+         log_info "Doctor ${directory}"
+      fi
+
+      while IFS= read -r config
+      do
+         local config_name
+
+         r_basename "${config}"
+         config_name="${RVAL}"
+
+         if ! (
+               cd "${directory}" &&
+               SOURCETREE_CONFIG_NAME="${config_name}" exekutor mulle-project-sourcetree-doctor "/"
+            )
+         then
+            failed=1
+         fi
+      done <<< "${config_files}"
+
+      return ${failed}
+   }
+
+   local tests
+   local test
+   local others
+   local other
+   local failed=0
+
+   check_sourcetree_in_directory "." "main" || failed=1
+
+   tests="`mulle-env --search-here environment get --lenient MULLE_SDE_TEST_PATH 2>/dev/null`"
+   tests="${tests:-test}"
+   .foreachpath test in ${tests}
+   .do
+      [ -d "${test}" ] || .continue
+      check_sourcetree_in_directory "${test}" "test" || failed=1
+   .done
+
+   others="`mulle-env --search-here environment get --lenient MULLE_SDE_OTHER_PROJECTS_PATH 2>/dev/null`"
+   others="${others:-demo}"
+   .foreachpath other in ${others}
+   .do
+      [ -d "${other}" ] || .continue
+      check_sourcetree_in_directory "${other}" "other" || failed=1
+   .done
+
    if [ ${failed} -eq 1 ]
    then
       fail "Sourcetree doctor failed on one or more configs"
@@ -349,11 +387,6 @@ check_readme_freshness()
 
 main()
 {
-   #
-   # simple option/flag handling
-   #
-   local OPTION_VALUE
-
    while [ $# -ne 0 ]
    do
       if options_technical_flags "$1"
@@ -371,22 +404,11 @@ main()
             usage
          ;;
 
-         --value)
-            [ $# -eq 1 ] && usage "missing argument to $1"
-            shift
-
-            OPTION_VALUE="$1"
-         ;;
-
          --version)
             printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
             exit 0
          ;;
 
-
-         ##
-         ## ADD YOUR FLAGS HERE
-         ##
 
          -*)
             usage "Unknown flag \"$1\""
