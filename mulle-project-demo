@@ -152,7 +152,7 @@ foreach( SOURCE \${SOURCES})
    #             offset 9  length -9 - 2
    # ignore library "main.c" and "main.m" files, just in case
    #
-   if( NOT (SOURCE MATCHES ".*/main\\.[cm]$"))
+   if( NOT (SOURCE MATCHES ".*/main\\\\.[cm]$"))
       if( SOURCE MATCHES "^src/main-")
          list( APPEND DEMO_MAIN_SOURCES "\${SOURCE}")
       else()
@@ -387,28 +387,36 @@ demo::main()
 
       # include from demo/src/generic means ../../.. to reach parent
 
-      if [ -f "../../../src/generic/include-private.h" ]
+      if [ -f "../src/generic/include-private.h" ]
       then
          demo::insert_line_before_last_endif 'src/generic/include-private.h' \
                                                   '#include "../../../src/generic/include-private.h"'
+      else
+         log_verbose "generic/include-private.h not found"
       fi
 
-      if [ -f "../../../src/generic/include.h" ]
+      if [ -f "../src/generic/include.h" ]
       then
          demo::insert_line_before_last_endif 'src/generic/include.h' \
                                                   '#include "../../../src/generic/include.h"'
+      else
+         log_verbose "generic/include.h not found"
       fi
 
-      if [ -f "../../../src/generic/import-private.h" ]
+      if [ -f "../src/generic/import-private.h" ]
       then
          demo::append_line_at_end 'src/generic/import-private.h' \
                                        '#import "../../../src/generic/import-private.h"'
+      else
+         log_verbose "generic/import-private.h not found"
       fi
 
-      if [ -f "../../../src/generic/import.h" ]
+      if [ -f "../src/generic/import.h" ]
       then
          demo::append_line_at_end 'src/generic/import.h' \
                                        '#import "../../../src/generic/import.h"'
+      else
+         log_verbose "generic/import.h not found"
       fi
    )
    fi

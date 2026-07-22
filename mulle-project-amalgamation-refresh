@@ -126,7 +126,7 @@ logfile_start()
    then
       # if the start was ancient, ignore it
       previous_timestamp="${previous#??}"
-      previous_timestamp="${timestamp%%;*}"
+      previous_timestamp="${previous_timestamp%%;*}"
       now_timestamp="${now%%;*}"
 
       if [ $(( now_timestamp - previous_timestamp )) -lt 60 ]

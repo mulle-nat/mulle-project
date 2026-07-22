@@ -89,7 +89,7 @@ _mulle_project_complete()
             ;;
         
         ai)
-            local ai_flags="--model --plugin --help"
+            local ai_flags="--help --local --openrouter --provider --model --openrouter-model --ollama-model --ollama-url --attach --plugin"
             if [[ "$cur" == -* ]]; then
                 COMPREPLY=( $(compgen -W "$ai_flags" -- "$cur") )
             fi

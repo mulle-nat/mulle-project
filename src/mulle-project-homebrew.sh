@@ -117,8 +117,17 @@ project::homebrew::generate_formula_header()
    fi
 
    local hash
+   local shasum
+   local shasumflags
 
-   hash="`PATH='/bin:/usr/bin:/usr/local/bin' exekutor shasum -a 256 "${tmparchive}" | exekutor awk '{ print $1 }'`" || exit 1
+   shasumflags="-a 256"
+   if ! shasum=`command -v shasum`
+   then
+      shasumflags=""
+      shasum=`command -v sha256sum`
+   fi
+
+   hash="`exekutor "${shasum}" ${shasumflags} "${tmparchive}" | exekutor awk '{ print $1 }'`" || exit 1
    log_verbose "Calculated shasum256 \"${hash}\" for \"${tmparchive}\"."
 
    local formula
