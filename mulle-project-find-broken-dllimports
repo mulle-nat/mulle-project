@@ -1,0 +1,180 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PATH="/opt/mulle-clang-project-windows/21.1.8.2/bin:$PATH"
+
+DB="${DB:-/tmp/dll-symbols-$$.db}"
+OBJDUMP_BIN="${OBJDUMP_BIN:-x86_64-w64-mingw32-objdump}"
+KEEP_DB="${KEEP_DB:-0}"
+
+if ! command -v sqlite3 >/dev/null 2>&1; then
+  echo "Error: sqlite3 not found in PATH" >&2
+  exit 1
+fi
+
+if ! command -v "$OBJDUMP_BIN" >/dev/null 2>&1; then
+  echo "Error: $OBJDUMP_BIN not found in PATH" >&2
+  exit 1
+fi
+
+if [ "$#" -eq 0 ]; then
+  echo "Usage: $0 <dll-or-dir>..." >&2
+  exit 1
+fi
+
+rm -f "$DB"*
+sqlite3 "$DB" <<'SQL'
+PRAGMA journal_mode = WAL;
+CREATE TABLE symbols (
+  name     TEXT NOT NULL,
+  type     TEXT NOT NULL,
+  dll      TEXT NOT NULL,
+  from_dll TEXT
+);
+CREATE INDEX idx_symbols_name ON symbols(name);
+CREATE INDEX idx_symbols_type ON symbols(type);
+CREATE INDEX idx_symbols_dll ON symbols(dll);
+SQL
+
+dlls=()
+for arg in "$@"; do
+  if [ -d "$arg" ]; then
+    while IFS= read -r -d '' f; do
+      dlls+=("$f")
+    done < <(find "$arg" -type f -iname '*.dll' -print0)
+  elif [ -f "$arg" ] && printf '%s\n' "$arg" | grep -qi '\.dll$'; then
+    dlls+=("$arg")
+  else
+    echo "Warning: skipping '$arg' (not a dll or directory)" >&2
+  fi
+done
+
+[ "${#dlls[@]}" -eq 0 ] && { echo "No DLLs found." >&2; exit 1; }
+
+# Parse dllexports from "Export Table:" in objdump -p
+insert_exports() {
+  local dll="$1"
+  "$OBJDUMP_BIN" -p "$dll" 2>/dev/null | awk -v dll="$dll" '
+    /^Export Table:/ { in_exports=1; next }
+    in_exports && /^[^ \t]/ { in_exports=0 }
+    in_exports && /^ +[0-9]+ +0x[0-9a-f]+ +[^ ]/ {
+      name = $3
+      printf "INSERT INTO symbols(name,type,dll,from_dll) VALUES(\"%s\",\"EXPORT\",\"%s\",NULL);\n", name, dll
+    }
+  '
+}
+
+# Parse dllimports from "The Import Tables:" in objdump -p
+# Format: "DLL Name: foo.dll" followed by "  0  symbolname" lines
+insert_imports() {
+  local dll="$1"
+  "$OBJDUMP_BIN" -p "$dll" 2>/dev/null | awk -v dll="$dll" '
+    /^The Import Tables:/ { in_imports=1; next }
+    in_imports && /^[^ \t]/ { in_imports=0 }
+    in_imports && /DLL Name:/ {
+      from_dll = $3
+      next
+    }
+    in_imports && from_dll && /^ +[0-9]+ +[A-Za-z_]/ {
+      name = $2
+      printf "INSERT INTO symbols(name,type,dll,from_dll) VALUES(\"%s\",\"IMPORT\",\"%s\",\"%s\");\n", name, dll, from_dll
+    }
+  '
+}
+
+# Parse unbound __imp_ symbols from objdump -x (sec -1 = external/undefined)
+insert_unbound_imports() {
+  local dll="$1"
+  "$OBJDUMP_BIN" -x "$dll" 2>/dev/null | awk -v dll="$dll" '
+    /\(sec -1\).*__imp_/ {
+      for (i=1; i<=NF; i++) {
+        if ($i ~ /^__imp_/) {
+          name = substr($i, 7)
+          printf "INSERT INTO symbols(name,type,dll,from_dll) VALUES(\"%s\",\"UNBOUND_IMPORT\",\"%s\",NULL);\n", name, dll
+        }
+      }
+    }
+  '
+}
+
+echo "=== PER-DLL SYMBOL STATS ==="
+echo "DLL                              | EXPORTS | IMPORTS | UNBOUND"
+echo -n "-----------------------------------"
+printf '%.0s-' {1..40}
+echo
+
+total_exports=0
+total_imports=0
+total_unbound=0
+
+for dll in "${dlls[@]}"; do
+  echo "Indexing $dll..."
+  {
+    insert_exports "$dll"
+    insert_imports "$dll"
+    insert_unbound_imports "$dll"
+  } | sqlite3 "$DB"
+
+  stats=$(sqlite3 "$DB" "
+    SELECT
+      (SELECT COUNT(*) FROM symbols WHERE dll='$dll' AND type='EXPORT'),
+      (SELECT COUNT(*) FROM symbols WHERE dll='$dll' AND type='IMPORT'),
+      (SELECT COUNT(*) FROM symbols WHERE dll='$dll' AND type='UNBOUND_IMPORT')
+  ")
+
+  exports=$(echo "$stats" | cut -d'|' -f1 | tr -d ' ')
+  imports=$(echo "$stats" | cut -d'|' -f2 | tr -d ' ')
+  unbound=$(echo "$stats" | cut -d'|' -f3 | tr -d ' ')
+
+  exports="${exports:-0}"
+  imports="${imports:-0}"
+  unbound="${unbound:-0}"
+
+  total_exports=$((total_exports + exports))
+  total_imports=$((total_imports + imports))
+  total_unbound=$((total_unbound + unbound))
+
+  printf "%-32s | %7s | %7s | %7s\n" "${dll##*/}" "$exports" "$imports" "$unbound"
+done
+
+echo -n "-----------------------------------"
+printf '%.0s-' {1..40}
+echo
+printf "TOTALS                           | %7s | %7s | %7s\n" "$total_exports" "$total_imports" "$total_unbound"
+echo
+
+echo "=== Symbols exported by more than one DLL ==="
+sqlite3 "$DB" <<'SQL'
+SELECT name, GROUP_CONCAT(dll, ', ') AS dlls
+FROM symbols
+WHERE type = 'EXPORT'
+GROUP BY name HAVING COUNT(*) > 1 ORDER BY name;
+SQL
+
+echo
+echo "=== Imports not satisfied by any DLL export ==="
+sqlite3 "$DB" <<'SQL'
+SELECT DISTINCT s.name, s.dll, s.from_dll
+FROM symbols AS s
+LEFT JOIN symbols AS e ON s.name = e.name AND e.type = 'EXPORT'
+WHERE s.type = 'IMPORT' AND e.name IS NULL
+ORDER BY s.name, s.dll;
+SQL
+
+echo
+echo "=== Unbound imports (__imp_ symbols with sec -1) ==="
+sqlite3 "$DB" <<'SQL'
+SELECT s.name, s.dll
+FROM symbols AS s
+WHERE s.type = 'UNBOUND_IMPORT'
+ORDER BY s.name, s.dll;
+SQL
+
+if [ "$KEEP_DB" != "1" ]; then
+  echo "Cleaning up temporary DB..."
+  sqlite3 "$DB" "PRAGMA journal_mode = DELETE;"
+  rm -f "$DB"*
+  echo "DB removed."
+else
+  echo "DB kept at: $DB"
+fi

@@ -1,0 +1,247 @@
+#! /bin/bash
+#
+# Create a game project split into a library and an executable.
+#
+# Structure:
+#   <name>/
+#     <name>-lib/     library (mulle-ui-foundation/game-developer)
+#       test/
+#     <name>/         executable (mulle-ui-foundation/game-developer)
+#       test/
+#
+usage()
+{
+   cat <<EOF >&2
+Usage: mulle-project-new-game [options] <name>
+
+   Create a new mulle-ui game project with a library and an executable.
+   This can take a minute or two, please be patient.
+
+Options:
+   -u <user>       : github user/organization (default: \$GITHUB_USER or \$USER)
+   -m <meta>       : meta extension (default: mulle-ui-foundation/game-developer)
+   -p <platform>   : glfw platform: wayland, x11, macos (default: auto-detect)
+   -h              : this help
+
+EOF
+   exit 1
+}
+
+
+main()
+{
+   local OPTION_GITHUB_USER="${GITHUB_USER:-${USER}}"
+   local OPTION_META="mulle-ui-foundation/game-developer"
+   local OPTION_PLATFORM=""
+
+   while [ $# -gt 0 ]
+   do
+      case "$1" in
+         -h|--help)
+            usage
+         ;;
+         -u|--user)
+            shift
+            OPTION_GITHUB_USER="$1"
+         ;;
+         -m|--meta)
+            shift
+            OPTION_META="$1"
+         ;;
+         -p|--platform)
+            shift
+            OPTION_PLATFORM="$1"
+         ;;
+         -*)
+            usage
+         ;;
+         *)
+            break
+         ;;
+      esac
+      shift
+   done
+
+   local name="${1}"
+
+   [ -z "${name}" ] && usage
+
+   # auto-detect platform
+   if [ -z "${OPTION_PLATFORM}" ]
+   then
+      # if local MulleGLFW exists (symlinked dev), match its config
+      local glfw_config
+      glfw_config="$(mulle-sde -d ../MulleUI/MulleGLFW config show 2>/dev/null | sed -n 's/MULLE_SOURCETREE_CONFIG_NAME=\([^ ]*\).*/\1/p')"
+      if [ -n "${glfw_config}" ] && [ "${glfw_config}" != "config" ]
+      then
+         OPTION_PLATFORM="${glfw_config}"
+      else
+         case "$(uname -s)" in
+            Darwin) OPTION_PLATFORM="macos" ;;
+            *)
+               if [ -n "${WAYLAND_DISPLAY}" ] || [ "${XDG_SESSION_TYPE}" = "wayland" ]
+               then
+                  OPTION_PLATFORM="wayland"
+               else
+                  OPTION_PLATFORM="x11"
+               fi
+            ;;
+         esac
+      fi
+   fi
+
+   local libname="${name}-lib"
+   local appname="${name}"
+
+   if [ -e "${name}" ]
+   then
+      echo "Directory \"${name}\" already exists" >&2
+      exit 1
+   fi
+
+   mkdir -p "${name}" || exit 1
+
+   echo "Creating library project \"${libname}\" ..."
+   echo ""
+
+   mulle-sde init -n "${libname}" \
+                  -d "${name}/${libname}" \
+                  -m "${OPTION_META}" \
+                  --github-user "${OPTION_GITHUB_USER}" \
+                  library || exit 1
+
+   mulle-sde -d "${name}/${libname}" \
+      environment --scope "os-$(uname -s | tr 'A-Z' 'a-z')" set MULLE_SOURCETREE_CONFIG_NAME_MULLE_GLFW "${OPTION_PLATFORM}" || exit 1
+
+   echo ""
+   echo "Initializing library tests..."
+   echo ""
+
+   mulle-sde -d "${name}/${libname}" test init || exit 1
+
+   echo ""
+   echo "Creating executable project \"${appname}\"..."
+   echo ""
+
+   mulle-sde init -n "${appname}" \
+                  -d "${name}/${appname}" \
+                  -m "${OPTION_META}" \
+                  --github-user "${OPTION_GITHUB_USER}" \
+                  executable || exit 1
+
+   mulle-sde -d "${name}/${appname}" \
+      environment --scope "os-$(uname -s | tr 'A-Z' 'a-z')" set MULLE_SOURCETREE_CONFIG_NAME_MULLE_GLFW "${OPTION_PLATFORM}" || exit 1
+
+   echo ""
+   echo "Adding library dependency to executable..."
+   echo ""
+
+   mulle-sde -d "${name}/${appname}" dependency add \
+      --objc \
+      --github "${OPTION_GITHUB_USER}" \
+      "${libname}" || exit 1
+
+   echo ""
+   echo "Initializing executable tests..."
+   echo ""
+
+   mulle-sde -d "${name}/${appname}" test init || exit 1
+
+   echo ""
+   echo "Setting executable clean target to library..."
+   echo ""
+
+   mulle-sde -d "${name}/${appname}" \
+      environment --scope project set MULLE_SDE_CLEAN_DEFAULT "${libname}" || exit 1
+
+   echo ""
+   echo "Building executable..."
+   echo ""
+
+   mulle-sde -d "${name}/${appname}" -DMULLE_VIBECODING=NO craft || exit 1
+
+   echo ""
+   echo "Creating roam database..."
+   echo ""
+
+   # do this so AI doesn't time out on first try and then tosses the command
+   mulle-sde -d "${name}/${appname}" code search CGRect > /dev/null || exit 1
+
+   echo ""
+   echo "Adding AI support to envelope project..."
+   echo ""
+   mulle-sde -d "${name}" init -e mulle-ui/game-ai -d . none  || exit 1
+
+   echo "Done. Project created in ${name}/"
+   echo "  Library:    ${name}/${libname}/"
+   echo "  Executable: ${name}/${appname}/"
+
+   tee "${name}/README.md" <<EOF
+# ${name}
+
+A mulle-ui game project with a library and an executable.
+
+
+AI Support is installed for **opencode** and **kiro**. In opencode or kiro
+choose  the \`game-conductor\` agent and tell it your game idea.
+
+
+The idea is that you put game logic code into the library \`${libname}/\` and
+refine it with non-graphic tests.
+
+The actual game \`${appname}/\` will link to the library and supply the
+graphics and sounds. It also has a test environment, where you can use
+\`UIEventReplayer\` to recrate scenarios w/o user intervention (e.g. press
+START after 2s)
+
+> For AI: it's generally too complicated to start here. You go into the
+> \`${appname}\` directory. Read AGENTS.md there and you execute all the commands
+> there until you are ready to code.
+
+
+
+## Structure
+
+| Directory | Purpose |
+|-----------|---------|
+| \`${libname}/\` | Game library (logic, scenes, resources) |
+| \`${appname}/\` | Executable (links the library, provides main) |
+
+## Development
+
+Work in the executable directory for day-to-day development:
+
+\`\`\`bash
+cd ${name}/${appname}
+mulle-sde check    # syntax check project
+mulle-sde craft    # build
+mulle-sde run      # run the game
+mulle-sde clean    # clean (also cleans ${libname})
+mulle-sde reflect  # after adding/removing source files
+\`\`\`
+
+The executable depends on \`${libname}\`, so changes in the library are
+rebuilt automatically during \`mulle-sde craft\`.
+
+To work on the library in isolation:
+
+\`\`\`bash
+cd ${name}/${libname}
+mulle-sde craft
+mulle-sde test
+\`\`\`
+
+## Platform
+
+GLFW backend: **${OPTION_PLATFORM}**
+
+Change with:
+\`\`\`bash
+mulle-sde environment --scope os-linux set MULLE_SOURCETREE_CONFIG_NAME_MULLE_GLFW wayland
+mulle-sde clean all
+mulle-sde craft
+\`\`\`
+EOF
+}
+
+main "$@"
