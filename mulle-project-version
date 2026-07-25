@@ -424,11 +424,11 @@ warn_version()
       commits="`project::git::commits_from_tag "${VERSION}"`"
       if [ ! -z "${commits}" ]
       then
-         log_warning "${VERSION} already exists as a git tag, but has commits"
+         log_warning "${VERSION} already exists as a git tag, but the project has commits"
       else
          if ! project::git::is_clean
          then
-            log_warning "${VERSION} already exists as a git tag, but has uncommitted files"
+            log_warning "${VERSION} already exists as a git tag, but the project has uncommitted files"
          else
             last="`rexekutor git tag -l --sort=-creatordate | grep -E -x '[0-9]*\.[0-9]*\.[0-9]*' | head -1`"
 

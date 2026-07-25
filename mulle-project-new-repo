@@ -509,7 +509,7 @@ new_repo::main()
    user="${org_and_repo%%/*}"
    repo="${org_and_repo#*/}"
 
-   if [ -d "${repo}" ]
+   if [ -d "${repo}/.git" ]
    then
       fail "There is already a repo \"${repo}\" here, enter it or move it aside"
    fi
