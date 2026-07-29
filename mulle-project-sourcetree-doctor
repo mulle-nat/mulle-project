@@ -561,7 +561,7 @@ doctor_check_variable_wrapping()
    
    # Skip variable wrapping checks for special nodetypes
    case "${_nodetype}" in
-      *none*|*comment*|*local*)
+      *none*|*comment*|*error*|*local*)
          return 0
       ;;
    esac
@@ -572,8 +572,11 @@ doctor_check_variable_wrapping()
       return 0
    fi
    
-   # Check if nodetype is properly wrapped
+   # Check if nodetype is properly wrapped (skip for 'file' - it's always file)
    case "${_nodetype}" in
+      *file*)
+         # file nodetype doesn't need wrapping
+      ;;
       \$\{${upcaseid}_NODETYPE:-*\})
          # properly wrapped
       ;;
@@ -619,7 +622,11 @@ doctor_check_variable_wrapping()
       ;;
    esac
    
-   # Check if branch is properly wrapped
+   # Check if branch is properly wrapped (skip for 'file' - no branches)
+   case "${_nodetype}" in
+      *file*)
+      ;;
+      *)
    case "${_branch}" in
       \$\{${upcaseid}_BRANCH*\})
          # properly wrapped (can be with or without default)
@@ -661,6 +668,8 @@ doctor_check_variable_wrapping()
          fi
       ;;
    esac
+      ;;
+   esac
    
    # Check if URL is properly wrapped
    case "${_url}" in
@@ -674,7 +683,8 @@ doctor_check_variable_wrapping()
                # Already a variable, don't suggest wrapping
             ;;
             *)
-               log_warning "warning: ${address}: url \"${_url}\" should be wrapped as \${${upcaseid}_URL:-${_url}}"
+               r_escaped_doublequotes "${_url}"
+               log_warning "warning: ${address}: url \"${_url}\" should be wrapped as \"\${${upcaseid}_URL:-${RVAL}}\""
                if [ "${OPTION_FIX}" = 'YES' ]
                then
                   __doctor_fix_variable_wrapping "${address}" "url" "${_url}" "${upcaseid}"
@@ -802,10 +812,21 @@ doctor_nodeline()
 
    if find_line "${UPCASEIDS}" "${upcaseid}"
    then
-      doctor_log_warning "${_address}" "warning: ${_address}: ${upcaseid} might be a duplicate of another address"
+      local other_address
+      local _varname
+
+      _varname="UPCASEID_ADDRESSES__${upcaseid}"
+      other_address="${!_varname}"
+      if [ "${_address}" = "${other_address}" ]
+      then
+         doctor_log_warning "${_address}" "warning: ${_address}: duplicate entry in sourcetree"
+      else
+         doctor_log_warning "${_address}" "warning: ${_address}: identifier \"${upcaseid}\" collides with \"${other_address}\" (same env variable prefix)"
+      fi
    else
       r_add_line "${UPCASEIDS}" "${upcaseid}"
       UPCASEIDS="${RVAL}"
+      printf -v "UPCASEID_ADDRESSES__${upcaseid}" "%s" "${_address}"
    fi
 
    local _evaledurl

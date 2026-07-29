@@ -119,6 +119,12 @@ main()
       usage
    fi
 
+   if ! git rev-parse "${TAG}" > /dev/null 2>&1
+   then
+      log_verbose "Tag \"${TAG}\" does not exist, nothing to untag"
+      return 0
+   fi
+
    log_info "Trying to remove local tag"
    exekutor git tag -d "$TAG" || [ "${OPTION_FORCE}" = 'YES' ] || exit 1
 

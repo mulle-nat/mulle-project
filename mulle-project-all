@@ -545,6 +545,7 @@ project_it()
    shift 2
 
    local old
+   local rval=0
 
    case ",${mode}," in
       *,main-project,*)
@@ -562,9 +563,13 @@ project_it()
             fi
          fi
 
-         if ! shell_it "${project}" "$@" && [ "${OPTION_LENIENT}" = 'NO' ]
+         if ! shell_it "${project}" "$@"
          then
-            exit 1
+            if [ "${OPTION_LENIENT}" = 'NO' ]
+            then
+               exit 1
+            fi
+            rval=1
          fi
 
          PROJECT_NAME=
@@ -620,9 +625,13 @@ project_it()
             then
                TEST_NAME="${test}"
 
-               if ! shell_it "${project}/${test}" "$@" && [ "${OPTION_LENIENT}" = 'NO' ]
+               if ! shell_it "${project}/${test}" "$@"
                then
-                  exit 1
+                  if [ "${OPTION_LENIENT}" = 'NO' ]
+                  then
+                     exit 1
+                  fi
+                  rval=1
                fi
             fi
          .done
@@ -654,6 +663,8 @@ project_it()
          OTHER_NAME="${old}"
       ;;
    esac
+
+   return ${rval}
 }
 
 
@@ -692,9 +703,7 @@ parallel_execute_argument_first()
 
          log_debug "Running job #${_parallel_jobs}: $*"
 
-         (
-            project_it "${argument}" "${mode}" "$@"
-         ) &
+         __parallel_execute project_it "${argument}" "${mode}" "$@"
       fi
    .done
 
@@ -737,6 +746,7 @@ r_repos_contents()
       then
          fail "--skip-from \"${skipfrom}\", repository not found"
       fi
+      local raw_skipfrom="${skipfrom}"
       r_escaped_sed_pattern "${skipfrom}"
       skipfrom="/^${RVAL}\$/"
    fi
@@ -782,9 +792,38 @@ r_repos_contents()
       fi
    fi
 
-   local lines 
+   local lines
 
-   lines="`rexekutor sed -e "${skipfrom:-${start}},${skipuntil:-"\$"}d" <<< "${repos}"`"
+   if [ ! -z "${skipfrom}" -a ! -z "${skipuntil}" ]
+   then
+      #
+      # Both --from and --until are specified.
+      # --from X (first/skipuntil) means "start at X"
+      # --until Y (raw_skipfrom/skipfrom) means "stop before Y"
+      # Combined: keep entries from X up to but not including Y.
+      # When X == Y: keep only X (which is in "first").
+      #
+      # Use line numbers since pattern-based sed ranges don't work well
+      # when both patterns can match the same line or --from is at/after --until.
+      #
+      local from_line
+      local until_line
+
+      from_line="$(grep -n -F -x "${first}" <<< "${repos}" | head -1 | cut -d: -f1)"
+      until_line="$(grep -n -F -x "${raw_skipfrom}" <<< "${repos}" | head -1 | cut -d: -f1)"
+
+      # first already contains the --from entry, so we want lines after from up to before until
+      local after_from=$((from_line + 1))
+
+      if [ "${after_from}" -le "$((until_line - 1))" ]
+      then
+         lines="$(rexekutor sed -n "${after_from},$((until_line - 1))p" <<< "${repos}")"
+      else
+         lines=""
+      fi
+   else
+      lines="`rexekutor sed -e "${skipfrom:-${start}},${skipuntil:-"\$"}d" <<< "${repos}"`"
+   fi
 
    log_debug "${first}"
    log_debug "${lines}"

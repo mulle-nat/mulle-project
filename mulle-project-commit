@@ -21,6 +21,8 @@ print_flags()
    echo "   --                 : arguments after -- are passed to the git commit"
    echo "   --always-amend     : always amend the commit [dangerous]"
    echo "   --boring           : all files are considered to be boring"
+   echo "   --boring-file <p>  : add a pattern to the boring file list (repeatable)"
+   echo "   --only-boring      : only commit if all changes are boring (implies --safe-amend)"
    echo "   --ignore-untracked : ignore untracked files"
    echo "   --no-amend         : never amend, just create a new commit [most safe]"
    echo "   --no-diff          : don't diff non-boring changes"
@@ -86,6 +88,8 @@ main()
    local OPTION_DIFF='YES'
    local OPTION_BUMP
    local OPTION_BORING
+   local OPTION_BORING_FILES
+   local OPTION_ONLY_BORING
    local OPTION_MESSAGE
 
    local pass_args
@@ -142,6 +146,27 @@ main()
 
          --boring)
             OPTION_BORING='YES'
+         ;;
+
+         --boring-file)
+            [ $# -eq 1 ] && fail "missing parameter for \"$1\""
+            shift
+            # convert glob-like pattern to regex (. -> \., * -> .*)
+            local _pattern
+
+            _pattern="${1//./\\.}"
+            _pattern="${_pattern//\*/.*}"
+            if [ -z "${OPTION_BORING_FILES}" ]
+            then
+               OPTION_BORING_FILES="${_pattern}"
+            else
+               OPTION_BORING_FILES="${OPTION_BORING_FILES}|${_pattern}"
+            fi
+         ;;
+
+         --only-boring)
+            OPTION_ONLY_BORING='YES'
+            OPTION_AMEND='SAFE'
          ;;
 
          --diff)
@@ -266,11 +291,23 @@ ${C_RESET}${bad_changes# }"
       ignore_patterns="${ignore_patterns}|README\.md"
       ignore_patterns="${ignore_patterns}|overview\.dot\.svg"
 
+      if [ ! -z "${OPTION_BORING_FILES}" ]
+      then
+         ignore_patterns="${ignore_patterns}|${OPTION_BORING_FILES}"
+      fi
+
       local interesting_changes
 
       interesting_changes="`grep -E -v "${ignore_patterns}" <<< "${changes}" `"
       if [ ! -z "${interesting_changes}" ]
       then
+         if [ "${OPTION_ONLY_BORING}" = 'YES' ]
+         then
+            log_info "Non-boring changes detected, not committing:
+${C_RESET}${interesting_changes# }"
+            return 1
+         fi
+
          if [ "${OPTION_STATUS}" = 'YES' ]
          then
             MULLE_LOG_FAIL_ERROR_PREFIX=""

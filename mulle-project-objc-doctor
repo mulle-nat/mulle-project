@@ -285,7 +285,7 @@ check_git_remotes()
                log_verbose "Remote '${remote}' URL matches project name"
             ;;
             *)
-               log_warning "Remote '${remote}' URL doesn't match project name '${project_name}': ${url}"
+               log_warning "Git remote '${remote}' URL doesn't match project name '${project_name}': ${url}"
             ;;
          esac
       fi
@@ -423,6 +423,11 @@ main()
    done
 
    options_setup_trace "${MULLE_TRACE}" && set -x
+
+   if [ -f ".mulle/etc/project-objc-doctor/note.txt" ]
+   then
+      log_info "Note: `cat ".mulle/etc/project-objc-doctor/note.txt"`"
+   fi
 
    log_verbose "Diagnose git repository"
    check_git_repository
