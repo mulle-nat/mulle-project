@@ -151,6 +151,7 @@ check_sourcetree()
       local role="$2"
       local config_files
       local config
+      local config_name
       local failed=0
 
       if [ ! -d "${directory}/.mulle/etc/sourcetree" ]
@@ -173,8 +174,6 @@ check_sourcetree()
 
       while IFS= read -r config
       do
-         local config_name
-
          r_basename "${config}"
          config_name="${RVAL}"
 
@@ -273,10 +272,10 @@ check_git_remotes()
    fi
    
    local remote
+   local url
    while IFS= read -r remote
    do
       [ -z "${remote}" ] && continue
-      local url
       url="`git remote get-url \"${remote}\" 2>/dev/null`"
       if [ ! -z "${url}" ]
       then

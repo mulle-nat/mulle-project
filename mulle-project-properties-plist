@@ -421,9 +421,17 @@ print_dependencies()
    local lines
 
    # ignore embedded
+   #
+   # --nodetype no-comment,ALL : skip sourcetree "comment" nodes, whose
+   # address/url fields may hold free-form prose (developer reminders) rather
+   # than a parseable URL. Without this they leak into properties.plist and
+   # then into the generated README.md dependency table as a broken link row,
+   # and trigger "Could not parse URL ..." warnings. ",ALL" keeps every other
+   # node type (documented form, cf. `mulle-sourcetree list -h`).
    lines=`rexekutor mulle-sde ${MULLE_SDE_FLAGS} \
                         dependency list --columnar \
                                         -- \
+                                           --nodetype no-comment,ALL \
                                            --dedupe-mode url-filename \
                                            --qualifier "${qualifier}" \
                                            --output-eval \

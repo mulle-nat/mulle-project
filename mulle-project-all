@@ -73,6 +73,7 @@ print_flags()
    --repos-file <f>    : REPOS file to use (shortcut: -r)
    --sde               : only execute in mulle-sde projects
    --from <s>          : skip projects in REPOS until <s>
+   --no-summary        : don't print a summary of failed repos at the end
    --strict            : errors preempt
    --tests             : also execute in test directories
 EOF
@@ -359,7 +360,7 @@ shell_it()
       then
          if [ ! -d "${OPTION_DIRECTORY}" ]
          then
-            log_warning "Warning \"${OPTION_DIRECTORY}\" is missing (skipped)"
+            log_info "Directory \"${OPTION_DIRECTORY}\" is missing (skipped)"
             exit 0
          fi
          if [ "${OPTION_CD}" = 'YES' ]
@@ -664,6 +665,11 @@ project_it()
       ;;
    esac
 
+   if [ ${rval} -ne 0 -a ! -z "${_parallel_failed_repos_file}" ]
+   then
+      printf "%s\n" "${project}" >> "${_parallel_failed_repos_file}"
+   fi
+
    return ${rval}
 }
 
@@ -953,7 +959,14 @@ main()
    local OPTION_START_WITH
    local OPTION_PRINT
    local OPTION_SUBLIME
+   local OPTION_SUMMARY='YES'
    local OPTION_VERBATIM
+
+   local rval
+   local failed_repos
+   local nr
+   local repo
+   local i
 
    #
    # simple flag handling
@@ -1063,6 +1076,10 @@ main()
 
          --no-cd)
             OPTION_CD='NO'
+         ;;
+
+         --no-summary)
+            OPTION_SUMMARY='NO'
          ;;
 
          -p|--parallel)
@@ -1247,6 +1264,65 @@ main()
                     "${OPTION_SKIP_PAST}"
    repos="${RVAL}"
 
+   #
+   # Apply --ignore and --match filters to repos before processing
+   #
+   if [ ! -z "${OPTION_IGNORE}" -o ! -z "${OPTION_MATCH}" ]
+   then
+      local filtered
+      local pattern
+      local ignored
+      local matched
+
+      filtered=""
+      .foreachline i in ${repos}
+      .do
+         if [ ! -z "${OPTION_IGNORE}" ]
+         then
+            ignored='NO'
+
+            .foreachline pattern in ${OPTION_IGNORE}
+            .do
+               case "${i}" in
+                  ${pattern})
+                     ignored='YES'
+                     .break
+                  ;;
+               esac
+            .done
+
+            if [ "${ignored}" = 'YES' ]
+            then
+               .continue
+            fi
+         fi
+
+         if [ ! -z "${OPTION_MATCH}" ]
+         then
+            matched='NO'
+
+            .foreachline pattern in ${OPTION_MATCH}
+            .do
+               case "${i}" in
+                  ${pattern})
+                     matched='YES'
+                     .break
+                  ;;
+               esac
+            .done
+
+            if [ "${matched}" = 'NO' ]
+            then
+               .continue
+            fi
+         fi
+
+         r_add_line "${filtered}" "${i}"
+         filtered="${RVAL}"
+      .done
+      repos="${filtered}"
+   fi
+
    if [ -z "${repos}" ]
    then
       log_info "Nothing to do"
@@ -1278,65 +1354,90 @@ main()
 
    if [ "${OPTION_PARALLEL}" = 'YES' ]
    then
+      MULLE_PARALLEL_JOB_CONTROL="${MULLE_PARALLEL_JOB_CONTROL:-YES}"
+
       include "parallel"
 
       rmdir "/tmp/mulle-project-all-$$" 2>/dev/null
+
+      local _parallel_failed_repos_file
+
+      r_make_tmp "mulle-project-all-failures" || exit 1
+      _parallel_failed_repos_file="${RVAL}"
+      export _parallel_failed_repos_file
 
       parallel_execute_argument_first "${repos}" \
                                       "${OPTION_MODE}" \
                                       "${OPTION_EXISTS_FILE}" \
                                       "$@"
-      return $?
+      rval=$?
+
+      failed_repos="$(cat "${_parallel_failed_repos_file}" 2>/dev/null)"
+      rm -f "${_parallel_failed_repos_file}"
+
+      if [ "${OPTION_SUMMARY}" = 'YES' -a ! -z "${failed_repos}" ]
+      then
+         nr=0
+         .foreachline repo in ${failed_repos}
+         .do
+            nr=$(( nr + 1 ))
+         .done
+
+         log_info ""
+         log_error "${nr} repo(s) failed:"
+         log_info ""
+         printf "${C_RESET_BOLD}%s${C_RESET}\n" "Repo"
+         printf "%s\n" "${short_dashes}"
+
+         .foreachline repo in ${failed_repos}
+         .do
+            printf "%s\n" "${repo}"
+         .done
+
+         printf "%s\n" "${short_dashes}"
+         log_info ""
+      fi
+
+      return $rval
    fi
 
-   local i
+   failed_repos=""
+   rval=0
 
    .foreachline i in ${repos}
    .do
-      if [ ! -z "${OPTION_IGNORE}" ]
+      if ! project_it "$i" "${OPTION_MODE}" "$@"
       then
-         local pattern
-         local ignored='NO'
-
-         .foreachline pattern in ${OPTION_IGNORE}
-         .do
-            case "${i}" in
-               ${pattern})
-                  ignored='YES'
-                  .break
-               ;;
-            esac
-         .done
-
-         if [ "${ignored}" = 'YES' ]
-         then
-            .continue
-         fi
+         r_add_line "${failed_repos}" "$i"
+         failed_repos="${RVAL}"
+         rval=1
       fi
-
-      if [ ! -z "${OPTION_MATCH}" ]
-      then
-         local pattern
-         local matched='NO'
-
-         .foreachline pattern in ${OPTION_MATCH}
-         .do
-            case "${i}" in
-               ${pattern})
-                  matched='YES'
-                  .break
-               ;;
-            esac
-         .done
-
-         if [ "${matched}" = 'NO' ]
-         then
-            .continue
-         fi
-      fi
-
-      project_it "$i" "${OPTION_MODE}" "$@"
    .done
+
+   if [ "${OPTION_SUMMARY}" = 'YES' -a ! -z "${failed_repos}" ]
+   then
+      nr=0
+      .foreachline repo in ${failed_repos}
+      .do
+         nr=$(( nr + 1 ))
+      .done
+
+      log_info ""
+      log_error "${nr} repo(s) failed:"
+      log_info ""
+      printf "${C_RESET_BOLD}%s${C_RESET}\n" "Repo"
+      printf "%s\n" "${short_dashes}"
+
+      .foreachline repo in ${failed_repos}
+      .do
+         printf "%s\n" "${repo}"
+      .done
+
+      printf "%s\n" "${short_dashes}"
+      log_info ""
+   fi
+
+   return ${rval}
 }
 
 

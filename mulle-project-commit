@@ -93,6 +93,7 @@ main()
    local OPTION_MESSAGE
 
    local pass_args
+   local _pattern
    #
    # simple flag handling
    #
@@ -152,8 +153,6 @@ main()
             [ $# -eq 1 ] && fail "missing parameter for \"$1\""
             shift
             # convert glob-like pattern to regex (. -> \., * -> .*)
-            local _pattern
-
             _pattern="${1//./\\.}"
             _pattern="${_pattern//\*/.*}"
             if [ -z "${OPTION_BORING_FILES}" ]

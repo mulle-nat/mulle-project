@@ -309,6 +309,8 @@ main()
    local OPTION_WORD='NO'
    local OPTION_DELETE_LINE='NO'
 
+   local find
+
    #
    # simple flag handling
    #
@@ -381,7 +383,7 @@ main()
    then
       [ $# -lt 2 ] && usage "missing argument"
 
-      local find="$1"
+      find="$1"
 
       shift 1
 
@@ -395,7 +397,7 @@ main()
 
    [ $# -lt 3 ] && usage "missing argument"
 
-   local find="$1"
+   find="$1"
    local replace="$2"
 
    shift 2

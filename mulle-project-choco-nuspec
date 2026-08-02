@@ -516,7 +516,6 @@ EOF
    local name
    local line
    local archivename
-   local sep
 
    sep="   "
    .foreachline name in ${lines}

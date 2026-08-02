@@ -198,6 +198,33 @@ project::version::get_language_from_directoryname()
 }
 
 
+#
+# Resolve the project source directory. Usually "src", but customizable via
+# PROJECT_SOURCE_DIR in the mulle-sde environment. Sets RVAL to the resolved
+# directory, falling back to "src" when unset or when not running inside a
+# mulle-sde environment. Never emits "src" as a hardcoded literal elsewhere -
+# always route source-dir lookups through here.
+#
+project::version::r_project_source_dir()
+{
+   local src
+
+   # prefer an already exported environment variable, otherwise query mulle-env
+   src="${PROJECT_SOURCE_DIR}"
+   if [ -z "${src}" ]
+   then
+      src="`mulle-env environment get PROJECT_SOURCE_DIR 2> /dev/null`"
+   fi
+
+   if [ ! -z "${src}" ]
+   then
+      log_verbose "PROJECT_SOURCE_DIR resolved as \"${src}\""
+   fi
+
+   RVAL="${src:-src}"
+}
+
+
 project::version::get_header_from_project()
 {
    log_entry "project::version::get_header_from_project" "$@"
@@ -206,6 +233,10 @@ project::version::get_header_from_project()
    local language="$2"
 
    local filename
+   local srcdir
+
+   project::version::r_project_source_dir
+   srcdir="${RVAL}"
 
    case "${language}" in
       c)
@@ -218,14 +249,14 @@ project::version::get_header_from_project()
             return
          fi
 
-         filename="src/${project}-version"
+         filename="${srcdir}/${project}-version"
          if [ -f "${filename}.h" ]
          then
             printf "%s\n" "${filename}.h"
             return
          fi
 
-         filename="`project::version::make_file_string_no_hyphen <<< "src/${project}"`"
+         filename="`project::version::make_file_string_no_hyphen <<< "${srcdir}/${project}"`"
          if [ -f "${filename}.h" ]
          then
             printf "%s\n" "${filename}.h"
@@ -239,11 +270,35 @@ project::version::get_header_from_project()
             return
          fi
 
-         echo "src/${project}.h"
+         # also look in the source directory itself for a "<name>.h" header,
+         # which is the layout used by amalgamated projects (e.g. a source dir
+         # "mulle-core" holding "mulle-core.h")
+         filename="${srcdir}/${project}-version"
+         if [ -f "${filename}.h" ]
+         then
+            printf "%s\n" "${filename}.h"
+            return
+         fi
+
+         filename="`project::version::make_file_string_no_hyphen <<< "${srcdir}/${project}"`"
+         if [ -f "${filename}.h" ]
+         then
+            printf "%s\n" "${filename}.h"
+            return
+         fi
+
+         filename="`project::version::make_file_string <<< "${srcdir}/${project}.h" `"
+         if [ -f "${filename}" ]
+         then
+            printf "%s\n" "${filename}"
+            return
+         fi
+
+         echo "${srcdir}/${project}.h"
       ;;
 
       *|"")
-         echo "src/${project}.h"
+         echo "${srcdir}/${project}.h"
       ;;
    esac
 

@@ -242,7 +242,6 @@ mulle-concurrent|MulleEOF|MulleWeb|MulleFoundation|MulleUI)
       ;;
 
       */github.com/*)
-         local scheme domain host scm user repo branch tag
          eval `rexekutor mulle-domain parse-url --domain github "${_evaledurl}" `
 
          if [ -z "${repo}" ]

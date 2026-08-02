@@ -169,12 +169,13 @@ project::git::can_push()
 
    if ! rexekutor git fetch -q "${remote}" "${branch}"
    then
-      if [ "${branch}" = "develop" ]
+      #
+      # If the branch doesn't exist on the remote, that's fine — we can push.
+      # Use ls-remote to check if the branch actually exists on the remote.
+      #
+      if ! git ls-remote --exit-code "${remote}" "refs/heads/${branch}" > /dev/null 2>&1
       then
-         return 1
-      fi
-      if exekutor git fetch -q "${remote}" "develop"
-      then
+         log_verbose "Remote \"${remote}\" does not have branch \"${branch}\" yet, push is ok"
          return 0
       fi
       return 1

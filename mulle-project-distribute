@@ -694,7 +694,7 @@ main()
 
    if [ ! -d ".mulle/etc/project" ]
    then
-      log_warning "No .mulle/etc/project folder found."
+      log_verbose "No .mulle/etc/project folder found."
    fi
 
 #   . "${MULLE_PROJECT_LIBEXEC_DIR}/mulle-project-git.sh" || exit 1

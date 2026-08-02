@@ -547,6 +547,9 @@ main()
    local run_demos
    local demo_name
    local rc
+   local text
+   local EXECUTABLE
+   local MULLE_VIRTUAL_ROOT
 
    .foreachline exe_path in ${demos}
    .do
@@ -619,8 +622,6 @@ main()
                                        "${OPTION_RESIZE}"  &
          fi
 
-         local text
-
          if [ ${OPTION_TIMEOUT} -eq 0 ]
          then
             text="ever"
@@ -636,15 +637,14 @@ main()
          # others, that we intend to timeout the demo, so please don't fork
          # into background
          #
-         local rc
 
          if [ "${OPTION_SQUELCH}" = 'DEFAULT' -a "${MULLE_FLAG_LOG_VERBOSE}" = 'YES' ]
          then
             OPTION_SQUELCH='NO'
          fi
 
-         local EXECUTABLE="${exe_path}"
-         local MULLE_VIRTUAL_ROOT="${MULLE_VIRTUAL_ROOT:-$PWD}"
+         EXECUTABLE="${exe_path}"
+         MULLE_VIRTUAL_ROOT="${MULLE_VIRTUAL_ROOT:-$PWD}"
          r_fnv1a_32  "${MULLE_VIRTUAL_ROOT}"
          printf -v MULLE_VIRTUAL_ROOT_ID "%08x" "${RVAL}"
 

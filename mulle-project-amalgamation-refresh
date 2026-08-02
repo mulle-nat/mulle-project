@@ -282,11 +282,22 @@ refresh()
 
    log_verbose "Collecting nodes..."
 
+   local project_name
+
+   r_basename "${PWD}"
+   project_name="${RVAL}"
+
+   r_escaped_grep_pattern "${project_name}"
+   local grep_pattern="${RVAL}"
+
+   r_escaped_sed_pattern "${project_name}"
+   local sed_pattern="${RVAL}"
+
    nodes="`rexekutor mulle-sourcetree ${MULLE_TECHNICAL_FLAGS} list \
                                        --marks Amalgamated \
                                        --output-no-header \
-          | grep -E '^src/' \
-          | sed -e 's/^src\///' `"
+          | grep -E "^(src|${grep_pattern})/" \
+          | sed -e "s/^src\\///" -e "s/^${sed_pattern}\\///" `"
 
    log_debug "nodes: ${nodes}"
    if [ -z "${nodes}" ]

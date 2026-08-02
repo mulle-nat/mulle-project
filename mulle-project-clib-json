@@ -360,11 +360,18 @@ print_json()
       local dependencies
 
       # also use embedded resources and let the user sort it out
+      #
+      # --nodetype no-comment,ALL : skip sourcetree "comment" nodes. Their
+      # address/url fields can hold free-form prose (developer reminders) that
+      # is not a parseable URL, which otherwise makes `mulle-domain parse`
+      # emit "Could not parse URL ..." warnings. The ",ALL" keeps every other
+      # node type (the documented form, cf. `mulle-sourcetree list -h`).
       dependencies="`rexekutor mulle-sde ${MULLE_TECHNICAL_FLAGS} \
                               ${MULLE_SDE_FLAGS} \
                         dependency list \
                            --columnar \
                            -- \
+                              --nodetype no-comment,ALL \
                               --dedupe-mode url-filename \
                               --output-eval \
                               --output-no-column \

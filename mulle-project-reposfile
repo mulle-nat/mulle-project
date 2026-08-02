@@ -92,8 +92,6 @@ handle_reposfile()
    local reposfilename="$2"
    local init="$3"
 
-   local reposfilename
-
    local absfile
 
    r_absolutepath "${directory}"

@@ -118,6 +118,19 @@ get_xcodeproj_version()
 }
 
 
+#
+# The project source directory is usually "src", but can be customized via
+# PROJECT_SOURCE_DIR in the mulle-sde environment. Delegates to the library
+# resolver, which falls back to "src" if unset or if we are not running in a
+# mulle-sde environment.
+#
+get_project_source_dir()
+{
+   project::version::r_project_source_dir
+   printf "%s\n" "${RVAL}"
+}
+
+
 get_version()
 {
    log_entry "get_version" "$@"
@@ -144,6 +157,7 @@ get_version()
       if [ "${OPTION_READ_XCODE_VERSION}" = 'YES' ]
       then
          VERSION="${XCODE_VERSION}"
+         log_verbose "Version ${VERSION} found via CURRENT_PROJECT_VERSION in Xcode project \"${ACTUAL_XCODEPROJ}/project.pbxproj\""
       fi
    fi
 
@@ -161,6 +175,7 @@ get_version()
       if [ -z "${VERSIONFILE}" ]
       then
          VERSIONFILE="`project::version::get_header_from_project "${PROJECT_NAME}" "${LANGUAGE}"`"
+         log_verbose "VERSIONFILE deduced as \"${VERSIONFILE}\" from PROJECT_NAME \"${PROJECT_NAME}\" (LANGUAGE \"${LANGUAGE}\")"
       fi
 
       # Don't auto-generate VERSIONNAME for CMakeLists.txt
@@ -181,6 +196,7 @@ get_version()
                VERSIONNAME="${RVAL}_VERSION"
             ;;
          esac
+         log_verbose "VERSIONNAME deduced as \"${VERSIONNAME}\" from PROJECT_NAME \"${PROJECT_NAME}\""
       fi
 
       if [ ! -f "${VERSIONFILE}" -a -f "VERSION" ]
@@ -190,6 +206,7 @@ get_version()
          then
             VERSIONFILE="VERSION"
             VERSIONNAME=""
+            log_verbose "Version ${VERSION} found in plain \"VERSION\" file (\"${VERSIONFILE}\" header not present)"
          fi
       else
          # Special handling for CMakeLists.txt with empty VERSIONNAME
@@ -197,18 +214,33 @@ get_version()
          then
             VERSION="`rexekutor grep -A10 "^project" "${VERSIONFILE}" \
                       | grep -E "project|VERSION"        \
-                      | sed -n 's/.*VERSION[[:space:]]*"\([0-9]\+\.[0-9]\+\.[0-9]\+\)".*/\1/p' \
+                      | sed -n 's/.*VERSION[[:space:]]*"\{0,1\}\([0-9]\{1,\}\.[0-9]\{1,\}\.[0-9]\{1,\}\).*/\1/p' \
                       | head -n1`"
+            if [ ! -z "${VERSION}" ]
+            then
+               log_verbose "Version ${VERSION} found via project(... VERSION ...) in \"${VERSIONFILE}\""
+            fi
          else
             VERSION="`project::version::get_project_version "${VERSIONFILE}" "${VERSIONNAME}" "${VERSIONCUSTOM}"`"
+            if [ ! -z "${VERSION}" ]
+            then
+               log_verbose "Version ${VERSION} found via \"${VERSIONNAME}\" in \"${VERSIONFILE}\""
+            fi
          fi
          
          if [ -z "${VERSION}" ]
          then
-            VERSION="`project::version::get_project_version "src/version.h" "${VERSIONNAME}" "${VERSIONCUSTOM}"`"
+            local _srcdir
+            local _fallback_versionfile
+
+            _srcdir="`get_project_source_dir`"
+            _fallback_versionfile="${_srcdir}/version.h"
+
+            VERSION="`project::version::get_project_version "${_fallback_versionfile}" "${VERSIONNAME}" "${VERSIONCUSTOM}"`"
             if [ ! -z "${VERSION}" ]
             then
-               VERSIONFILE="src/version.h"
+               VERSIONFILE="${_fallback_versionfile}"
+               log_verbose "Version ${VERSION} found via \"${VERSIONNAME}\" in fallback \"${_fallback_versionfile}\""
             fi
          fi
       fi
@@ -220,6 +252,7 @@ get_version()
          then
             VERSIONFILE="package.json"
             VERSIONNAME="version"
+            log_verbose "Version ${VERSION} found via \"version\" key in \"package.json\""
          fi
       fi
    else
@@ -232,9 +265,13 @@ get_version()
       then
          VERSION="`rexekutor grep -A10 "^project" CMakeLists.txt \
                    | grep -E "project|VERSION"        \
-                   | sed -n 's/.*VERSION[[:space:]]*\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p' \
+                   | sed -n 's/.*VERSION[[:space:]]*"\{0,1\}\([0-9]\{1,\}\.[0-9]\{1,\}\.[0-9]\{1,\}\).*/\1/p' \
                    | head -n1`"
          # we don't change VERSIONFILE here
+         if [ ! -z "${VERSION}" ]
+         then
+            log_verbose "Version ${VERSION} found via project(... VERSION ...) in fallback \"CMakeLists.txt\""
+         fi
       fi
    fi
 
@@ -245,6 +282,7 @@ LANGUAGE=\"${LANGUAGE}\", VERSIONNAME=\"${VERSIONNAME}\", \
 VERSIONFILE=\"${VERSIONFILE}\".
 Hint: specify VERSIONNAME, VERSIONFILE in .mulle/etc/project/version-info.sh"
    else
+      log_verbose "Determined version ${VERSION} (VERSIONFILE=\"${VERSIONFILE}\", VERSIONNAME=\"${VERSIONNAME}\")"
       log_fluff "Versionfile: ${VERSIONFILE}"
       log_fluff "Versionname: ${VERSIONNAME}"
    fi
@@ -1221,6 +1259,15 @@ main()
    VERSIONFILE="${OPTION_VERSIONFILE:-${VERSIONFILE}}"
    VERSIONCUSTOM="${OPTION_CUSTOM_VERSIONING:-${VERSIONCUSTOM}}"
    VERSIONXCODEPROJ="${OPTION_XCODEPROJ:-${VERSIONXCODEPROJ}}"
+
+   if [ ! -z "${VERSIONFILE}" ]
+   then
+      log_verbose "VERSIONFILE preset to \"${VERSIONFILE}\" (via option or version-info.sh), skipping auto-detection"
+   fi
+   if [ ! -z "${VERSIONNAME}" ]
+   then
+      log_verbose "VERSIONNAME preset to \"${VERSIONNAME}\" (via option or version-info.sh), skipping auto-detection"
+   fi
 
    # Handle NONE sentinel for CMakeLists.txt (convert before get_version)
    if [ "${VERSIONNAME}" = "NONE" ]

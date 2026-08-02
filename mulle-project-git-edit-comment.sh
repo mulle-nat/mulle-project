@@ -96,6 +96,9 @@ project_git_edit_comment::main()
    local OPTION_NEW_MESSAGE
    local OPTION_INTERACTIVE='NO'
 
+   local escaped_old
+   local escaped_new
+
    while [ $# -ne 0 ]
    do
       if options_technical_flags "$1"
@@ -166,13 +169,10 @@ project_git_edit_comment::main()
 
    if [ "${OPTION_INTERACTIVE}" = 'YES' ]
    then
-      local escaped_old
       # Rebase to the commit before the one we want to change
       r_escaped_doublequotes "${OPTION_OLD_MESSAGE}"
       r_escaped_doublequotes "${RVAL}"
       escaped_old="${RVAL}"
-
-      local escaped_new
 
       r_escaped_doublequotes "${OPTION_NEW_MESSAGE}"
       r_escaped_doublequotes "${RVAL}"
@@ -182,12 +182,8 @@ project_git_edit_comment::main()
       exekutor git rebase -i "$COMMIT_HASH~1" \
                           -x "if [ \"\$(git log -1 --format='%s')\" = \"$escaped_old\" ]; then git commit --amend -m \"$escaped_new\" --allow-empty; fi"
    else
-      local escaped_old
-
       r_escaped_sed_pattern "${OPTION_OLD_MESSAGE}"
       escaped_old="${RVAL}"
-
-      local escaped_new
 
       r_escaped_sed_pattern "${OPTION_NEW_MESSAGE}"
       escaped_new="${RVAL}"

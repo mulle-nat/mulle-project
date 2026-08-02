@@ -177,7 +177,6 @@ check_repo()
 
    filtered="`rexekutor jq '.workflow_runs[] | .head_branch, .conclusion' <<< "${result}" `"
 
-   local branch
    local conclusion
 
    local local_branches
