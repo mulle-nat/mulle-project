@@ -351,7 +351,7 @@ ${C_INFO}Run mulle-sde fetch if this is unexpected."
 
    local folder
 
-   folder="${PROJECT_SOURCE_DIR:-src}/reflect"
+   folder="${PROJECT_SOURCE_DIR:-src}/${MULLE_SDE_REFLECT_DIR:-reflect}"
    if [ ! -d "${folder}" ]
    then
       if [ "${MULLE_FLAG_MAGNUM_FORCE}" != 'YES' ]
@@ -364,7 +364,7 @@ ${C_INFO}Run mulle-sde fetch if this is unexpected."
    local dstfile
    local verb
 
-   dstfile="${PROJECT_SOURCE_DIR:-src}/reflect/_${PROJECT_NAME}-versioncheck.h"
+   dstfile="${PROJECT_SOURCE_DIR:-src}/${MULLE_SDE_REFLECT_DIR:-reflect}/_${PROJECT_NAME}-versioncheck.h"
    log_verbose "dstfile is \"${dstfile}"
 
    verb="Updated"
