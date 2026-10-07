@@ -26,8 +26,8 @@ print_flags()
    echo "   --ignore-untracked : ignore untracked files"
    echo "   --no-amend         : never amend, just create a new commit [most safe]"
    echo "   --no-diff          : don't diff non-boring changes"
-   echo "   --only-amend       : don't commit, if an amend is not possible"
-   echo "   --safe-amend       : amend if harmless, otherwise new commit (default)"
+   echo "   --only-amend       : fail, if an amend is not possible"
+   echo "   --safe-amend       : amend if unpushed/untagged, else new commit (default)"
 
    options_technical_flags_usage \
                 "              : "
@@ -43,16 +43,13 @@ usage()
 Usage:
    mulle-project-commit [flags]
 
-   Automatically commit with \`--amend\` the current changes, if the changes 
-   are due to a mulle-sde upgrade. In more technical terms, changes in "share"
-   and "reflect" folders are considered boring.
-   It is checked that only a commit is amended, that hasn't been tagged
-   or pushed yet. Otherwise a regular commit is created, that needs a
-   commit message.
+   Amends the last commit with boring changes (mulle-sde upgrade output in
+   "share" and "reflect"), if that commit is safe to rewrite: not pushed,
+   not tagged and not a merge. Otherwise a new commit is created instead,
+   and non-boring changes always create a new one.
 
-   Specify a commit message with \`-m <message>\` like you would with git,
-   not needed for \`--only-amend\` though, the default. The commit message
-   will only be used for new commits.
+   Give new commits a message with \`-m <message>\` like git. Not needed for
+   \`--only-amend\`, which never creates one.
 
 Example:
       mulle-project-commit -m "boring changes to mulle-sde files"
@@ -350,6 +347,39 @@ ${C_RESET}${interesting_changes# }"
    then
       local commit_options
 
+      #
+      # If an amend is impossible, decide what to do based on the mode:
+      #
+      #   --only-amend : amending is mandatory, so fail and explain why we
+      #                  cannot amend (never ask for a commit message).
+      #   --boring     : never ask the user for a commit message; explain
+      #                  why we couldn't amend and create a new boring
+      #                  commit with a default message instead.
+      #
+      local cannot_amend_reason
+
+      cannot_amend_reason=""
+      if ! project::git::can_amend
+      then
+         project::git::r_cannot_amend_reason
+         cannot_amend_reason="${RVAL}"
+      fi
+
+      if [ "${OPTION_AMEND}" = 'ONLY' -a ! -z "${cannot_amend_reason}" ]
+      then
+         fail "Cannot amend the last commit because ${cannot_amend_reason}."
+      fi
+
+      if [ -z "${OPTION_MESSAGE}" -a "${OPTION_BORING}" = 'YES' ]
+      then
+         if [ ! -z "${cannot_amend_reason}" ]
+         then
+            log_info "Cannot amend the last commit because ${cannot_amend_reason}, \
+creating a new boring commit instead."
+         fi
+         OPTION_MESSAGE="boring changes"
+      fi
+
       project::git::r_commit_options "${OPTION_AMEND}" "" "${OPTION_MESSAGE}"
       commit_options="${RVAL}"
 
@@ -360,7 +390,7 @@ ${C_RESET}${interesting_changes# }"
          *)
             if [ -z "${OPTION_MESSAGE}" ]
             then
-               fail "Need a commit message for this commit"
+               fail "Need a commit message for this commit (use -m <message>)"
             fi
          ;;
       esac

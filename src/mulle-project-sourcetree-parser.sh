@@ -61,6 +61,53 @@ project::sourcetree_parser::get_dependency_address_nodetype_branch_tag_url()
 }
 
 
+# Query whether the sourcetree database is complete and in sync.
+#
+# The database is what mulle-sourcetree uses to resolve transitive dependencies.
+# When it is stale or missing, mulle-sourcetree list only emits the dependencies
+# it can see and (in share mode) prints a "Listing will be complete after a sync"
+# warning -- while still exiting successfully. Consumers that trust the listing
+# therefore silently operate on an incomplete dependency set.
+#
+# Returns (as mulle-sourcetree dbstatus):
+#   0 - up to date
+#   1 - no sourcetree here
+#   2 - not up to date, needs a sync
+#   3 - stash directory changed, needs fetch and clean
+#
+# RVAL is set to the numeric status.
+#
+project::sourcetree_parser::r_database_status()
+{
+   log_entry "project::sourcetree_parser::r_database_status" "$@"
+
+   local rc
+
+   rexekutor mulle-sourcetree \
+                  ${MULLE_SOURCETREE_FLAGS:-} \
+                  -N \
+               dbstatus -s
+
+   rc=$?
+   RVAL="${rc}"
+   return ${rc}
+}
+
+
+project::sourcetree_parser::r_database_status_description()
+{
+   log_entry "project::sourcetree_parser::r_database_status_description" "$@"
+
+   case "$1" in
+      0) RVAL="up to date" ;;
+      1) RVAL="no sourcetree found" ;;
+      2) RVAL="not synced" ;;
+      3) RVAL="stash directory changed (needs fetch and clean)" ;;
+      *) RVAL="unexpected dbstatus ${1}" ;;
+   esac
+}
+
+
 project::sourcetree_parser::is_matching_wildcards()
 {
    log_entry "project::sourcetree_parser::is_matching_wildcards" "$@"

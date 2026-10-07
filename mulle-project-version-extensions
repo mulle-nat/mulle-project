@@ -197,6 +197,37 @@ common_main()
 }
 
 
+#
+# Returns the nearest ancestor of <directory> (including itself) whose
+# basename ends in "-developer". Sets RVAL to that directory or to the
+# empty string if none was found.
+#
+r_developer_project_dir()
+{
+   local dir="$1"
+
+   while [ -n "${dir}" ]
+   do
+      r_basename "${dir}"
+      case "${RVAL}" in
+         *-developer)
+            RVAL="${dir}"
+            return
+         ;;
+      esac
+
+      r_dirname "${dir}"
+      if [ "${RVAL}" = "${dir}" ]
+      then
+         break
+      fi
+      dir="${RVAL}"
+   done
+
+   RVAL=
+}
+
+
 main()
 {
    local MULLE_FLAG_MAGNUM_FORCE='NO'
@@ -280,30 +311,46 @@ main()
    [ $# -ne 0 ] && usage "superflous parameters $*"
 
    local project_dir
-
-   project_dir="`mulle-sde project-dir 2> /dev/null`"
-   project_dir="${project_dir:-$PWD}"
-   rexekutor cd "${project_dir}" || exit 1
-
    local vendor="${OPTION_VENDOR}"
+   local src="src"
 
-   if [ -z "${vendor}" ]
+   #
+   # If we are inside a "*-developer" project, use that project and do not
+   # consult mulle-env, which might report an umbrella project instead.
+   #
+   r_developer_project_dir "${PWD}"
+
+   if [ -n "${RVAL}" ]
    then
-      vendor="`mulle-env environment get PROJECT_NAME 2> /dev/null`"
+      project_dir="${RVAL}"
+
       if [ -z "${vendor}" ]
       then
          r_basename "${project_dir}"
-         vendor="${RVAL}"
+         vendor="${RVAL%-developer}"
       fi
-      vendor="${vendor%-developer}"
+   else
+      project_dir="`mulle-sde project-dir 2> /dev/null`"
+      project_dir="${project_dir:-$PWD}"
+
+      if [ -z "${vendor}" ]
+      then
+         vendor="`mulle-env environment get PROJECT_NAME 2> /dev/null`"
+         if [ -z "${vendor}" ]
+         then
+            r_basename "${project_dir}"
+            vendor="${RVAL}"
+         fi
+         vendor="${vendor%-developer}"
+      fi
+
+      src="`mulle-env environment get PROJECT_SOURCE_DIR  2> /dev/null`"
+      src="${src:-src}"
    fi
 
+   rexekutor cd "${project_dir}" || exit 1
+
    [ -z "${vendor}" ] && _internal_fail "Couldn't figure out vendor"
-
-   local src
-
-   src="`mulle-env environment get PROJECT_SOURCE_DIR  2> /dev/null`"
-   src="${src:-src}"
 
    local extensions_dir
 

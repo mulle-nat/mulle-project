@@ -106,6 +106,88 @@ __doctor_fix_mulle_org()
 }
 
 
+#
+# Extract the default value from a "${PREFIX:-default}" expression.
+# If the value is not a wrapped variable expression, returns it unchanged.
+# For URLs the default itself may contain nested "${...}" (e.g. ${MULLE_TAG}),
+# so we strip only the leading "${PREFIX:-" and the single trailing "}".
+#
+r_doctor_default_value()
+{
+   local value="$1"
+
+   case "${value}" in
+      \$\{*:-*\})
+         # strip leading "${...:-"
+         RVAL="${value#*:-}"
+         # strip the single trailing "}" that closes the outer wrapper
+         RVAL="${RVAL%\}}"
+      ;;
+
+      \$\{*\})
+         # wrapped but no default, e.g. ${FOO} -> empty default
+         RVAL=""
+      ;;
+
+      *)
+         # not wrapped at all
+         RVAL="${value}"
+      ;;
+   esac
+}
+
+
+__doctor_fix_archive_field()
+{
+   log_entry "__doctor_fix_archive_field" "$@"
+
+   local address="$1"
+   local field="$2"
+   local upcaseid="$3"
+   local defvalue="$4"
+
+   local uppercasefield
+   local wrapped_value
+
+   case "${field}" in
+      nodetype) uppercasefield="NODETYPE" ;;
+      url)      uppercasefield="URL" ;;
+      tag)      uppercasefield="TAG" ;;
+      branch)   uppercasefield="BRANCH" ;;
+      *)
+         r_uppercase "${field}"
+         uppercasefield="${RVAL}"
+      ;;
+   esac
+
+   if [ -z "${defvalue}" ]
+   then
+      wrapped_value="\${${upcaseid}_${uppercasefield}}"
+   else
+      wrapped_value="\${${upcaseid}_${uppercasefield}:-${defvalue}}"
+   fi
+
+   log_info "Fixing ${field} for ${address} to \"${wrapped_value}\"..."
+
+   # Source mulle-sde if needed
+   if [ -z "${MULLE_SDE_LIBEXEC_DIR}" ]
+   then
+      MULLE_SDE_LIBEXEC_DIR="`mulle-sde libexec-dir 2>/dev/null`"
+   fi
+
+   if [ ! -f "${MULLE_SDE_LIBEXEC_DIR}/mulle-sde-dependency.sh" ]
+   then
+      log_error "mulle-sde not available, cannot fix automatically"
+      return 1
+   fi
+
+   source "${MULLE_SDE_LIBEXEC_DIR}/mulle-sde-common.sh"
+   source "${MULLE_SDE_LIBEXEC_DIR}/mulle-sde-dependency.sh"
+
+   sde::dependency::set_main "${address}" "${field}" "${wrapped_value}"
+}
+
+
 __doctor_repo_nodeline()
 {
    log_entry "__doctor_repo_nodeline" "$@"
@@ -179,6 +261,10 @@ __doctor_archive_nodeline()
    if [ "${_nodetype}" != "${expect}" ]
    then
       doctor_log_warning "${_address}" "warning: ${_address}: nodetype is \"${_nodetype}\" not \"${expect}\""
+      if [ "${OPTION_FIX}" = 'YES' ]
+      then
+         __doctor_fix_archive_field "${_address}" "nodetype" "${upcaseid}" "${defvalue}"
+      fi
    fi
 
    expect="\${${upcaseid}_URL:-"
@@ -188,6 +274,14 @@ __doctor_archive_nodeline()
 
       *)
          doctor_log_warning "${_address}" "warning: ${_address}: url \"${_url}\" does not start with \"${expect}\""
+         if [ "${OPTION_FIX}" = 'YES' ]
+         then
+            local urldefvalue
+
+            r_doctor_default_value "${_url}"
+            urldefvalue="${RVAL}"
+            __doctor_fix_archive_field "${_address}" "url" "${upcaseid}" "${urldefvalue}"
+         fi
       ;;
    esac
 
@@ -204,6 +298,10 @@ mulle-concurrent|MulleEOF|MulleWeb|MulleFoundation|MulleUI)
                if [ "${_tag}" != "${expect}" ]
                then
                   doctor_log_info "${_address}" "${_address}: tag is \"${_tag}\" not \"${expect}\""
+                  if [ "${OPTION_FIX}" = 'YES' ]
+                  then
+                     __doctor_fix_archive_field "${_address}" "tag" "${upcaseid}" "latest"
+                  fi
                fi
             ;;
          esac
@@ -627,43 +725,29 @@ doctor_check_variable_wrapping()
       ;;
       *)
    case "${_branch}" in
-      \$\{${upcaseid}_BRANCH*\})
-         # properly wrapped (can be with or without default)
+      \$\{${upcaseid}_BRANCH:-\})
+         # empty default should be removed: ${PREFIX_BRANCH:-} -> ${PREFIX_BRANCH}
+         log_warning "warning: ${address}: branch \"${_branch}\" has a superfluous empty default, should be \${${upcaseid}_BRANCH}"
+         if [ "${OPTION_FIX}" = 'YES' ]
+         then
+            __doctor_fix_empty_default "${address}" "branch" "${_branch}"
+         fi
+      ;;
+      \$\{${upcaseid}_BRANCH\}|\$\{${upcaseid}_BRANCH:-?*\})
+         # properly wrapped: either no default, or a non-empty default
+      ;;
+      "")
+         # empty branch is valid (common for archives and tag-pinned repos)
+      ;;
+      \$\{*\})
+         # wrapped under some other variable; leave it alone
       ;;
       *)
-         if [ ! -z "${_branch}" ]
+         # non-empty literal branch, wrap it preserving the value as default
+         log_warning "warning: ${address}: branch \"${_branch}\" should be wrapped as \${${upcaseid}_BRANCH:-${_branch}}"
+         if [ "${OPTION_FIX}" = 'YES' ]
          then
-            # Don't suggest wrapping if it's already a variable reference
-            case "${_branch}" in
-               \$\{*\})
-                  # Already a variable, don't suggest wrapping
-               ;;
-               *)
-                  log_warning "warning: ${address}: branch \"${_branch}\" should be wrapped as \${${upcaseid}_BRANCH:-${_branch}}"
-                  if [ "${OPTION_FIX}" = 'YES' ]
-                  then
-                     __doctor_fix_variable_wrapping "${address}" "branch" "${_branch}" "${upcaseid}"
-                  fi
-               ;;
-            esac
-         else
-            # Check for empty default that should be removed
-            case "${_branch}" in
-               *:-\})
-                  log_warning "warning: ${address}: branch \"${_branch}\" should be wrapped as \${${upcaseid}_BRANCH}"
-                  if [ "${OPTION_FIX}" = 'YES' ]
-                  then
-                     __doctor_fix_empty_default "${address}" "branch" "${_branch}"
-                  fi
-               ;;
-               *)
-                  log_warning "warning: ${address}: branch \"${_branch}\" should be wrapped as \${${upcaseid}_BRANCH}"
-                  if [ "${OPTION_FIX}" = 'YES' ]
-                  then
-                     __doctor_fix_variable_wrapping "${address}" "branch" "" "${upcaseid}"
-                  fi
-               ;;
-            esac
+            __doctor_fix_variable_wrapping "${address}" "branch" "${_branch}" "${upcaseid}"
          fi
       ;;
    esac

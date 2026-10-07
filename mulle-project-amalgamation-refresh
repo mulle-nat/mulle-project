@@ -243,9 +243,6 @@ create_clib_json_in_constituents()
 }
 
 
-CLEAN_DOMAINS="graveyard sourcetree_share output monitor project"
-
-
 reamalgamate()
 {
    log_info "Reamalgamate"
@@ -254,6 +251,7 @@ reamalgamate()
    # parallel status reflects, which isn't food
    rexekutor mulle-sde ${MULLE_TECHNICAL_FLAGS} clean --domain graveyard \
                                                       --domain sourcetree_share \
+                                                      --domain db \
                                                       --domain project  &&
    rexekutor mulle-sde ${MULLE_TECHNICAL_FLAGS} fetch &&
    rexekutor mulle-sde ${MULLE_TECHNICAL_FLAGS} reflect

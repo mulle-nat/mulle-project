@@ -281,15 +281,12 @@ copy_without_first_entry()
 {
    log_entry "copy_without_first_entry" "$@"
 
-   local header="$1"
-
-   # remove old comments for same version
-   local markers
+   # Skip the first entry (whatever its heading level) and copy everything from
+   # the next version heading on. The caller passes the header with its '#'
+   # stripped, so the heading level can not be derived from it; entries also mix
+   # levels (# major, ## minor, ### patch), so match any version heading.
    local state
    local line
-
-   markers="`sed 's/^\(#+\).*/\1/' <<< "${header}"`"
-   log_debug "markers: ${markers}"
 
    state="start"
    while IFS=$'\n' read -r line
@@ -300,7 +297,7 @@ copy_without_first_entry()
          ;;
 
          search)
-            if grep -E "^${markers} *" <<< "${line}"
+            if grep -E -q '^#+[[:space:]]*[0-9]+\.[0-9]+\.[0-9]+' <<< "${line}"
             then
                state="copy"
                exekutor printf "%s\n" "${line}"

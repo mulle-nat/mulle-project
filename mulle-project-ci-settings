@@ -14,7 +14,7 @@ fi
 
 print_flags()
 {
-   echo "   -f               : force operation"
+   echo "   -f               : force operation, repair and refetch the sourcetree"
 
    ##
    ## ADD YOUR FLAGS HERE
@@ -51,6 +51,14 @@ Usage:
    mulle-sde clean tidy ; mulle-sde clean fetch
    mulle-sde test clean tidy ; mulle-sde test fetch
 
+   The command verifies the sourcetree database with "mulle-sourcetree
+   dbstatus" before it writes anything. If the database is stale or missing,
+   it repairs it automatically with "mulle-sde clean tidy" and, unless
+   --no-fetch is given, "mulle-sde clean fetch" followed by "mulle-sde fetch".
+   Only if the database still cannot be made usable does it fail, so that an
+   incomplete settings file is never generated. Use --no-fix to skip the
+   automatic repair and fail immediately instead.
+
 Example:
    mulle-project-ci-settings --user 'mulle-*' --user '!mintomic'
 
@@ -63,11 +71,45 @@ Flags:
    --scope <name>   : specify environment scope (host-ci-prerelease)
    --mulle          : standard values for mulle-c/mulle-objc projects
    --append         : don't overwrite existing file completely
+   --fetch          : allow the automatic repair to refetch from remotes
+                      (default)
+   --no-fetch       : repair locally only, never touch the network
+   --no-fix         : don't repair, fail if the database is not usable
 
 EOF
    print_flags | LC_ALL=C sort >&2
 
    exit 1
+}
+
+
+repair_sourcetree()
+{
+   log_entry repair_sourcetree "$@"
+
+   local do_fetch="$1"
+
+   log_info "Repairing sourcetree database (mulle-sde clean tidy)"
+
+   exekutor mulle-sde \
+               ${MULLE_TECHNICAL_FLAGS} \
+            --no-test-check \
+            clean tidy || return $?
+
+   if [ "${do_fetch}" = 'YES' ]
+   then
+      log_info "Refetching dependencies (mulle-sde clean fetch ; mulle-sde fetch)"
+
+      exekutor mulle-sde \
+                  ${MULLE_TECHNICAL_FLAGS} \
+               --no-test-check \
+               clean fetch || return $?
+
+      exekutor mulle-sde \
+                  ${MULLE_TECHNICAL_FLAGS} \
+               --no-test-check \
+               fetch || return $?
+   fi
 }
 
 
@@ -80,6 +122,8 @@ produce_environment()
    local matching_users="$3"
    local matching_repos="$4"
    local clobber="$5"
+   local fix="$6"
+   local fetch="$7"
 
    if [ -z "${MULLE_VIRTUAL_ROOT}" ]
    then
@@ -93,19 +137,51 @@ produce_environment()
    [ -z "${mapped_branch}" ] && _internal_fail "mapped_branch is empty"
    [ -z "${mapped_scope}" ]  && _internal_fail "mapped_scope is empty"
 
-   exekutor mulle-env \
-               ${MULLE_TECHNICAL_FLAGS} \
-               ${MULLE_ENV_FLAGS} \
-            scope  \
-               remove --if-exists "${mapped_scope}"  || fail "Could not remove old scope"
+   #
+   # The dependency listing is only trustworthy while the sourcetree database
+   # is complete. A stale or missing database makes mulle-sourcetree list emit
+   # an incomplete set (with only a warning on stderr) yet still exit
+   # successfully, which used to silently produce a settings file with missing
+   # transitive dependencies. Verify the database and, unless disabled, repair
+   # it before writing anything.
+   #
+   local dbstatus
+
+   project::sourcetree_parser::r_database_status
+   dbstatus=$?
+
+   if [ ${dbstatus} -eq 1 ]
+   then
+      log_warning "No sourcetree here.
+Nothing to write to scope '${mapped_scope}'."
+      return 0
+   fi
+
+   if [ ${dbstatus} -ne 0 ] && [ "${fix}" = 'YES' ]
+   then
+      project::sourcetree_parser::r_database_status_description "${dbstatus}"
+      log_warning "Sourcetree database not usable (${dbstatus}: ${RVAL}), repairing"
+
+      repair_sourcetree "${fetch}" || fail "Could not repair sourcetree database"
+
+      project::sourcetree_parser::r_database_status
+      dbstatus=$?
+   fi
+
+   if [ ${dbstatus} -ne 0 ]
+   then
+      project::sourcetree_parser::r_database_status_description "${dbstatus}"
+
+      fail "Sourcetree database is not usable (${dbstatus}: ${RVAL}).
+Refusing to generate CI settings from an incomplete dependency listing.
+
+Let this command repair it with --fetch, or do it manually:
+   mulle-sde clean tidy ; mulle-sde clean fetch ; mulle-sde fetch
+
+Use --no-fix to check without repairing."
+   fi
 
    local lines
-
-   if [ "${clobber}" = 'YES' ]
-   then
-      eval `mulle-env mulle-tool-env env`
-      remove_file_if_present "${MULLE_ENV_ETC_DIR}/environment-host-ci-prerelease.sh"
-   fi
 
    #
    # uses mulle-sourcetree-parser library
@@ -131,9 +207,16 @@ produce_environment()
 
    local mapped_url
    local line
+   local mapped_count=0
+   local matching_lines
 
    log_debug "lines: ${lines}"
 
+   #
+   # First pass: determine which dependencies would be mapped. This runs
+   # before the existing scope/file is touched, so that a failure never
+   # destroys prior settings and a partial result is never written.
+   #
    .foreachline line in ${lines}
    .do
       [ -z "${line}" ] && .continue
@@ -144,15 +227,13 @@ produce_environment()
       fi
 
       [ -z "${_address}" ] && fail "Can't figure out address: ${line}"
-      #
-      # we need it to set to git for prerelease
-      #
-      [ -z "${_url_identifier}" ] && fail "Can't figure out URL from URL ${_url}: ${line}"
-      #
-      # we need it to set prerelease branch
-      #
-      [ -z "${_branch_identifier}" ] && fail "Can't figure out branch identifier: ${line}"
 
+      #
+      # Skip dependencies that do not match the user/repo filter BEFORE the
+      # stricter identifier validation. A non-matching dependency (e.g. a
+      # third-party tar dep with a templated URL) may legitimately lack an
+      # override identifier and must not abort the whole run.
+      #
       if [ ! -z "${_user}" ] && ! project::sourcetree_parser::is_matching_wildcards "${matching_users}" "${_user}"
       then
          log_fluff "\"${_user}\" does not match \"${matching_users}\""
@@ -161,6 +242,87 @@ produce_environment()
       if [ ! -z "${_repo}" ] && ! project::sourcetree_parser::is_matching_wildcards "${matching_repos}" "${_repo}"
       then
          log_fluff "\"${_repo}\" does not match \"${matching_repos}\""
+         .continue
+      fi
+
+      #
+      # A dependency can only be remapped when its nodetype/url/branch are
+      # written as overridable variables, e.g. \${FOO_URL:-https://...}. The
+      # parser only yields an override identifier for that form. Such
+      # identifiers are produced by mulle-project-add-missing-branch-identifier.
+      #
+      # A literal value has no identifier and therefore cannot be redirected.
+      # Skip it with a warning instead of aborting the whole run. Note that
+      # deriving an identifier here would be wrong: it would remap e.g. a
+      # third-party tar dependency to an unrelated git repository.
+      #
+      # Validate everything the second pass relies on, so that applying the
+      # mappings cannot fail after the existing scope has been replaced.
+      #
+      case "${_nodetype}" in
+         *clib*)
+            if [ -z "${_branch_identifier}" ]
+            then
+               log_warning "\"${_address}\" has no branch override identifier (branch \"${_branch}\"); skipping.
+Run mulle-project-add-missing-branch-identifier to make it overridable."
+               .continue
+            fi
+
+            [ -z "${_url}" ]    && fail "Can't figure out URL: ${line}"
+            [ -z "${_branch}" ] && fail "Can't figure out branch: ${line}"
+         ;;
+
+         *)
+            if [ -z "${_nodetype_identifier}" -o \
+                 -z "${_url_identifier}"    -o \
+                 -z "${_branch_identifier}" ]
+            then
+               log_warning "\"${_address}\" has no nodetype/url/branch override identifier (nodetype \"${_nodetype}\", url \"${_url}\", branch \"${_branch}\"); skipping.
+Run mulle-project-add-missing-branch-identifier to make it overridable."
+               .continue
+            fi
+
+            [ -z "${_user}" ]    && fail "Can't figure out user from URL ${_url}: ${line}"
+            [ -z "${_repo}" ]    && fail "Can't figure out repo from URL ${_url}: ${line}"
+            [ -z "${_host}" ]    && fail "Can't figure out host from URL ${_url}: ${line}"
+         ;;
+      esac
+
+      r_add_line "${matching_lines}" "${line}"
+      matching_lines="${RVAL}"
+   .done
+
+   if [ -z "${matching_lines}" ]
+   then
+      log_warning "No dependencies matched (--user '${matching_users}', --repo '${matching_repos}').
+Nothing to write to scope '${mapped_scope}'."
+      return 0
+   fi
+
+   #
+   # We have something to write, so it is safe to replace the old scope.
+   #
+   exekutor mulle-env \
+               ${MULLE_TECHNICAL_FLAGS} \
+               ${MULLE_ENV_FLAGS} \
+            scope  \
+               remove --if-exists "${mapped_scope}"  || fail "Could not remove old scope"
+
+   if [ "${clobber}" = 'YES' ]
+   then
+      eval `mulle-env mulle-tool-env env`
+      remove_file_if_present "${MULLE_ENV_ETC_DIR}/environment-${mapped_scope}.sh"
+   fi
+
+   #
+   # Second pass: apply the mappings.
+   #
+   .foreachline line in ${matching_lines}
+   .do
+      [ -z "${line}" ] && .continue
+
+      if ! project::sourcetree_parser::parse_nodetype_branch_tag_url "${line}"
+      then
          .continue
       fi
 
@@ -210,7 +372,11 @@ produce_environment()
                         set "${_branch_identifier}" "${mapped_branch}" "${_address} branch: ${_branch}"
          ;;
       esac
+
+      mapped_count=$(( mapped_count + 1 ))
    .done
+
+   log_verbose "Mapped ${mapped_count} dependenc$([ ${mapped_count} -eq 1 ] && echo y || echo ies) to scope ${C_RESET_BOLD}${mapped_scope}"
 }
 
 
@@ -221,6 +387,8 @@ main()
    local OPTION_USERS
    local OPTION_REPOS
    local OPTION_CLOBBER='YES'
+   local OPTION_FIX='YES'
+   local OPTION_FETCH='YES'
 
    #
    # simple flag handling
@@ -236,6 +404,24 @@ main()
       case "$1" in
          -f|--force)
             MULLE_FLAG_MAGNUM_FORCE='YES'
+            OPTION_FIX='YES'
+            OPTION_FETCH='YES'
+         ;;
+
+         --fix)
+            OPTION_FIX='YES'
+         ;;
+
+         --no-fix|--no-repair)
+            OPTION_FIX='NO'
+         ;;
+
+         --fetch)
+            OPTION_FETCH='YES'
+         ;;
+
+         --no-fetch)
+            OPTION_FETCH='NO'
          ;;
 
          -h*|--help|help)
@@ -315,7 +501,9 @@ main()
                        "${OPTION_SCOPE:-host-ci-${OPTION_BRANCH:-prerelease}}" \
                        "${OPTION_USERS}" \
                        "${OPTION_REPOS}" \
-                       "${OPTION_CLOBBER}"
+                       "${OPTION_CLOBBER}" \
+                       "${OPTION_FIX}" \
+                       "${OPTION_FETCH}"
 }
 
 

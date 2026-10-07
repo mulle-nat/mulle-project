@@ -66,7 +66,6 @@ mulle-project-sourcetree-update-tags
 mulle-project-squash-commits
 mulle-project-squash-prerelease
 mulle-project-tag
-mulle-project-travis-ci-prerelease
 mulle-project-untag
 mulle-project-upgrade-cmake
 mulle-project-version

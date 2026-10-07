@@ -61,7 +61,7 @@ Commands:
    remove <file>         : remove version mirror file
    list                  : show current configuration
    status                : check if version needs a bump
-   diff                  : output version jump type (none, patch, minor, major)
+   diff                  : output version jump type (none, custom, patch, minor, major)
 
 Get/Set Options:
    ++                    : shorthand for --increment-patch --write
@@ -579,19 +579,82 @@ write_version()
    if [ "${OPTION_WRITE}" = 'YES' ]
    then
       #
-      # small hack for extensions to distribute versioning
-      # improve with namekeys later
+      # Mirror files also carry the version. If VERSIONFILEMIRRORS is given,
+      # we use exactly those entries (no assumptions). Otherwise we assume a
+      # conventional set, each only if present.
       #
-      local other
+      # Each entry may carry its own key as "path:key". If no key is given,
+      # the default is VERSIONMIRRORNAME if set, else "VERSION" for
+      # CMakeLists.txt and "version" for everything else. We always do a
+      # key-anchored in-place edit, never a whole-file overwrite.
+      #
+      local mirrors
 
-      .foreachline other in ${VERSIONFILEMIRRORS}
+      mirrors="${VERSIONFILEMIRRORS}"
+      if [ -z "${mirrors}" ]
+      then
+         local candidate
+
+         for candidate in CMakeLists.txt cola/properties.plist clib.json package.json
+         do
+            if [ -f "${candidate}" ]
+            then
+               r_add_line "${mirrors}" "${candidate}"
+               mirrors="${RVAL}"
+            fi
+         done
+      fi
+
+      local other
+      local mirrorfile
+      local mirrorkey
+
+      .foreachline other in ${mirrors}
       .do
          if [ ! -z "${other}" ]
          then
-            project::version::set "${VERSION}" \
-                                  "${other}" \
-                                  "${VERSIONMIRRORNAME}" \
-                                  "${VERSIONCUSTOM}" || exit 1
+            #
+            # split "path:key" on the last ':' (paths rarely contain ':')
+            #
+            case "${other}" in
+               *:*)
+                  mirrorfile="${other%:*}"
+                  mirrorkey="${other##*:}"
+               ;;
+
+               *)
+                  mirrorfile="${other}"
+                  mirrorkey=""
+               ;;
+            esac
+
+            if [ -z "${mirrorkey}" ]
+            then
+               mirrorkey="${VERSIONMIRRORNAME}"
+            fi
+
+            if [ -z "${mirrorkey}" ]
+            then
+               case "${mirrorfile}" in
+                  CMakeLists.txt|*/CMakeLists.txt)
+                     mirrorkey="VERSION"
+                  ;;
+
+                  *)
+                     mirrorkey="version"
+                  ;;
+               esac
+            fi
+
+            if [ ! -f "${mirrorfile}" ]
+            then
+               log_verbose "Mirror file \"${mirrorfile}\" not present, skipping"
+            else
+               project::version::set "${VERSION}" \
+                                     "${mirrorfile}" \
+                                     "${mirrorkey}" \
+                                     "${VERSIONCUSTOM}" || exit 1
+            fi
          fi
       .done
 
@@ -675,45 +738,22 @@ diff_version()
       return 0
    fi
 
-   # Use mulle-bashfunctions version parsing
-   local current_major current_minor current_patch
-   local last_major last_minor last_patch
+   # Split at the dots. A missing part is 0. (The old code tested
+   # "${temp}" = "${minor}" for "no patch part", which is also true for a
+   # version like 0.1.1, so its patch was read as 0 and 0.1.1 vs 0.1.0 was
+   # "none".)
+   local current_major current_minor current_patch current_custom
+   local last_major last_minor last_patch last_custom
 
-   # Parse current version
-   current_major="${current%%\.*}"
-   local temp="${current#*\.}"
-   if [ "${temp}" = "${current}" ]
-   then
-      current_minor=0
-      current_patch=0
-   else
-      current_minor="${temp%%\.*}"
-      temp="${temp#*\.}"
-      if [ "${temp}" = "${current_minor}" ]
-      then
-         current_patch=0
-      else
-         current_patch="${temp%%\.*}"
-      fi
-   fi
+   IFS=. read -r current_major current_minor current_patch current_custom <<< "${current}"
+   IFS=. read -r last_major last_minor last_patch last_custom <<< "${last}"
 
-   # Parse last version
-   last_major="${last%%\.*}"
-   temp="${last#*\.}"
-   if [ "${temp}" = "${last}" ]
-   then
-      last_minor=0
-      last_patch=0
-   else
-      last_minor="${temp%%\.*}"
-      temp="${temp#*\.}"
-      if [ "${temp}" = "${last_minor}" ]
-      then
-         last_patch=0
-      else
-         last_patch="${temp%%\.*}"
-      fi
-   fi
+   current_minor="${current_minor:-0}"
+   current_patch="${current_patch:-0}"
+   last_minor="${last_minor:-0}"
+   last_patch="${last_patch:-0}"
+   current_custom="${current_custom:-0}"
+   last_custom="${last_custom:-0}"
 
    # Compare versions
    if [ "${current_major}" != "${last_major}" ]
@@ -725,6 +765,9 @@ diff_version()
    elif [ "${current_patch}" != "${last_patch}" ]
    then
       echo "patch"
+   elif [ "${current_custom}" != "${last_custom}" ]
+   then
+      echo "custom"
    else
       echo "none"
    fi
@@ -1319,7 +1362,13 @@ main()
 
    if [ "${OPTION_DIFF}" = 'YES' ]
    then
-      last="`rexekutor git tag -l --sort=-creatordate | grep -E -x '[0-9]*\.[0-9]*\.[0-9]*' | head -1`"
+      # custom versioning (four numbers) is tagged with four numbers
+      if [ "${VERSIONCUSTOM}" = 'YES' ]
+      then
+         last="`rexekutor git tag -l --sort=-creatordate | grep -E -x '[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1`"
+      else
+         last="`rexekutor git tag -l --sort=-creatordate | grep -E -x '[0-9]+\.[0-9]+\.[0-9]+' | head -1`"
+      fi
       diff_version "${VERSION}" "${last}"
       return 0
    fi

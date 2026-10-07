@@ -145,13 +145,49 @@ project::git::can_amend()
    fi
 
    #
-   # check that last commit wasn't a merge, don't want to amend those
+   # check that last commit wasn't a merge, don't want to amend those.
+   # With magnum force (-f) the user explicitly wants the merge amended.
    #
-   git log -1 --pretty="%B" | head -1 | grep -E '^Merge branch' > /dev/null
-   if [ $? -eq 0 ]
+   if [ "${MULLE_FLAG_MAGNUM_FORCE:-}" != 'YES' ]
    then
-      log_debug "Last commit is a merge from another branch"
-      return 1
+      git log -1 --pretty="%B" | head -1 | grep -E '^Merge branch' > /dev/null
+      if [ $? -eq 0 ]
+      then
+         log_debug "Last commit is a merge from another branch"
+         return 1
+      fi
+   fi
+
+   return 0
+}
+
+#
+# Returns in RVAL a human-readable reason why the last commit cannot be
+# amended, or an empty string if it can be amended. Mirrors the checks in
+# project::git::can_amend.
+#
+project::git::r_cannot_amend_reason()
+{
+   log_entry "project::git::r_cannot_amend_reason" "$@"
+
+   local branch="$1"
+
+   RVAL=""
+
+   # branch can be empty!!
+   if ! git log -1 --decorate -q ${branch} | grep -E '\(HEAD -> [^,)]*\)' > /dev/null
+   then
+      RVAL="the last commit has already been pushed or is tagged"
+      return 0
+   fi
+
+   if [ "${MULLE_FLAG_MAGNUM_FORCE:-}" != 'YES' ]
+   then
+      if git log -1 --pretty="%B" | head -1 | grep -E '^Merge branch' > /dev/null
+      then
+         RVAL="the last commit is a merge from another branch"
+         return 0
+      fi
    fi
 
    return 0

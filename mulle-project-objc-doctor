@@ -384,6 +384,18 @@ check_readme_freshness()
 }
 
 
+check_graveyard()
+{
+   if [ ! -d ".graveyard" ]
+   then
+      log_verbose "No .graveyard directory found"
+      return
+   fi
+
+   log_warning "Project root contains a .graveyard directory (release blocker)"
+}
+
+
 main()
 {
    while [ $# -ne 0 ]
@@ -438,6 +450,8 @@ main()
    check_current_branch
    log_verbose "Diagnose git status"
    check_git_status
+   log_verbose "Diagnose graveyard"
+   check_graveyard
    log_verbose "Diagnose sourcetree"
    check_sourcetree
    log_verbose "Diagnose project version"

@@ -453,6 +453,36 @@ project::version::set()
 
    if [ -z "${versionname}" ]
    then
+      #
+      # An empty versionname means "the whole file is just the version"
+      # (e.g. a bare VERSION file). Overwriting the file is only safe if it
+      # really is trivial. Refuse to clobber a structured file - that path
+      # has truncated real files (package.json, plists) in the past.
+      #
+      if [ -f "${versionfile}" ]
+      then
+         local _existing
+
+         _existing="`cat "${versionfile}" 2>/dev/null`"
+         # trivial == empty, or a single line that is only a version/number
+         case "${_existing}" in
+            "")
+            ;;
+
+            *$'\n'*)
+               fail "Refusing to overwrite \"${versionfile}\" with just the \
+version: it has multiple lines and no version key was given. Specify a key \
+(e.g. \"${versionfile}:version\")."
+            ;;
+
+            *[!0-9.]*)
+               fail "Refusing to overwrite \"${versionfile}\" with just the \
+version: its content is not a bare version and no version key was given. \
+Specify a key (e.g. \"${versionfile}:version\")."
+            ;;
+         esac
+      fi
+
       redirect_exekutor "${versionfile}" printf "%s\n" "$version"
       return
    fi
