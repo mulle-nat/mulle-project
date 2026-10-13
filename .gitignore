@@ -12,7 +12,6 @@ mulle-project.graffle
 obsolete-mulle-project-init
 templates/
 tmp/
-.gitignore
 .mulle-make-build-dir
 var/
 cola/wilted/
