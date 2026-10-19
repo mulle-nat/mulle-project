@@ -1,4 +1,4 @@
-## 4.6.0
+## 4.6.1
 
 feature: add `--rm` flag to mulle-gitignore to remove ignore entries
 
