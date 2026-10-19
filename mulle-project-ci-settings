@@ -292,6 +292,24 @@ Run mulle-project-add-missing-branch-identifier to make it overridable."
       matching_lines="${RVAL}"
    .done
 
+   #
+   # CAVEAT: this may become unnecessary if a future mulle-sourcetree version
+   # guarantees a stable dependency order for "list". For now it does not, so
+   # sort here.
+   #
+   # mulle-sourcetree list emits dependencies in recursive pre-order, i.e. in
+   # the line order of the (nested) sourcetree config files. That order changes
+   # whenever a config is rewritten (add/remove/fetch), so the generated scope
+   # file churns in git even though nothing changed. Sort the *source* lines by
+   # address so the output is stable. Sorting here (instead of sorting the
+   # generated file) is what keeps each dependency's comment together with its
+   # export statement.
+   #
+   if [ ! -z "${matching_lines}" ]
+   then
+      matching_lines="`printf '%s\n' "${matching_lines}" | LC_ALL=C sort`"
+   fi
+
    if [ -z "${matching_lines}" ]
    then
       log_warning "No dependencies matched (--user '${matching_users}', --repo '${matching_repos}').

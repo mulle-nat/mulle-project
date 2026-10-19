@@ -49,6 +49,7 @@ MULLE_EXECUTABLE_VERSION="0.0.1"
 
 print_flags()
 {
+   echo "   --rm    : remove matching entries instead of adding them"
    echo "   --stdin : read file values from stdin instead"
    options_technical_flags_usage "   : "
 }
@@ -65,6 +66,7 @@ Usage:
 
    Add a file or directory to the .gitignore file, if it's not already present.
    Add patterns in single quotes like for example \`*.old\`.
+   Use \`--rm\` to remove matching entries from the .gitignore file instead.
 
 Flags:
 EOF
@@ -162,10 +164,111 @@ append_to_gitignore_if_needed()
 }
 
 
+remove_from_gitignore_if_needed()
+{
+   local file="$1"
+
+   r_trim_whitespace "${file}"
+   file="${RVAL}"
+
+   case "${file}" in
+      ""|\#*)
+         return
+      ;;
+   esac
+
+   [ -f ".gitignore" ] || return
+
+   # accept both "foo" and "!foo", drop either form
+   file="${file#!}"
+
+   #
+   # Build the variations that the append side considers equivalent, with
+   # and without a leading '!', so a removal catches whatever is there.
+   #
+   local p0 p1 p2 p3 n0 n1 n2 n3
+   local directory
+
+   case "${file}" in
+      */*)
+         directory="${file##/}"
+         directory="${directory%%/}"
+
+         p0="${directory}"
+         p1="${directory}/"
+         p2="/${directory}"
+         p3="/${directory}/"
+      ;;
+
+      *)
+         p0="${file}"
+         p1="${file}/"
+      ;;
+   esac
+
+   n0="!${p0}"
+   [ ! -z "${p1}" ] && n1="!${p1}"
+   [ ! -z "${p2}" ] && n2="!${p2}"
+   [ ! -z "${p3}" ] && n3="!${p3}"
+
+   local output
+
+   output="`mktemp`" || fail "Couldn't create temporary file"
+
+   local pattern
+   local line
+   local skip
+   local removed='NO'
+
+   while IFS= read -r line || [ ! -z "${line}" ]
+   do
+      skip='NO'
+
+      for pattern in "${p0}" "${p1}" "${p2}" "${p3}" "${n0}" "${n1}" "${n2}" "${n3}"
+      do
+         if [ ! -z "${pattern}" -a "${line}" = "${pattern}" ]
+         then
+            skip='YES'
+            removed='YES'
+            break
+         fi
+      done
+
+      if [ "${skip}" = 'NO' ]
+      then
+         printf '%s\n' "${line}"
+      fi
+   done < .gitignore > "${output}"
+
+   if [ "${removed}" = 'NO' ]
+   then
+      rm -f "${output}"
+      log_verbose "No entry matching ${C_RESET_BOLD}${file}${C_VERBOSE} found"
+      return
+   fi
+
+   log_info "Removing \"${file}\" from \".gitignore\""
+   redirect_exekutor .gitignore cat "${output}" || fail "Couldn't update .gitignore"
+   rm -f "${output}"
+}
+
+
+process_gitignore_if_needed()
+{
+   if [ "${FLAG_RM}" = 'YES' ]
+   then
+      remove_from_gitignore_if_needed "$1"
+   else
+      append_to_gitignore_if_needed "$1"
+   fi
+}
+
+
 
 main()
 {
    local FLAG_STDIN='NO'
+   local FLAG_RM='NO'
 
    #
    # simple flag handling
@@ -185,6 +288,10 @@ main()
 
          -h*|--help|help)
             usage
+         ;;
+
+         -r|--rm)
+            FLAG_RM='YES'
          ;;
 
          --stdin)
@@ -220,7 +327,7 @@ main()
    then
       while IFS=$'\n' read -r line
       do
-         append_to_gitignore_if_needed "${line}"
+         process_gitignore_if_needed "${line}"
       done
       return 0
    fi
@@ -229,7 +336,7 @@ main()
 
    .foreachline line in "$@"
    .do
-      append_to_gitignore_if_needed "${line}"
+      process_gitignore_if_needed "${line}"
    .done
 }
 
