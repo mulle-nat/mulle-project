@@ -1,5 +1,10 @@
 ## 4.6.0
 
+feature: add `--rm` flag to mulle-gitignore to remove ignore entries
+
+* `mulle-gitignore` now accepts `-r`/`--rm` to remove matching entries from `.gitignore` instead of adding them, handling both plain and `!`-prefixed patterns as well as directory/slash variants
+* `mulle-project-ci-settings` now sorts dependency source lines by address, keeping generated scope output stable and preventing spurious churn when nested sourcetree configs are rewritten
+
 
 * dropped `amalgamate-sources.sh`, superseded by newer tooling
 * removed outdated `README-RELEASENOTES.md` instructions
